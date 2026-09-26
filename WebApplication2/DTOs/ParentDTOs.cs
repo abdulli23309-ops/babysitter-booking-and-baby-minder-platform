@@ -13,4 +13,23 @@ namespace WebApplication2.DTOs
         public string PictureAddress { get; set; }
     }
 
+    public class ParentProfileDto
+    {
+        public int Parent_ID { get; set; }
+        public string FullName { get; set; }
+        public string EmailAddress { get; set; }
+        public string Username { get; set; }
+        public string PhoneNumber { get; set; }
+        public string PictureAddress { get; set; }
+        public string Address { get; set; }
+    }
+
+    public class UpdateParentProfileDto
+    {
+        public string FullName { get; set; }
+        public string PhoneNumber { get; set; }
+        public string PictureAddress { get; set; }
+        public string Address { get; set; }
+    }
+
 }

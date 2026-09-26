@@ -5,7 +5,7 @@ using System.Web;
 
 namespace WebApplication2.DTOs
 {
-        public class SitterDTO
+    public class SitterDTO
     {
         public int Sitter_ID { get; set; }
         public string FullName { get; set; }

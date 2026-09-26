@@ -6,6 +6,7 @@ using System.Net.Http.Headers;
 using System.Web.Http;
 using System.Web.Http.Cors;
 using WebApplication2.DTOs;
+using WebApplication2.Infrastructure;
 using WebApplication2.Services.Implementations;
 using WebApplication2.Services.Interfaces;
 
@@ -55,6 +56,31 @@ namespace WebApplication2.Controllers
         public HttpResponseMessage GetRootImage(string filename)
         {
             return GetImage("default", filename);
+        }
+
+        // POST api/images/upload  (multipart/form-data, field name: "file")
+        // Stores the picture under Images/Parents or Images/Sitters based on the caller's role
+        // and returns { PictureAddress } relative path for persistence via profile update.
+        [HttpPost]
+        [Route("upload")]
+        [SessionAuthorize]
+        public IHttpActionResult UploadProfilePicture()
+        {
+            try
+            {
+                var file = System.Web.HttpContext.Current.Request.Files["file"];
+                var role = ClaimsPrincipalHelper.GetRole();
+                var relativePath = _imageService.UploadProfilePicture(file, role);
+                return Ok(new { PictureAddress = relativePath, pictureAddress = relativePath });
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest("Upload Error: " + ex.Message);
+            }
         }
     }
 }

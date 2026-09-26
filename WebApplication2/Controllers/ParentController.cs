@@ -504,5 +504,86 @@ namespace WebApplication2.Controllers
             }
         }
 
+        [HttpGet]
+        [Route("{parentId}/profile")]
+        [SessionAuthorize(Roles = "Parent")]
+        public IHttpActionResult GetProfile(int parentId)
+        {
+            if (parentId <= 0)
+                return BadRequest("Parent ID must be a positive integer.");
+
+            var current = ClaimsPrincipalHelper.GetUserId();
+            if (current != parentId)
+                return StatusCode(HttpStatusCode.Forbidden);
+
+            try
+            {
+                using (var db = new BabySitterBooking_and_BabyMinderEntities())
+                {
+                    var parent = db.Parents.FirstOrDefault(p => p.Parent_ID == parentId && !p.IsDeleted);
+                    if (parent == null)
+                        return Content(HttpStatusCode.NotFound, "Parent profile not found.");
+
+                    var profile = new ParentProfileDto
+                    {
+                        Parent_ID = parent.Parent_ID,
+                        FullName = parent.FullName,
+                        EmailAddress = parent.EmailAddress,
+                        Username = parent.Username,
+                        PhoneNumber = parent.PhoneNumber,
+                        PictureAddress = parent.PictureAddress,
+                        Address = parent.Address
+                    };
+
+                    return Ok(profile);
+                }
+            }
+            catch (Exception ex)
+            {
+                return BadRequest("Error retrieving profile: " + ex.Message);
+            }
+        }
+
+        [HttpPut]
+        [Route("{parentId}/profile")]
+        [SessionAuthorize(Roles = "Parent")]
+        public IHttpActionResult UpdateProfile(int parentId, [FromBody] UpdateParentProfileDto dto)
+        {
+            if (parentId <= 0)
+                return BadRequest("Parent ID must be a positive integer.");
+            if (dto == null)
+                return BadRequest("Update data is required.");
+
+            var current = ClaimsPrincipalHelper.GetUserId();
+            if (current != parentId)
+                return StatusCode(HttpStatusCode.Forbidden);
+
+            try
+            {
+                using (var db = new BabySitterBooking_and_BabyMinderEntities())
+                {
+                    var parent = db.Parents.FirstOrDefault(p => p.Parent_ID == parentId && !p.IsDeleted);
+                    if (parent == null)
+                        return Content(HttpStatusCode.NotFound, "Parent profile not found.");
+
+                    if (dto.FullName != null)
+                        parent.FullName = dto.FullName;
+                    if (dto.PhoneNumber != null)
+                        parent.PhoneNumber = dto.PhoneNumber;
+                    if (dto.PictureAddress != null)
+                        parent.PictureAddress = dto.PictureAddress;
+                    if (dto.Address != null)
+                        parent.Address = dto.Address;
+
+                    db.SaveChanges();
+                    return Ok(new { message = "Parent profile updated successfully." });
+                }
+            }
+            catch (Exception ex)
+            {
+                return BadRequest("Update Error: " + ex.Message);
+            }
+        }
+
     }
 }

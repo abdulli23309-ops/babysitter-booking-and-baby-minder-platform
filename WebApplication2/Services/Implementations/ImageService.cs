@@ -96,5 +96,41 @@ namespace WebApplication2.Services.Implementations
                 MimeType = mimeType
             };
         }
+
+        public string UploadProfilePicture(HttpPostedFile file, string role)
+        {
+            if (file == null)
+                throw new ArgumentException("No file provided.");
+            return UploadProfilePicture(new HttpPostedFileWrapper(file), role);
+        }
+
+        public string UploadProfilePicture(HttpPostedFileBase file, string role)
+        {
+            if (file == null || file.ContentLength == 0)
+                throw new ArgumentException("No file provided.");
+            if (file.ContentLength > 5 * 1024 * 1024)
+                throw new ArgumentException("File too large (max 5 MB).");
+
+            var ext = Path.GetExtension(file.FileName)?.ToLowerInvariant();
+            if (ext != ".jpg" && ext != ".jpeg" && ext != ".png")
+                throw new ArgumentException("Only .jpg, .jpeg, .png allowed.");
+
+            // Role claim values are the UserRole enum names ("Parent" / "Sitter") — see SessionAuthorizeAttribute.
+            var isParent = string.Equals(role, "Parent", StringComparison.OrdinalIgnoreCase);
+            var isSitter = string.Equals(role, "Sitter", StringComparison.OrdinalIgnoreCase);
+            if (!isParent && !isSitter)
+                throw new ArgumentException("Unrecognized role for profile picture upload.");
+
+            var subfolder = isParent ? "Parents" : "Sitters";
+            var fileName = Guid.NewGuid().ToString() + ext;
+            var relativePath = subfolder + "/" + fileName;
+
+            var virtualFolder = isParent ? "~/Images/Parents/" : "~/Images/Sitters/";
+            var physicalFolder = _mapPath(virtualFolder);
+            Directory.CreateDirectory(physicalFolder);
+            file.SaveAs(Path.Combine(physicalFolder, fileName));
+
+            return relativePath;
+        }
     }
 }
