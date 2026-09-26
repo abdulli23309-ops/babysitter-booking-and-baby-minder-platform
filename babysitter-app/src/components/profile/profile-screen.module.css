@@ -1,0 +1,186 @@
+/* Unified Profile screen (both roles) — Phase UNIFY-PROFILES.
+ *
+ * Only holds what the shared sitter module (features/babysitter/
+ * babysitter-profile.module.css) does not already provide verbatim:
+ * the read-only lock glyph, the ID badge, and the parent-only
+ * Children section (rows + empty state).
+ *
+ * Every token below is defined in src/styles/tokens.css (light + dark).
+ */
+
+/* ---- Read-only row affordance (Email / Username) ---- */
+.lockIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-faint);
+  flex-shrink: 0;
+  margin-left: 8px;
+}
+
+/* ---- Hero ID badge (PK-####) ---- */
+.idBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--color-text-secondary);
+}
+
+/* ---- Children section (parent only) ---- */
+.childrenSection {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sectionHeading {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--color-text);
+  letter-spacing: -0.01em;
+}
+
+.childrenList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.childRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgb(var(--surface-rgb) / 0.9);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--glass-border);
+  border-radius: 18px;
+  padding: 12px 14px;
+  box-shadow: 0 4px 16px rgb(var(--ink-rgb) / 0.04);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  user-select: none;
+}
+
+.childRow:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgb(var(--primary-rgb) / 0.1);
+}
+
+.childInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.childName {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.childMeta {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-tertiary);
+}
+
+.childChevron {
+  font-size: 20px;
+  line-height: 1;
+  color: var(--color-text-faint);
+  flex-shrink: 0;
+}
+
+.addAnotherChild {
+  align-self: center;
+  background: none;
+  border: none;
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-primary);
+  cursor: pointer;
+}
+
+.addAnotherChild:hover {
+  text-decoration: underline;
+}
+
+/* ---- Empty state (no children yet) ---- */
+.emptyCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 6px;
+  background: rgb(var(--surface-rgb) / 0.9);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px dashed var(--color-border-subtle);
+  border-radius: 20px;
+  padding: 20px 18px;
+  box-shadow: 0 6px 20px rgb(var(--ink-rgb) / 0.04);
+}
+
+.emptyIcon {
+  font-size: 30px;
+  line-height: 1;
+}
+
+.emptyTitle {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--color-text);
+}
+
+.emptyText {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text-tertiary);
+  line-height: 1.5;
+}
+
+.addChildBtn {
+  margin-top: 8px;
+  width: 100%;
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  border: none;
+  border-radius: 999px;
+  padding: 13px 20px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgb(var(--primary-rgb) / 0.25);
+  transition: all 0.2s ease;
+}
+
+.addChildBtn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgb(var(--primary-rgb) / 0.3);
+}
+
+/* ---- Profile fetch failure note ---- */
+.loadError {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-danger);
+  text-align: center;
+}

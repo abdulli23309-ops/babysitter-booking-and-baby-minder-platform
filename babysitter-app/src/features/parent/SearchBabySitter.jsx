@@ -451,7 +451,7 @@ export default function SearchBabySitter() {
           <button
             type="button"
             className={styles.userAvatarBtn}
-            onClick={() => navigate('/parent-profile')}
+            onClick={() => navigate('/my-profile')}
             aria-label="User Profile"
           >
             <UserAvatar

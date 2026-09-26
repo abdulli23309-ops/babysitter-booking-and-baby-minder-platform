@@ -34,7 +34,7 @@ const tabs = [
   { icon: 'home', label: 'Home', route: '/parent-dashboard', matches: ['/parent-dashboard', '/main-screen', '/parent-home'] },
   { icon: 'jobs', label: 'Jobs', route: '/my-jobs', matches: ['/my-jobs', '/parent-active-job', '/parent-upcoming-job', '/parent-my-jobs'] },
   { icon: 'monitor', label: 'Monitor', route: '/baby-monitoring', matches: ['/baby-monitoring', '/cry-alert', '/child-cry-alert'] },
-  { icon: 'profile', label: 'Profile', route: '/parent-profile', matches: ['/parent-profile', '/child-profile', '/set-child-profile', '/update-child-profile'] },
+  { icon: 'profile', label: 'Profile', route: '/my-profile', matches: ['/my-profile', '/child-profile', '/set-child-profile', '/update-child-profile'] },
 ];
 
 export default function ParentBottomNav() {

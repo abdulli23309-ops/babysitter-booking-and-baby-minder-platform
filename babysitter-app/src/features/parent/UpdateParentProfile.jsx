@@ -152,7 +152,7 @@ const UpdateParentProfile = () => {
       await API.updateParentProfile(parentId, payload);
       setSuccess('Profile updated.');
       setProfileFile(null); // consumed
-      setTimeout(() => navigate('/parent-profile'), 1500);
+      setTimeout(() => navigate('/my-profile'), 1500);
     } catch (err) {
       setError(err?.message || 'Could not save profile.');
     } finally {
@@ -242,7 +242,7 @@ const UpdateParentProfile = () => {
 
           {/* Save / Cancel */}
           <div style={{ display: 'flex', gap: '12px', marginTop: '20px' }}>
-            <button onClick={() => navigate('/parent-profile')} disabled={saving} style={{
+            <button onClick={() => navigate('/my-profile')} disabled={saving} style={{
               flex: 1, padding: '16px', borderRadius: '30px', background: 'var(--color-surface)',
               color: 'var(--color-text)', border: '1px solid var(--color-border)',
               fontWeight: 'bold', fontSize: '16px', cursor: saving ? 'wait' : 'pointer',

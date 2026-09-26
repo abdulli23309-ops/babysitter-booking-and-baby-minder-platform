@@ -18,7 +18,7 @@ import SetAvailability from '../features/babysitter/SetAvailability';
 import SetChildProfile from '../features/parent/SetChildProfile';
 import BabySitterDetails from '../features/parent/BabySitterDetails';
 import ChildProfile from '../features/parent/ChildProfile';
-import ParentProfileScreen from '../features/parent/ParentProfileScreen';
+import ProfileScreen from '../features/profile/ProfileScreen';
 import SearchBabysitter from '../features/parent/SearchBabySitter';
 import MyJobsScreen from '../features/parent/MyJobsScreen';
 import BookingStatus from '../features/parent/BookingStatus';
@@ -26,7 +26,6 @@ import UpdateChildProfileScreen from '../features/parent/UpdateChildProfileScree
 import UpdateParentProfile from '../features/parent/UpdateParentProfile';
 import ParentActiveJobScreen from '../features/parent/ParentActiveJobScreen';
 import ParentUpcomingJobScreen from '../features/parent/ParentUpcomingJobScreen';
-import MyProfile from '../features/babysitter/babysitterprofilescreen';
 import UpdateProfile from '../features/babysitter/UpdateProfile';
 import ActiveJobDetails from '../features/babysitter/ActiveJobDetails';
 import Earnings from '../features/babysitter/Earnings';
@@ -65,7 +64,7 @@ function App() {
               <Route path="/set-child-profile" element={<ProtectedRoute allowedRoles={['parent']}><SetChildProfile /></ProtectedRoute>} />
               <Route path="/babysitter-details" element={<ProtectedRoute allowedRoles={['parent']}><BabySitterDetails /></ProtectedRoute>} />
               <Route path="/child-profile" element={<ProtectedRoute allowedRoles={['parent']}><ChildProfile /></ProtectedRoute>} />
-              <Route path="/parent-profile" element={<ProtectedRoute allowedRoles={['parent']}><ParentProfileScreen /></ProtectedRoute>} />
+              <Route path="/parent-profile" element={<Navigate to="/my-profile" replace />} />
               <Route path="/search-babysitter" element={<ProtectedRoute allowedRoles={['parent']}><SearchBabysitter /></ProtectedRoute>} />
               <Route path="/my-jobs" element={<ProtectedRoute allowedRoles={['parent']}><MyJobsScreen /></ProtectedRoute>} />
               <Route path="/booking-status/:jobId" element={<ProtectedRoute allowedRoles={['parent']}><BookingStatus /></ProtectedRoute>} />
@@ -97,7 +96,7 @@ function App() {
               <Route path="/babysitter-dashboard" element={<ProtectedRoute allowedRoles={['babysitter']}><BabysitterDashboard /></ProtectedRoute>} />
               <Route path="/job-request" element={<ProtectedRoute allowedRoles={['babysitter']}><JobRequest /></ProtectedRoute>} />
               <Route path="/set-availability" element={<ProtectedRoute allowedRoles={['babysitter']}><SetAvailability /></ProtectedRoute>} />
-              <Route path="/my-profile" element={<ProtectedRoute allowedRoles={['babysitter']}><MyProfile /></ProtectedRoute>} />
+              <Route path="/my-profile" element={<ProtectedRoute allowedRoles={['parent', 'babysitter']}><ProfileScreen /></ProtectedRoute>} />
               <Route path="/update-profile" element={<ProtectedRoute allowedRoles={['babysitter']}><UpdateProfile /></ProtectedRoute>} />
               <Route path="/active-job-details" element={<ProtectedRoute allowedRoles={['babysitter']}><ActiveJobDetails /></ProtectedRoute>} />
               <Route path="/completed-job-details" element={<ProtectedRoute allowedRoles={['babysitter']}><CompletedJobDetails /></ProtectedRoute>} />

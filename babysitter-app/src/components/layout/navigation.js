@@ -23,7 +23,7 @@ const ROUTE_TITLES = {
   '/child-profile': 'Children Profiles',
   '/set-child-profile': 'Register Child',
   '/update-child-profile': 'Update Child Profile',
-  '/parent-profile': 'Account Profile',
+  '/parent-profile': 'My Profile',
   '/parent-active-job': 'Active Booking',
   '/parent-upcoming-job': 'Upcoming Booking',
   '/baby-monitoring': 'Baby Monitor',
@@ -38,7 +38,7 @@ const ROUTE_TITLES = {
   '/job-request': 'Job Invitations',
   '/set-availability': 'Availability',
   '/babysitter-my-jobs': 'My Jobs',
-  '/my-profile': 'Caregiver Profile',
+  '/my-profile': 'My Profile',
   '/update-profile': 'Update Profile',
   '/active-job-details': 'Active Job',
   '/upcoming-job-details': 'Upcoming Job',
@@ -90,7 +90,7 @@ const PARENT_ITEMS = [
   { id: 'baby-monitoring', icon: 'camera', label: 'Baby Monitor', route: '/baby-monitoring' },
   { id: 'cry-detector', icon: 'wave', label: 'Cry Detector', route: '/cry-detector' },
   { id: 'parent-notifications', icon: 'bell', label: 'Notifications', route: '/parent-notifications' },
-  { id: 'parent-profile', icon: 'user', label: 'Account Profile', route: '/parent-profile' },
+  { id: 'parent-profile', icon: 'user', label: 'My Profile', route: '/my-profile' },
   { id: 'support', icon: 'help', label: 'Help & Support', route: '/support' },
 ];
 
@@ -103,7 +103,7 @@ const BABYSITTER_ITEMS = [
   { id: 'ratings', icon: 'star', label: 'Ratings & Feedback', route: '/ratings' },
   { id: 'cry-detector', icon: 'wave', label: 'Cry Detector', route: '/cry-detector' },
   { id: 'babysitter-notifications', icon: 'bell', label: 'Notifications', route: '/babysitter-notifications' },
-  { id: 'my-profile', icon: 'user', label: 'Caregiver Profile', route: '/my-profile' },
+  { id: 'my-profile', icon: 'user', label: 'My Profile', route: '/my-profile' },
   { id: 'support', icon: 'help', label: 'Help & Support', route: '/support' },
 ];
 
