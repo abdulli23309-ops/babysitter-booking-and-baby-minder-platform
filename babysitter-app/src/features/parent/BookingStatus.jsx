@@ -401,65 +401,6 @@ export default function BookingStatus() {
           />
         )}
 
-        {/* Phase 8B — parent/sitter parity: the sitter's "Job Summary" shows a
-            Care Schedule card (date + slots), an actual-session row and a
-            Session/Total row. The parent history screen rendered none of these,
-            so the two ?series=history screens were not comparable. The parent's
-            own "Booking Details" card still stays above for the open/active
-            flow; this block only fills the parity gap below the pagination. */}
-        <div
-          style={{ background: 'var(--color-surface)', borderRadius: 20, padding: 20, marginBottom: 16, boxShadow: '0 4px 16px rgb(var(--ink-rgb) / 0.04)', border: '1px solid var(--color-border-subtle)' }}
-        >
-          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 14 }}>Care Schedule</div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-            <span>📅</span>
-            <div>
-              <div style={{ fontSize: 12, color: 'var(--color-text-faint)', fontWeight: 600 }}>Date</div>
-              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)' }}>
-                {job.JobDate ? new Date(job.JobDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : 'Date to be confirmed'}
-              </div>
-            </div>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 12 }}>
-            <span>🕒</span>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 12, color: 'var(--color-text-faint)', fontWeight: 600 }}>Time</div>
-              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)' }}>
-                {careTimeRange}
-              </div>
-            </div>
-          </div>
-          {sessionStartedAt && (
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 12 }}>
-              <span>⏱️</span>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 12, color: 'var(--color-text-faint)', fontWeight: 600 }}>Session</div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)' }}>
-                  {sessionLabel}
-                </div>
-              </div>
-            </div>
-          )}
-          {job.Payment != null && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-              <span>💰</span>
-              <div>
-                <div style={{ fontSize: 12, color: 'var(--color-text-faint)', fontWeight: 600 }}>Session Amount</div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-success-strong)' }}>PKR {Number(job.Payment).toLocaleString()}</div>
-              </div>
-            </div>
-          )}
-          {job.JobSeries_ID != null && job.SeriesTotalPayment != null && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <span>🧾</span>
-              <div>
-                <div style={{ fontSize: 12, color: 'var(--color-text-faint)', fontWeight: 600 }}>Total (series)</div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)' }}>PKR {Number(job.SeriesTotalPayment).toLocaleString()}</div>
-              </div>
-            </div>
-          )}
-        </div>
-
         {/* Phase 8C: /parent-upcoming-job (ParentUpcomingJobScreen) was routed in
             App.jsx but had ZERO callers, so the parent could never reach its
             "Start Session Now" / "Cancel Booking" actions. Offer it on an
@@ -682,40 +623,127 @@ export default function BookingStatus() {
           </div>
         )}
 
-        <div style={{ background: 'var(--color-surface)', borderRadius: 20, padding: 20, boxShadow: '0 4px 16px rgb(var(--ink-rgb) / 0.04)', border: '1px solid var(--color-border-subtle)' }}>
+        <div style={{ background: 'var(--color-surface)', borderRadius: 20, padding: 20, boxShadow: '0 4px 16px rgb(var(--ink-rgb) / 0.04)', border: '1px solid var(--color-border-subtle)', marginBottom: 16 }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 14 }}>Booking Details</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {job.Title && (
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                <span>📝</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 12, color: 'var(--color-text-faint)', fontWeight: 600 }}>Title</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)' }}>{job.Title}</div>
+                </div>
+              </div>
+            )}
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <span>📅</span>
               <div>
                 <div style={{ fontSize: 12, color: 'var(--color-text-faint)', fontWeight: 600 }}>Date</div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)' }}>{job.JobDate ? new Date(job.JobDate).toLocaleDateString() : '—'}</div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)' }}>
+                  {job.JobDate
+                    ? new Date(job.JobDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+                    : 'Date to be confirmed'}
+                </div>
               </div>
             </div>
+            {careTimeRange && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span>🕒</span>
+                <div>
+                  <div style={{ fontSize: 12, color: 'var(--color-text-faint)', fontWeight: 600 }}>Time</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)' }}>{careTimeRange}</div>
+                </div>
+              </div>
+            )}
+            {sessionStartedAt && (
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                <span>⏱️</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 12, color: 'var(--color-text-faint)', fontWeight: 600 }}>Session</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)' }}>{sessionLabel}</div>
+                </div>
+              </div>
+            )}
             {job.City && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <span>📍</span>
-                <div>
+                <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 12, color: 'var(--color-text-faint)', fontWeight: 600 }}>City</div>
                   <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)' }}>{job.City}</div>
                 </div>
+                {job.Latitude != null && job.Longitude != null && (
+                  <a
+                    href={`https://www.google.com/maps?q=${job.Latitude},${job.Longitude}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      fontSize: 12,
+                      fontWeight: 700,
+                      color: 'var(--color-primary)',
+                      textDecoration: 'none',
+                      padding: '4px 10px',
+                      borderRadius: 999,
+                      background: 'var(--color-primary-tint)',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    Directions →
+                  </a>
+                )}
               </div>
             )}
             {job.Payment != null && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <span>💰</span>
                 <div>
-                  <div style={{ fontSize: 12, color: 'var(--color-text-faint)', fontWeight: 600 }}>Payment</div>
+                  <div style={{ fontSize: 12, color: 'var(--color-text-faint)', fontWeight: 600 }}>Session Amount</div>
                   <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-success-strong)' }}>PKR {Number(job.Payment).toLocaleString()}</div>
                 </div>
               </div>
             )}
+            {job.JobSeries_ID != null && job.SeriesTotalPayment != null && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span>🧾</span>
+                <div>
+                  <div style={{ fontSize: 12, color: 'var(--color-text-faint)', fontWeight: 600 }}>
+                    {job.SeriesOccurrenceIndex != null && job.SeriesTotalCount != null
+                      ? `Series Total · Day ${job.SeriesOccurrenceIndex} of ${job.SeriesTotalCount}`
+                      : 'Series Total'}
+                  </div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)' }}>PKR {Number(job.SeriesTotalPayment).toLocaleString()}</div>
+                </div>
+              </div>
+            )}
+            {Array.isArray(job.Children) && job.Children.length > 0 ? (
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                <span>👶</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 12, color: 'var(--color-text-faint)', fontWeight: 600 }}>
+                    {job.Children.length === 1 ? 'Child' : `Children (${job.Children.length})`}
+                  </div>
+                  {job.Children.map((c, idx) => (
+                    <div key={c.Child_ID ?? idx} style={{ fontSize: 13, color: 'var(--color-text)', marginTop: idx === 0 ? 2 : 4 }}>
+                      <span style={{ fontWeight: 600 }}>{c.ChildName}</span>
+                      {c.ChildAge != null && <span style={{ color: 'var(--color-text-muted)' }}> · {c.ChildAge}y</span>}
+                      {c.SpecialRequirements && (
+                        <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 1 }}>
+                          ⚠️ {c.SpecialRequirements}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : job.ChildName ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span>👶</span>
+                <div>
+                  <div style={{ fontSize: 12, color: 'var(--color-text-faint)', fontWeight: 600 }}>Child</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)' }}>{job.ChildName}</div>
+                </div>
+              </div>
+            ) : null}
           </div>
-          {formatChildren(job) && (
-            <p style={{ marginTop: 4, fontSize: 13, color: 'var(--color-text-muted)' }}>
-              {formatChildren(job)}
-            </p>
-          )}
         </div>
 
         {/* Parent-side live tracking entry point — only while the session runs.
