@@ -136,6 +136,13 @@ export const API = {
   updateSitterProfile: (sitterId, payload) =>
     apiPut(`/babysitter/update/${sitterId}`, payload),
 
+  // ---- Profile picture upload (POST api/images/upload) ----
+  // Multipart body with a single "file" field. Returns { PictureAddress: "Sitters/<guid>.jpg" }.
+  // Same shape/convention as createChild / updateChild above.
+  uploadProfilePicture: (formData) => apiPost('/images/upload', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }),
+
   // ---- Parent: create job (replaces raw fetch in BabySitterDetails.jsx) ----
   createJob: (payload) => apiPost('/parent/create-job', payload),
 

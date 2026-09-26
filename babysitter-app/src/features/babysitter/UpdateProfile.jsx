@@ -8,16 +8,10 @@ import { useAuth } from '../auth/AuthContext';
 
 const orange = 'var(--color-primary)';
 
-const buildImageUrl = (pic) => {
-  if (!pic) return null;
-  if (pic.startsWith('http') || pic.startsWith('data:')) return pic;
-  const parts = pic.split('/');
-  if (parts.length === 2) {
-    const [type, filename] = parts;
-    return `/api/images/${type}/${filename}`;
-  }
-  return `/api/images/default/${pic}`;
-};
+// NOTE: the local buildImageUrl() helper was removed. UserAvatar already resolves a
+// relative "Type/file.jpg" path through getAvatarUrl(), so pre-prefixing it here produced
+// a double-prefixed URL ("/api/images/Parents/api/images/Sitters/x.jpg") and the avatar
+// always fell back to the letter circle. The raw PictureAddress is now passed straight in.
 
 const Icons = {
   arrowBack: () => (
@@ -61,26 +55,21 @@ const UpdateProfile = () => {
   const sitterId = Number(user?.userId || localStorage.getItem('userId'));
 
   const fileInputRef = useRef(null);
-  const updateFileRef = useRef(null);
-  const [loading, setLoading] = useState(false);
   const [isLoading, setIsLoading] = useState(() => Boolean(sitterId));
-  const [message, setMessage] = useState('');
   const [profileImage, setProfileImage] = useState(null);
+  const [profileFile, setProfileFile] = useState(null); // ← the actual File chosen for upload
   const [originalProfile, setOriginalProfile] = useState(null);
 
   const [form, setForm] = useState({
     fullName: '',
-    cnic: '',
-    dob: '',
-    gender: 'Female',
-    professionalTitle: '',
-    preferredChildAge: 'Toddlers (1-4 years)',
-    experienceYears: '',
-    location: '',
-    fullAddress: '',
     contactNo: '',
-    experienceSummary: '',
+    dob: '',
+    experienceYears: '',
+    hourlyRate: '',
   });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -89,21 +78,17 @@ const UpdateProfile = () => {
         setOriginalProfile(data);
         setForm({
           fullName: data.FullName || '',
-          cnic: data.CNIC || '',
-          dob: data.DOB ? data.DOB.split('T')[0] : '',
-          gender: data.Gender || 'Female',
-          professionalTitle: data.ProfessionalTitle || '',
-          preferredChildAge: data.PreferredChildAge || 'Toddlers (1-4 years)',
-          experienceYears: data.ExperienceYears != null ? String(data.ExperienceYears) : '',
-          location: data.City || '',
-          fullAddress: data.Address || '',
           contactNo: data.PhoneNumber || '',
-          experienceSummary: data.Bio || '',
+          dob: data.DOB ? data.DOB.slice(0, 10) : '',
+          experienceYears: data.ExperienceYears != null ? String(data.ExperienceYears) : '',
+          hourlyRate: data.HourlyRate != null ? String(data.HourlyRate) : '',
         });
-        setProfileImage(buildImageUrl(data.PictureAddress));
-            } catch (err) {
+        // Keep the RAW "Type/file.jpg" path — UserAvatar -> getAvatarUrl() prefixes it
+        // exactly once. Prefixing here as well double-prefixed the URL and broke the image.
+        if (data.PictureAddress) setProfileImage(data.PictureAddress);
+      } catch (err) {
         console.error(err);
-        setMessage('Could not load profile.');
+        setError('Could not load profile.');
       } finally {
         setIsLoading(false);
       }
@@ -115,14 +100,15 @@ const UpdateProfile = () => {
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (!['image/jpeg', 'image/jpg', 'image/png'].includes(file.type)) {
-      setMessage('Only JPG/PNG images allowed');
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Image must be under 5 MB.');
       return;
     }
+    setProfileFile(file);
     const reader = new FileReader();
-    reader.onload = () => { setProfileImage(reader.result); setMessage(''); };
+    reader.onload = () => setProfileImage(reader.result);
     reader.readAsDataURL(file);
-    updateFileRef.current = file;
+    setError('');
   };
 
   const handleChange = (field, value) => {
@@ -130,37 +116,51 @@ const UpdateProfile = () => {
   };
 
   const handleSave = async () => {
-    setLoading(true);
-    setMessage('');
+    setError('');
+    setSuccess('');
 
-    // Map to the new backend UpdateSitterDto (PUT api/babysitter/update/{sitterId}).
-    // Only existing Babysitter columns are available on API-C; fields like CNIC, City,
-    // Gender, Bio/Address are DOCUMENT ONLY (no schema column) and are intentionally omitted.
-    const payload = {
-      FullName: form.fullName || undefined,
-      PhoneNumber: form.contactNo || undefined,
-      DOB: form.dob ? new Date(form.dob).toISOString() : undefined,
-      ExperienceYears: form.experienceYears !== '' && !Number.isNaN(Number(form.experienceYears))
-        ? Number(form.experienceYears)
-        : undefined,
-      PictureAddress:
-        originalProfile?.PictureAddress
-          ? originalProfile.PictureAddress
-          : undefined,
-    };
-    // Only send non-empty values.
-    const cleanPayload = Object.fromEntries(
-      Object.entries(payload).filter(([, v]) => v !== undefined && v !== null && v !== '')
-    );
+    // Required fields
+    if (!form.fullName.trim()) { setError('Full name is required.'); return; }
+    if (!form.dob) { setError('Date of birth is required.'); return; }
+    if (!form.contactNo.trim()) { setError('Phone number is required.'); return; }
 
+    setSaving(true);
     try {
-      await API.updateSitterProfile(sitterId, cleanPayload);
-      setMessage('Profile updated successfully!');
+      // 1. If a new file was chosen, upload it first and use the returned path.
+      let newPicturePath;
+      if (profileFile) {
+        const fd = new FormData();
+        fd.append('file', profileFile);
+        const uploadRes = await API.uploadProfilePicture(fd);
+        newPicturePath = uploadRes?.PictureAddress;
+        if (!newPicturePath) throw new Error('Image upload failed.');
+      }
+
+      // 2. Build the update payload from fields that map to real Babysitter columns
+      //    (PUT api/babysitter/update/{sitterId}). CNIC / Gender / City / Address / Bio
+      //    have no column on this API and are no longer collected by this form.
+      const payload = {
+        FullName: form.fullName.trim(),
+        PhoneNumber: form.contactNo.trim() || null,
+        DOB: form.dob ? new Date(form.dob).toISOString() : null,
+        ExperienceYears: form.experienceYears ? Number(form.experienceYears) : null,
+        HourlyRate: form.hourlyRate ? Number(form.hourlyRate) : null,
+      };
+      if (newPicturePath) payload.PictureAddress = newPicturePath;
+
+      // 3. Remove nulls so the backend's `if (dto.X != null)` guards skip untouched fields.
+      Object.keys(payload).forEach((k) => {
+        if (payload[k] === null) delete payload[k];
+      });
+
+      await API.updateSitterProfile(sitterId, payload);
+      setSuccess('Profile updated.');
+      setProfileFile(null); // consumed
       setTimeout(() => navigate('/my-profile'), 1500);
     } catch (err) {
-      setMessage(err?.message || 'Update failed');
+      setError(err?.message || 'Could not save profile.');
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
@@ -239,51 +239,28 @@ const UpdateProfile = () => {
           </div>
 
           <CardField label="FULL NAME" value={form.fullName} onChange={(v) => handleChange('fullName', v)} locked />
-          <CardField label="CNIC / ID NUMBER" value={form.cnic} onChange={(v) => handleChange('cnic', v)} locked />
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <div style={{ flex: 1 }}>
-              <CardField label="DOB" type="date" value={form.dob} onChange={(v) => handleChange('dob', v)} locked />
-            </div>
-            <div style={{ flex: 1 }}>
-              <label style={labelStyle}>GENDER</label>
-              <div style={{ ...cardStyle, marginBottom: 0 }}>
-                <span style={{ fontSize: '14px', color: 'var(--color-text)' }}>{form.gender}</span>
-                <Icons.lock />
-              </div>
-            </div>
-          </div>
+          <CardField label="DOB" type="date" value={form.dob} onChange={(v) => handleChange('dob', v)} locked />
         </div>
 
         {/* Professional Experience */}
         <SectionHeader icon="📝" title="Professional Experience" />
-        <InputField label="PROFESSIONAL TITLE" value={form.professionalTitle} onChange={(v) => handleChange('professionalTitle', v)} />
         <InputField label="EXPERIENCE (YEARS)" type="number" min="0" value={form.experienceYears} onChange={(v) => handleChange('experienceYears', v)} />
-        <label style={labelStyle}>PREFERRED CHILD AGE</label>
-        <div style={{ position: 'relative', marginBottom: '12px' }}>
-          <select value={form.preferredChildAge} onChange={(e) => handleChange('preferredChildAge', e.target.value)} style={{ ...inputStyle, marginBottom: 0, appearance: 'none', paddingRight: '40px', cursor: 'pointer' }}>
-            <option>Toddlers (1-4 years)</option>
-            <option>Infants (0-1 year)</option>
-            <option>Kids (4-8 years)</option>
-            <option>Pre-teens (8-12 years)</option>
-          </select>
-          <Icons.chevronDown style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
-        </div>
-        <div style={{ position: 'relative' }}>
-          <InputField label="LOCATION" value={form.location} onChange={(v) => handleChange('location', v)} />
-          <Icons.location style={{ position: 'absolute', right: '14px', top: '40px', transform: 'translateY(-50%)' }} />
-        </div>
-        <InputField label="FULL ADDRESS" value={form.fullAddress} onChange={(v) => handleChange('fullAddress', v)} />
-        <InputField label="CONTACT NO" type="tel" value={form.contactNo} onChange={(v) => handleChange('contactNo', v)} />
-        <label style={labelStyle}>EXPERIENCE SUMMARY</label>
-        <textarea
-          style={{ ...inputStyle, height: '120px', resize: 'none', verticalAlign: 'top', fontFamily: 'inherit', lineHeight: '1.5' }}
-          value={form.experienceSummary}
-          onChange={(e) => handleChange('experienceSummary', e.target.value)}
+        <label style={labelStyle}>HOURLY RATE (PKR)</label>
+        <input
+          type="number"
+          min="0"
+          step="50"
+          value={form.hourlyRate}
+          onChange={(e) => setForm({ ...form, hourlyRate: e.target.value })}
+          placeholder="e.g. 750"
+          style={inputStyle}
         />
+        <InputField label="CONTACT NO" type="tel" value={form.contactNo} onChange={(v) => handleChange('contactNo', v)} />
 
-        {message && <p style={{ color: message.includes('success') ? '#27ae60' : '#e74c3c', textAlign: 'center', margin: '10px 0' }}>{message}</p>}
+        {error && <p style={{ color: '#e74c3c', textAlign: 'center', margin: '10px 0' }}>{error}</p>}
+        {success && <p style={{ color: '#27ae60', textAlign: 'center', margin: '10px 0' }}>{success}</p>}
 
-        <button onClick={handleSave} disabled={loading} style={{
+        <button onClick={handleSave} disabled={saving} style={{
           width: '100%', padding: '16px', borderRadius: '30px',
           background: 'linear-gradient(to right, var(--color-warning), var(--color-warning-strong))',
           color: 'var(--color-text-inverse)', border: 'none', fontWeight: 'bold', fontSize: '16px',
