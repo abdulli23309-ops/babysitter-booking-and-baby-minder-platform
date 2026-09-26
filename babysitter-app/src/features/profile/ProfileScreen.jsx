@@ -435,7 +435,7 @@ export default function ProfileScreen() {
 
       <Modal
         isOpen={showDeactivateModal}
-        onClose={() => setShowDeactivateModal(false)}
+        onClose={() => { if (!isDeactivating) setShowDeactivateModal(false); }}
         title="Deactivate Account?"
       >
         <p style={{ margin: 0, color: 'var(--color-text-secondary)', fontSize: '14px', lineHeight: 1.6 }}>
