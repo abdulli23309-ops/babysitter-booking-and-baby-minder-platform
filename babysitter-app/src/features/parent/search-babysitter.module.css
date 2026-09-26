@@ -569,3 +569,32 @@
 .clearFiltersBtn:active {
   transform: scale(0.97);
 }
+
+/* Phase 8I follow-up: the empty state's three "widen the search" actions are
+   secondary to "Clear All Filters", so they drop the filled primary pill for an
+   outline style. Without this all four buttons rendered identically and read as
+   one overlapping block. */
+.widenBtn {
+  width: 100%;
+  padding: 12px 20px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-text);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.widenBtn:hover {
+  background: var(--color-surface-muted);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.widenBtn:active {
+  transform: scale(0.98);
+}
+

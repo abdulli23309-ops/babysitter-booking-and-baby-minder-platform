@@ -6,7 +6,7 @@ import UserAvatar from '../../components/ui/UserAvatar';
 import { useAuth } from '../auth/AuthContext';
 import { useToast } from '../../components/ui/ToastContext';
 import { API } from '../../services/api';
-import { formatLocalDate } from '../../utils/dateUtils';
+import { formatLocalDate, todayISO, addDaysISO } from '../../utils/dateUtils';
 import LocationPointPicker from '../../components/ui/LocationPointPicker';
 import styles from './search-babysitter.module.css';
 
@@ -91,8 +91,12 @@ export default function SearchBabySitter() {
   // Filter States (Phase F-UI-12: Age Group & Experience removed)
   const [city, setCity] = useState(stored?.city ?? '');
   const [availabilityType, setAvailabilityType] = useState(stored?.availabilityType || 'Repeat Days');
-  const [startDate, setStartDate] = useState(stored?.startDate || '2026-10-12');
-  const [endDate, setEndDate] = useState(stored?.endDate || '2026-11-12');
+  const [startDate, setStartDate] = useState(
+    stored?.startDate || todayISO()
+  );
+  const [endDate, setEndDate] = useState(
+    stored?.endDate || addDaysISO(todayISO(), 29)
+  );
   const [startTime, setStartTime] = useState(stored?.startTime || '08:00 AM');
   const [endTime, setEndTime] = useState(stored?.endTime || '05:00 PM');
   const [timeError, setTimeError] = useState('');
@@ -348,8 +352,8 @@ export default function SearchBabySitter() {
     const defaults = {
       city: '',
       availabilityType: 'Repeat Days',
-      startDate: '2026-10-12',
-      endDate: '2026-11-12',
+      startDate: todayISO(),
+      endDate: addDaysISO(todayISO(), 29),
       startTime: '08:00 AM',
       endTime: '05:00 PM',
       selectedDays: {
@@ -736,13 +740,23 @@ export default function SearchBabySitter() {
                 instead of a dead end. Only shown once a search has actually
                 completed, so it never appears on a fresh/loading screen. */}
             {lastSearchRan && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 16 }}>
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 8,
+                  marginTop: 16,
+                  width: '100%',
+                  maxWidth: 320,
+                }}
+              >
                 {emptyStateCriteria && (
                   <p
                     style={{
                       margin: '0 0 4px',
                       fontSize: 12,
                       color: 'var(--color-text-tertiary)',
+                      textAlign: 'center',
                     }}
                   >
                     No one has published availability for {emptyStateCriteria}.
@@ -750,7 +764,7 @@ export default function SearchBabySitter() {
                 )}
                 <button
                   type="button"
-                  className={styles.clearFiltersBtn}
+                  className={styles.widenBtn}
                   onClick={() => {
                     setMinRating(0);
                     fetchSitters({ minRating: 0 });
@@ -760,7 +774,7 @@ export default function SearchBabySitter() {
                 </button>
                 <button
                   type="button"
-                  className={styles.clearFiltersBtn}
+                  className={styles.widenBtn}
                   onClick={() => {
                     setStartTime('06:00 AM');
                     setEndTime('10:00 PM');
@@ -771,7 +785,7 @@ export default function SearchBabySitter() {
                 </button>
                 <button
                   type="button"
-                  className={styles.clearFiltersBtn}
+                  className={styles.widenBtn}
                   onClick={() => {
                     setStartDate('');
                     setEndDate('');
@@ -780,12 +794,23 @@ export default function SearchBabySitter() {
                 >
                   Search a different day
                 </button>
+                <p
+                  style={{
+                    margin: '8px 0 4px',
+                    fontSize: 12,
+                    color: 'var(--color-text-tertiary)',
+                    textAlign: 'center',
+                  }}
+                >
+                  or
+                </p>
               </div>
             )}
             <button
               type="button"
               className={styles.clearFiltersBtn}
               onClick={handleResetFilters}
+              style={{ marginTop: lastSearchRan ? 0 : 16 }}
             >
               Clear All Filters
             </button>

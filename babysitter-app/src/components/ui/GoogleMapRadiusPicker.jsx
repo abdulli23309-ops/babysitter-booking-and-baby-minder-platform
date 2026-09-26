@@ -107,6 +107,11 @@ export default function GoogleMapRadiusPicker({
       if (changed) {
         lastCenterRef.current = center;
         setPosition(center);
+        // Phase 8P: without this the marker moves but the map stays on
+        // whatever center MapContainer mounted with (react-leaflet's
+        // `center` prop is mount-only, so <Recenter> is the only way to
+        // follow an external prop change).
+        setRecenterTrigger((t) => t + 1);
       }
     }
   }, [center]);

@@ -464,13 +464,17 @@ export default function SetAvailability() {
             r.RadiusKm === latest.RadiusKm
           );
 
-          // 3. Hydrate the map + radius from that save
-          setMapPosition({ lat: latest.Latitude, lng: latest.Longitude });
-          setMapRadiusKm(latest.RadiusKm ?? 3);
-          // Pin was restored from saved data — suppress the geolocation
-          // auto-detect effect so it cannot overwrite the saved pin.
+          // 3. Hydrate the map + radius from that save.
+          // Null-guarded: a row saved without coordinates must never produce a
+          // truthy { lat: null, lng: null } position, which would drive the
+          // Leaflet marker to [null, null]. When coords are missing we leave
+          // the map at whatever it is (default Islamabad) instead.
           if (latest.Latitude != null && latest.Longitude != null) {
+            // Pin was restored from saved data — suppress the geolocation
+            // auto-detect effect so it cannot overwrite the saved pin.
             hydratedFromServer.current = true;
+            setMapPosition({ lat: latest.Latitude, lng: latest.Longitude });
+            setMapRadiusKm(latest.RadiusKm ?? 3);
           }
           // 3b. Hydrate the per-availability rate (falls back to the
           // profile default already loaded if the row has NULL rate)
