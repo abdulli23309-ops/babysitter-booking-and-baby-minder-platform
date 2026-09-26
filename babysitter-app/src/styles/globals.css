@@ -1,0 +1,187 @@
+/* ============================================================
+   Phase F2 & Phase F-UI — Global styles
+   Universal Box-Sizing & Mobile Resets
+   ============================================================ */
+
+/* Universal box-sizing reset across all elements, pseudo-elements */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+/* Keyboard-only focus ring */
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* Mobile-app touch ergonomics and antialiasing */
+html, body {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  scroll-behavior: smooth;
+  font-family: var(--font-sans, system-ui, sans-serif);
+}
+
+/* Base button and interactive resets */
+button, a {
+  -webkit-touch-callout: none;
+  user-select: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ============================================================
+   Phase F-UI-11 (Phase 1) — Interaction polish & theme plumbing
+   ------------------------------------------------------------
+   Every selector below is wrapped in :where() so its specificity is
+   ZERO. Component CSS-module rules therefore always win, which makes
+   these global rules bleeding-proof by construction.
+   ============================================================ */
+
+/* Theme is driven by data-theme on <html>; it is applied pre-paint by
+   the inline bootstrap script in index.html to avoid a theme flash. */
+:root {
+  color-scheme: light;
+}
+
+[data-theme='dark'] {
+  color-scheme: dark;
+}
+
+/* Keyboard focus ring (restated so it stays visible in dark mode). */
+[data-theme='dark'] :focus-visible {
+  outline-color: var(--color-primary);
+}
+
+/* Global affordance: every clickable control eases its visual state
+   instead of snapping. Components that declare their own transition win. */
+:where(button, a[href], [role='button'], summary) {
+  transition:
+    background-color var(--transition-base),
+    border-color var(--transition-base),
+    color var(--transition-base),
+    box-shadow var(--transition-base),
+    filter var(--transition-base),
+    opacity var(--transition-base);
+}
+
+/* Hover feedback — pointer devices only (touch screens never hover). */
+@media (hover: hover) and (pointer: fine) {
+  /* Solid / filled controls dim slightly on hover. */
+  :where(button, a[href], [role='button']):not(:disabled):not([aria-disabled='true']):hover {
+    filter: brightness(0.96);
+  }
+
+  /* Long-form links keep full contrast; they get an underline cue instead. */
+  :where(a[href]):hover {
+    filter: none;
+    text-decoration-color: currentColor;
+  }
+
+  summary:hover {
+    filter: brightness(0.96);
+  }
+}
+
+/* Pressed feedback — mouse, touch and pen all get the same tactile cue. */
+:where(button, a[href], [role='button']):not(:disabled):not([aria-disabled='true']):active {
+  filter: brightness(0.92);
+}
+
+/* The skip-link target is a <main> region: it must receive focus without
+   drawing a ring around the entire page. */
+[tabindex='-1']:focus,
+[tabindex='-1']:focus-visible {
+  outline: none;
+}
+
+/* ============================================================
+   Phase 4 (Batch B, Step 6) — Print stylesheet
+   Physical printing should capture the job/booking content only:
+   chrome (header, drawer, FABs, banner, progress bar) is hidden,
+   and surfaces are forced to a clean white-on-black palette that
+   doesn't depend on the active theme.
+   ============================================================ */
+@media print {
+  /* App chrome — never printed */
+  header,
+  nav,
+  aside,
+  [class*='stickyHeader'],
+  [class*='mobileMenu'],
+  [class*='drawer'],
+  [class*='fab'],
+  [class*='floating'],
+  [class*='scrollProgress'],
+  [class*='cookieBanner'],
+  [class*='bottomNav'],
+  [class*='skipLink'],
+  [class*='themeToggle'] {
+    display: none !important;
+  }
+
+  /* Clean paper palette, independent of light/dark theme */
+  html,
+  body,
+  #root {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  /* Cards/surfaces: strip tints, shadows and gradients; keep hairline borders */
+  *,
+  *::before,
+  *::after {
+    background-image: none !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  [class*='card'],
+  [class*='surface'],
+  section,
+  article {
+    background: #ffffff !important;
+    color: #000000 !important;
+    border: 1px solid #cccccc !important;
+    break-inside: avoid;
+  }
+
+  a[href^='http']::after {
+    content: ' (' attr(href) ')';
+    font-size: 10px;
+    color: #555555;
+  }
+
+  /* Main content fills the page width */
+  main,
+  [class*='content'],
+  [class*='shell'] {
+        max-width: 100% !important;
+    width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+}
+
+/* Skeleton loader shimmer pulse (shared by inline / CSS-driven loaders) */
+@keyframes pulse {
+  0%   { opacity: 0.55; }
+  50%  { opacity: 1; }
+  100% { opacity: 0.55; }
+}
+
+
+

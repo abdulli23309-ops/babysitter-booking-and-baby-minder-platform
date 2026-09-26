@@ -1,0 +1,949 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<edmx:Edmx Version="3.0" xmlns:edmx="http://schemas.microsoft.com/ado/2009/11/edmx">
+  <!-- EF Runtime content -->
+  <edmx:Runtime>
+    <!-- SSDL content -->
+    <edmx:StorageModels>
+      <Schema Namespace="Model.Store" Provider="System.Data.SqlClient" ProviderManifestToken="2012" Alias="Self" xmlns:store="http://schemas.microsoft.com/ado/2007/12/edm/EntityStoreSchemaGenerator" xmlns:customannotation="http://schemas.microsoft.com/ado/2013/11/edm/customannotation" xmlns="http://schemas.microsoft.com/ado/2009/11/edm/ssdl">
+        <EntityType Name="Babysitter">
+          <Key>
+            <PropertyRef Name="Sitter_ID" />
+          </Key>
+          <Property Name="Sitter_ID" Type="int" StoreGeneratedPattern="Identity" Nullable="false" />
+          <Property Name="FullName" Type="nvarchar" MaxLength="150" Nullable="false" />
+          <Property Name="EmailAddress" Type="nvarchar" MaxLength="150" Nullable="false" />
+          <Property Name="Username" Type="nvarchar" MaxLength="50" Nullable="false" />
+          <Property Name="Password" Type="nvarchar" MaxLength="255" Nullable="false" />
+          <Property Name="PhoneNumber" Type="nvarchar" MaxLength="20" />
+          <Property Name="PictureAddress" Type="nvarchar(max)" />
+          <Property Name="DOB" Type="date" Nullable="false" />
+          <Property Name="ExperienceYears" Type="int" />
+          <Property Name="HourlyRate" Type="decimal" Precision="10" Scale="2" />
+          <Property Name="AvailabilityStatus" Type="nvarchar" MaxLength="50" />
+          <Property Name="CreatedAt" Type="datetime" />
+          <Property Name="IsDeleted" Type="bit" Nullable="false" />
+        </EntityType>
+        <EntityType Name="Bid">
+          <Key>
+            <PropertyRef Name="Bid_ID" />
+          </Key>
+          <Property Name="Bid_ID" Type="int" StoreGeneratedPattern="Identity" Nullable="false" />
+          <Property Name="Job_ID" Type="int" />
+          <Property Name="Sitter_ID" Type="int" />
+          <Property Name="ProposedPrice" Type="decimal" Precision="10" Scale="2" />
+          <Property Name="BidStatus" Type="nvarchar" MaxLength="50" />
+          <Property Name="BidDate" Type="datetime" />
+          <Property Name="IsDeleted" Type="bit" Nullable="false" />
+        </EntityType>
+        <EntityType Name="Child">
+          <Key>
+            <PropertyRef Name="Child_ID" />
+          </Key>
+          <Property Name="Child_ID" Type="int" StoreGeneratedPattern="Identity" Nullable="false" />
+          <Property Name="Parent_ID" Type="int" />
+          <Property Name="ChildName" Type="nvarchar" MaxLength="100" Nullable="false" />
+          <Property Name="DOB" Type="date" Nullable="false" />
+          <Property Name="Gender" Type="nvarchar" MaxLength="20" />
+          <Property Name="PictureAddress" Type="nvarchar(max)" />
+          <Property Name="SpecialRequirements" Type="nvarchar(max)" />
+          <Property Name="GuardianName" Type="nvarchar" MaxLength="100" />
+          <Property Name="GuardianRelation" Type="nvarchar" MaxLength="50" />
+          <Property Name="GuardianContact" Type="nvarchar" MaxLength="20" />
+          <Property Name="IsDeleted" Type="bit" Nullable="false" />
+        </EntityType>
+        <EntityType Name="CryAlert">
+          <Key>
+            <PropertyRef Name="Id" />
+          </Key>
+          <Property Name="Id" Type="uniqueidentifier" Nullable="false" />
+          <Property Name="Timestamp" Type="datetime" Nullable="false" />
+          <Property Name="Level" Type="nvarchar" MaxLength="50" Nullable="false" />
+          <Property Name="RoomName" Type="nvarchar" MaxLength="100" Nullable="false" />
+          <Property Name="JobId" Type="int" />
+          <Property Name="ParentId" Type="int" />
+          <Property Name="BabysitterId" Type="int" />
+          <Property Name="CreatedAt" Type="datetime" />
+          <Property Name="IsDeleted" Type="bit" Nullable="false" />
+        </EntityType>
+        <EntityType Name="Job">
+          <Key>
+            <PropertyRef Name="Job_ID" />
+          </Key>
+          <Property Name="Job_ID" Type="int" StoreGeneratedPattern="Identity" Nullable="false" />
+          <Property Name="Parent_ID" Type="int" />
+          <Property Name="Child_ID" Type="int" />
+          <Property Name="Title" Type="nvarchar" MaxLength="200" />
+          <Property Name="Description" Type="nvarchar(max)" />
+          <Property Name="JobDate" Type="date" Nullable="false" />
+          <Property Name="Status" Type="nvarchar" MaxLength="50" />
+          <Property Name="AssignedSitter_ID" Type="int" />
+                    <Property Name="Payment" Type="decimal" Precision="10" Scale="2" />
+          <Property Name="City" Type="nvarchar" MaxLength="100" />
+          <Property Name="IsDeleted" Type="bit" Nullable="false" />
+          <Property Name="SessionStartedAt" Type="datetime" />
+          <Property Name="SessionEndedAt" Type="datetime" />
+          <Property Name="JobSeries_ID" Type="int" />
+          <Property Name="SeriesOccurrenceIndex" Type="int" />
+          <Property Name="CancellationReason" Type="nvarchar" MaxLength="200" />
+          <Property Name="CancelledAt" Type="datetime" />
+        </EntityType>
+        <EntityType Name="JobTimeSlot">
+          <Key>
+            <PropertyRef Name="JobSlot_ID" />
+          </Key>
+          <Property Name="JobSlot_ID" Type="int" StoreGeneratedPattern="Identity" Nullable="false" />
+          <Property Name="Job_ID" Type="int" />
+          <Property Name="Slot_ID" Type="int" />
+        </EntityType>
+        <EntityType Name="Notification">
+          <Key>
+            <PropertyRef Name="Notification_ID" />
+          </Key>
+          <Property Name="Notification_ID" Type="int" StoreGeneratedPattern="Identity" Nullable="false" />
+          <Property Name="UserID" Type="int" Nullable="false" />
+          <Property Name="UserRole" Type="nvarchar" MaxLength="20" Nullable="false" />
+          <Property Name="Message" Type="nvarchar(max)" />
+          <Property Name="IsRead" Type="bit" />
+          <Property Name="CreatedAt" Type="datetime" />
+          <Property Name="Type" Type="nvarchar" MaxLength="50" />
+          <Property Name="IsDeleted" Type="bit" Nullable="false" />
+        </EntityType>
+        <EntityType Name="Parent">
+          <Key>
+            <PropertyRef Name="Parent_ID" />
+          </Key>
+          <Property Name="Parent_ID" Type="int" StoreGeneratedPattern="Identity" Nullable="false" />
+          <Property Name="FullName" Type="nvarchar" MaxLength="150" Nullable="false" />
+          <Property Name="EmailAddress" Type="nvarchar" MaxLength="150" Nullable="false" />
+          <Property Name="Username" Type="nvarchar" MaxLength="50" Nullable="false" />
+          <Property Name="Password" Type="nvarchar" MaxLength="255" Nullable="false" />
+          <Property Name="PhoneNumber" Type="nvarchar" MaxLength="20" />
+          <Property Name="PictureAddress" Type="nvarchar(max)" />
+          <Property Name="Address" Type="nvarchar(max)" />
+          <Property Name="CreatedAt" Type="datetime" />
+          <Property Name="IsDeleted" Type="bit" Nullable="false" />
+        </EntityType>
+        <EntityType Name="Review">
+          <Key>
+            <PropertyRef Name="Review_ID" />
+          </Key>
+          <Property Name="Review_ID" Type="int" StoreGeneratedPattern="Identity" Nullable="false" />
+          <Property Name="Job_ID" Type="int" />
+          <Property Name="Reviewer_ID" Type="int" Nullable="false" />
+          <Property Name="ReviewerRole" Type="nvarchar" MaxLength="20" Nullable="false" />
+          <Property Name="ReviewFor_ID" Type="int" Nullable="false" />
+          <Property Name="ReviewForRole" Type="nvarchar" MaxLength="20" Nullable="false" />
+          <Property Name="Rating" Type="decimal" Precision="2" Scale="1" Nullable="false" />
+          <Property Name="Comment" Type="nvarchar(max)" />
+          <Property Name="CreatedAt" Type="datetime" />
+          <Property Name="IsDeleted" Type="bit" Nullable="false" />
+        </EntityType>
+        <EntityType Name="SitterAvailability">
+          <Key>
+            <PropertyRef Name="Availability_ID" />
+          </Key>
+          <Property Name="Availability_ID" Type="int" StoreGeneratedPattern="Identity" Nullable="false" />
+          <Property Name="Sitter_ID" Type="int" />
+          <Property Name="AvailableDate" Type="date" />
+          <Property Name="Slot_ID" Type="int" />
+          <Property Name="City" Type="nvarchar" MaxLength="100" />
+                              <Property Name="IsDeleted" Type="bit" Nullable="false" />
+          <Property Name="HourlyRate" Type="decimal" Precision="10" Scale="2" />
+        </EntityType>
+        <EntityType Name="TimeSlot">
+          <Key>
+            <PropertyRef Name="Slot_ID" />
+          </Key>
+          <Property Name="Slot_ID" Type="int" StoreGeneratedPattern="Identity" Nullable="false" />
+          <Property Name="StartTime" Type="time" Precision="7" />
+          <Property Name="EndTime" Type="time" Precision="7" />
+          <Property Name="IsDeleted" Type="bit" Nullable="false" />
+        </EntityType>
+        <Association Name="FK__Bid__Job_ID__619B8048">
+          <End Role="Job" Type="Self.Job" Multiplicity="0..1" />
+          <End Role="Bid" Type="Self.Bid" Multiplicity="*" />
+          <ReferentialConstraint>
+            <Principal Role="Job">
+              <PropertyRef Name="Job_ID" />
+            </Principal>
+            <Dependent Role="Bid">
+              <PropertyRef Name="Job_ID" />
+            </Dependent>
+          </ReferentialConstraint>
+        </Association>
+        <Association Name="FK__Bid__Sitter_ID__628FA481">
+          <End Role="Babysitter" Type="Self.Babysitter" Multiplicity="0..1" />
+          <End Role="Bid" Type="Self.Bid" Multiplicity="*" />
+          <ReferentialConstraint>
+            <Principal Role="Babysitter">
+              <PropertyRef Name="Sitter_ID" />
+            </Principal>
+            <Dependent Role="Bid">
+              <PropertyRef Name="Sitter_ID" />
+            </Dependent>
+          </ReferentialConstraint>
+        </Association>
+        <Association Name="FK__Child__Parent_ID__5535A963">
+          <End Role="Parent" Type="Self.Parent" Multiplicity="0..1" />
+          <End Role="Child" Type="Self.Child" Multiplicity="*" />
+          <ReferentialConstraint>
+            <Principal Role="Parent">
+              <PropertyRef Name="Parent_ID" />
+            </Principal>
+            <Dependent Role="Child">
+              <PropertyRef Name="Parent_ID" />
+            </Dependent>
+          </ReferentialConstraint>
+        </Association>
+        <Association Name="FK__Job__AssignedSit__0C85DE4D">
+          <End Role="Babysitter" Type="Self.Babysitter" Multiplicity="0..1" />
+          <End Role="Job" Type="Self.Job" Multiplicity="*" />
+          <ReferentialConstraint>
+            <Principal Role="Babysitter">
+              <PropertyRef Name="Sitter_ID" />
+            </Principal>
+            <Dependent Role="Job">
+              <PropertyRef Name="AssignedSitter_ID" />
+            </Dependent>
+          </ReferentialConstraint>
+        </Association>
+        <Association Name="FK__Job__Child_ID__59063A47">
+          <End Role="Child" Type="Self.Child" Multiplicity="0..1" />
+          <End Role="Job" Type="Self.Job" Multiplicity="*" />
+          <ReferentialConstraint>
+            <Principal Role="Child">
+              <PropertyRef Name="Child_ID" />
+            </Principal>
+            <Dependent Role="Job">
+              <PropertyRef Name="Child_ID" />
+            </Dependent>
+          </ReferentialConstraint>
+        </Association>
+        <Association Name="FK__Job__Parent_ID__5812160E">
+          <End Role="Parent" Type="Self.Parent" Multiplicity="0..1" />
+          <End Role="Job" Type="Self.Job" Multiplicity="*" />
+          <ReferentialConstraint>
+            <Principal Role="Parent">
+              <PropertyRef Name="Parent_ID" />
+            </Principal>
+            <Dependent Role="Job">
+              <PropertyRef Name="Parent_ID" />
+            </Dependent>
+          </ReferentialConstraint>
+        </Association>
+        <Association Name="FK__JobTimeSl__Job_I__04E4BC85">
+          <End Role="Job" Type="Self.Job" Multiplicity="0..1" />
+          <End Role="JobTimeSlot" Type="Self.JobTimeSlot" Multiplicity="*" />
+          <ReferentialConstraint>
+            <Principal Role="Job">
+              <PropertyRef Name="Job_ID" />
+            </Principal>
+            <Dependent Role="JobTimeSlot">
+              <PropertyRef Name="Job_ID" />
+            </Dependent>
+          </ReferentialConstraint>
+        </Association>
+        <Association Name="FK__JobTimeSl__Slot___05D8E0BE">
+          <End Role="TimeSlot" Type="Self.TimeSlot" Multiplicity="0..1" />
+          <End Role="JobTimeSlot" Type="Self.JobTimeSlot" Multiplicity="*" />
+          <ReferentialConstraint>
+            <Principal Role="TimeSlot">
+              <PropertyRef Name="Slot_ID" />
+            </Principal>
+            <Dependent Role="JobTimeSlot">
+              <PropertyRef Name="Slot_ID" />
+            </Dependent>
+          </ReferentialConstraint>
+        </Association>
+        <Association Name="FK__Review__Job_ID__3E1D39E1">
+          <End Role="Job" Type="Self.Job" Multiplicity="0..1" />
+          <End Role="Review" Type="Self.Review" Multiplicity="*" />
+          <ReferentialConstraint>
+            <Principal Role="Job">
+              <PropertyRef Name="Job_ID" />
+            </Principal>
+            <Dependent Role="Review">
+              <PropertyRef Name="Job_ID" />
+            </Dependent>
+          </ReferentialConstraint>
+        </Association>
+        <Association Name="FK__SitterAva__Sitte__08B54D69">
+          <End Role="Babysitter" Type="Self.Babysitter" Multiplicity="0..1" />
+          <End Role="SitterAvailability" Type="Self.SitterAvailability" Multiplicity="*" />
+          <ReferentialConstraint>
+            <Principal Role="Babysitter">
+              <PropertyRef Name="Sitter_ID" />
+            </Principal>
+            <Dependent Role="SitterAvailability">
+              <PropertyRef Name="Sitter_ID" />
+            </Dependent>
+          </ReferentialConstraint>
+        </Association>
+        <Association Name="FK__SitterAva__Slot___09A971A2">
+          <End Role="TimeSlot" Type="Self.TimeSlot" Multiplicity="0..1" />
+          <End Role="SitterAvailability" Type="Self.SitterAvailability" Multiplicity="*" />
+          <ReferentialConstraint>
+            <Principal Role="TimeSlot">
+              <PropertyRef Name="Slot_ID" />
+            </Principal>
+            <Dependent Role="SitterAvailability">
+              <PropertyRef Name="Slot_ID" />
+            </Dependent>
+          </ReferentialConstraint>
+        </Association>
+        <EntityType Name="UserSessions">
+          <Key>
+            <PropertyRef Name="Token" />
+          </Key>
+          <Property Name="Token" Type="nvarchar" MaxLength="128" Nullable="false" />
+          <Property Name="UserId" Type="int" Nullable="false" />
+          <Property Name="Role" Type="nvarchar" MaxLength="50" Nullable="false" />
+          <Property Name="CreatedAt" Type="datetime" Nullable="false" />
+          <Property Name="ExpiresAt" Type="datetime" Nullable="false" />
+        </EntityType>
+        <EntityContainer Name="ModelStoreContainer">
+          <EntitySet Name="Babysitter" EntityType="Self.Babysitter" Schema="dbo" store:Type="Tables" />
+          <EntitySet Name="Bid" EntityType="Self.Bid" Schema="dbo" store:Type="Tables" />
+          <EntitySet Name="Child" EntityType="Self.Child" Schema="dbo" store:Type="Tables" />
+          <EntitySet Name="CryAlert" EntityType="Self.CryAlert" Schema="dbo" store:Type="Tables" />
+          <EntitySet Name="Job" EntityType="Self.Job" Schema="dbo" store:Type="Tables" />
+          <EntitySet Name="JobTimeSlot" EntityType="Self.JobTimeSlot" Schema="dbo" store:Type="Tables" />
+          <EntitySet Name="Notification" EntityType="Self.Notification" Schema="dbo" store:Type="Tables" />
+          <EntitySet Name="Parent" EntityType="Self.Parent" Schema="dbo" store:Type="Tables" />
+          <EntitySet Name="Review" EntityType="Self.Review" Schema="dbo" store:Type="Tables" />
+          <EntitySet Name="SitterAvailability" EntityType="Self.SitterAvailability" Schema="dbo" store:Type="Tables" />
+          <EntitySet Name="TimeSlot" EntityType="Self.TimeSlot" Schema="dbo" store:Type="Tables" />
+          <AssociationSet Name="FK__Bid__Job_ID__619B8048" Association="Self.FK__Bid__Job_ID__619B8048">
+            <End Role="Job" EntitySet="Job" />
+            <End Role="Bid" EntitySet="Bid" />
+          </AssociationSet>
+          <AssociationSet Name="FK__Bid__Sitter_ID__628FA481" Association="Self.FK__Bid__Sitter_ID__628FA481">
+            <End Role="Babysitter" EntitySet="Babysitter" />
+            <End Role="Bid" EntitySet="Bid" />
+          </AssociationSet>
+          <AssociationSet Name="FK__Child__Parent_ID__5535A963" Association="Self.FK__Child__Parent_ID__5535A963">
+            <End Role="Parent" EntitySet="Parent" />
+            <End Role="Child" EntitySet="Child" />
+          </AssociationSet>
+          <AssociationSet Name="FK__Job__AssignedSit__0C85DE4D" Association="Self.FK__Job__AssignedSit__0C85DE4D">
+            <End Role="Babysitter" EntitySet="Babysitter" />
+            <End Role="Job" EntitySet="Job" />
+          </AssociationSet>
+          <AssociationSet Name="FK__Job__Child_ID__59063A47" Association="Self.FK__Job__Child_ID__59063A47">
+            <End Role="Child" EntitySet="Child" />
+            <End Role="Job" EntitySet="Job" />
+          </AssociationSet>
+          <AssociationSet Name="FK__Job__Parent_ID__5812160E" Association="Self.FK__Job__Parent_ID__5812160E">
+            <End Role="Parent" EntitySet="Parent" />
+            <End Role="Job" EntitySet="Job" />
+          </AssociationSet>
+          <AssociationSet Name="FK__JobTimeSl__Job_I__04E4BC85" Association="Self.FK__JobTimeSl__Job_I__04E4BC85">
+            <End Role="Job" EntitySet="Job" />
+            <End Role="JobTimeSlot" EntitySet="JobTimeSlot" />
+          </AssociationSet>
+          <AssociationSet Name="FK__JobTimeSl__Slot___05D8E0BE" Association="Self.FK__JobTimeSl__Slot___05D8E0BE">
+            <End Role="TimeSlot" EntitySet="TimeSlot" />
+            <End Role="JobTimeSlot" EntitySet="JobTimeSlot" />
+          </AssociationSet>
+          <AssociationSet Name="FK__Review__Job_ID__3E1D39E1" Association="Self.FK__Review__Job_ID__3E1D39E1">
+            <End Role="Job" EntitySet="Job" />
+            <End Role="Review" EntitySet="Review" />
+          </AssociationSet>
+          <AssociationSet Name="FK__SitterAva__Sitte__08B54D69" Association="Self.FK__SitterAva__Sitte__08B54D69">
+            <End Role="Babysitter" EntitySet="Babysitter" />
+            <End Role="SitterAvailability" EntitySet="SitterAvailability" />
+          </AssociationSet>
+          <AssociationSet Name="FK__SitterAva__Slot___09A971A2" Association="Self.FK__SitterAva__Slot___09A971A2">
+            <End Role="TimeSlot" EntitySet="TimeSlot" />
+            <End Role="SitterAvailability" EntitySet="SitterAvailability" />
+          </AssociationSet>
+          <EntitySet Name="UserSessions" EntityType="Self.UserSessions" Schema="dbo" store:Type="Tables" />
+        </EntityContainer>
+      </Schema>
+    </edmx:StorageModels>
+    <!-- CSDL content -->
+    <edmx:ConceptualModels>
+      <Schema Namespace="Model" Alias="Self" annotation:UseStrongSpatialTypes="false" xmlns:annotation="http://schemas.microsoft.com/ado/2009/02/edm/annotation" xmlns:customannotation="http://schemas.microsoft.com/ado/2013/11/edm/customannotation" xmlns="http://schemas.microsoft.com/ado/2009/11/edm">
+        <EntityType Name="Babysitter">
+          <Key>
+            <PropertyRef Name="Sitter_ID" />
+          </Key>
+          <Property Name="Sitter_ID" Type="Int32" Nullable="false" annotation:StoreGeneratedPattern="Identity" />
+          <Property Name="FullName" Type="String" MaxLength="150" FixedLength="false" Unicode="true" Nullable="false" />
+          <Property Name="EmailAddress" Type="String" MaxLength="150" FixedLength="false" Unicode="true" Nullable="false" />
+          <Property Name="Username" Type="String" MaxLength="50" FixedLength="false" Unicode="true" Nullable="false" />
+          <Property Name="Password" Type="String" MaxLength="255" FixedLength="false" Unicode="true" Nullable="false" />
+          <Property Name="PhoneNumber" Type="String" MaxLength="20" FixedLength="false" Unicode="true" />
+          <Property Name="PictureAddress" Type="String" MaxLength="Max" FixedLength="false" Unicode="true" />
+          <Property Name="DOB" Type="DateTime" Nullable="false" Precision="0" />
+          <Property Name="ExperienceYears" Type="Int32" />
+          <Property Name="HourlyRate" Type="Decimal" Precision="10" Scale="2" />
+          <Property Name="AvailabilityStatus" Type="String" MaxLength="50" FixedLength="false" Unicode="true" />
+          <Property Name="CreatedAt" Type="DateTime" Precision="3" />
+          <Property Name="IsDeleted" Type="Boolean" Nullable="false" />
+          <NavigationProperty Name="Bids" Relationship="Self.FK__Bid__Sitter_ID__628FA481" FromRole="Babysitter" ToRole="Bid" />
+          <NavigationProperty Name="Jobs" Relationship="Self.FK__Job__AssignedSit__0C85DE4D" FromRole="Babysitter" ToRole="Job" />
+          <NavigationProperty Name="SitterAvailabilities" Relationship="Self.FK__SitterAva__Sitte__08B54D69" FromRole="Babysitter" ToRole="SitterAvailability" />
+        </EntityType>
+        <EntityType Name="Bid">
+          <Key>
+            <PropertyRef Name="Bid_ID" />
+          </Key>
+          <Property Name="Bid_ID" Type="Int32" Nullable="false" annotation:StoreGeneratedPattern="Identity" />
+          <Property Name="Job_ID" Type="Int32" />
+          <Property Name="Sitter_ID" Type="Int32" />
+          <Property Name="ProposedPrice" Type="Decimal" Precision="10" Scale="2" />
+          <Property Name="BidStatus" Type="String" MaxLength="50" FixedLength="false" Unicode="true" />
+          <Property Name="BidDate" Type="DateTime" Precision="3" />
+          <Property Name="IsDeleted" Type="Boolean" Nullable="false" />
+          <NavigationProperty Name="Babysitter" Relationship="Self.FK__Bid__Sitter_ID__628FA481" FromRole="Bid" ToRole="Babysitter" />
+          <NavigationProperty Name="Job" Relationship="Self.FK__Bid__Job_ID__619B8048" FromRole="Bid" ToRole="Job" />
+        </EntityType>
+        <EntityType Name="Child">
+          <Key>
+            <PropertyRef Name="Child_ID" />
+          </Key>
+          <Property Name="Child_ID" Type="Int32" Nullable="false" annotation:StoreGeneratedPattern="Identity" />
+          <Property Name="Parent_ID" Type="Int32" />
+          <Property Name="ChildName" Type="String" MaxLength="100" FixedLength="false" Unicode="true" Nullable="false" />
+          <Property Name="DOB" Type="DateTime" Nullable="false" Precision="0" />
+          <Property Name="Gender" Type="String" MaxLength="20" FixedLength="false" Unicode="true" />
+          <Property Name="PictureAddress" Type="String" MaxLength="Max" FixedLength="false" Unicode="true" />
+          <Property Name="SpecialRequirements" Type="String" MaxLength="Max" FixedLength="false" Unicode="true" />
+          <Property Name="IsDeleted" Type="Boolean" Nullable="false" />
+          <NavigationProperty Name="Parent" Relationship="Self.FK__Child__Parent_ID__5535A963" FromRole="Child" ToRole="Parent" />
+          <NavigationProperty Name="Jobs" Relationship="Self.FK__Job__Child_ID__59063A47" FromRole="Child" ToRole="Job" />
+          <Property Name="GuardianName" Type="String" MaxLength="100" FixedLength="false" Unicode="true" />
+          <Property Name="GuardianRelation" Type="String" MaxLength="50" FixedLength="false" Unicode="true" />
+          <Property Name="GuardianContact" Type="String" MaxLength="20" FixedLength="false" Unicode="true" />
+        </EntityType>
+        <EntityType Name="Job">
+          <Key>
+            <PropertyRef Name="Job_ID" />
+          </Key>
+          <Property Name="Job_ID" Type="Int32" Nullable="false" annotation:StoreGeneratedPattern="Identity" />
+          <Property Name="Parent_ID" Type="Int32" />
+          <Property Name="Child_ID" Type="Int32" />
+          <Property Name="Title" Type="String" MaxLength="200" FixedLength="false" Unicode="true" />
+          <Property Name="Description" Type="String" MaxLength="Max" FixedLength="false" Unicode="true" />
+          <Property Name="JobDate" Type="DateTime" Nullable="false" Precision="0" />
+          <Property Name="Status" Type="String" MaxLength="50" FixedLength="false" Unicode="true" />
+          <Property Name="AssignedSitter_ID" Type="Int32" />
+          <Property Name="Payment" Type="Decimal" Precision="10" Scale="2" />
+                    <Property Name="City" Type="String" MaxLength="100" FixedLength="false" Unicode="true" />
+          <Property Name="IsDeleted" Type="Boolean" Nullable="false" />
+          <Property Name="SessionStartedAt" Type="DateTime" Precision="3" />
+          <Property Name="SessionEndedAt" Type="DateTime" Precision="3" />
+          <Property Name="JobSeries_ID" Type="Int32" />
+          <Property Name="SeriesOccurrenceIndex" Type="Int32" />
+          <Property Name="CancellationReason" Type="String" MaxLength="200" FixedLength="false" Unicode="true" />
+          <Property Name="CancelledAt" Type="DateTime" Precision="3" />
+          <NavigationProperty Name="Babysitter" Relationship="Self.FK__Job__AssignedSit__0C85DE4D" FromRole="Job" ToRole="Babysitter" />
+          <NavigationProperty Name="Bids" Relationship="Self.FK__Bid__Job_ID__619B8048" FromRole="Job" ToRole="Bid" />
+          <NavigationProperty Name="Child" Relationship="Self.FK__Job__Child_ID__59063A47" FromRole="Job" ToRole="Child" />
+          <NavigationProperty Name="Parent" Relationship="Self.FK__Job__Parent_ID__5812160E" FromRole="Job" ToRole="Parent" />
+          <NavigationProperty Name="JobTimeSlots" Relationship="Self.FK__JobTimeSl__Job_I__04E4BC85" FromRole="Job" ToRole="JobTimeSlot" />
+          <NavigationProperty Name="Reviews" Relationship="Self.FK__Review__Job_ID__3E1D39E1" FromRole="Job" ToRole="Review" />
+        </EntityType>
+        <EntityType Name="JobTimeSlot">
+          <Key>
+            <PropertyRef Name="JobSlot_ID" />
+          </Key>
+          <Property Name="JobSlot_ID" Type="Int32" Nullable="false" annotation:StoreGeneratedPattern="Identity" />
+          <Property Name="Job_ID" Type="Int32" />
+          <Property Name="Slot_ID" Type="Int32" />
+          <NavigationProperty Name="Job" Relationship="Self.FK__JobTimeSl__Job_I__04E4BC85" FromRole="JobTimeSlot" ToRole="Job" />
+          <NavigationProperty Name="TimeSlot" Relationship="Self.FK__JobTimeSl__Slot___05D8E0BE" FromRole="JobTimeSlot" ToRole="TimeSlot" />
+        </EntityType>
+        <EntityType Name="Notification">
+          <Key>
+            <PropertyRef Name="Notification_ID" />
+          </Key>
+          <Property Name="Notification_ID" Type="Int32" Nullable="false" annotation:StoreGeneratedPattern="Identity" />
+          <Property Name="UserID" Type="Int32" Nullable="false" />
+          <Property Name="UserRole" Type="String" MaxLength="20" FixedLength="false" Unicode="true" Nullable="false" />
+          <Property Name="Message" Type="String" MaxLength="Max" FixedLength="false" Unicode="true" />
+          <Property Name="IsRead" Type="Boolean" />
+          <Property Name="CreatedAt" Type="DateTime" Precision="3" />
+          <Property Name="Type" Type="String" MaxLength="50" FixedLength="false" Unicode="true" />
+          <Property Name="IsDeleted" Type="Boolean" Nullable="false" />
+        </EntityType>
+        <EntityType Name="Parent">
+          <Key>
+            <PropertyRef Name="Parent_ID" />
+          </Key>
+          <Property Name="Parent_ID" Type="Int32" Nullable="false" annotation:StoreGeneratedPattern="Identity" />
+          <Property Name="FullName" Type="String" MaxLength="150" FixedLength="false" Unicode="true" Nullable="false" />
+          <Property Name="EmailAddress" Type="String" MaxLength="150" FixedLength="false" Unicode="true" Nullable="false" />
+          <Property Name="Username" Type="String" MaxLength="50" FixedLength="false" Unicode="true" Nullable="false" />
+          <Property Name="Password" Type="String" MaxLength="255" FixedLength="false" Unicode="true" Nullable="false" />
+          <Property Name="PhoneNumber" Type="String" MaxLength="20" FixedLength="false" Unicode="true" />
+          <Property Name="PictureAddress" Type="String" MaxLength="Max" FixedLength="false" Unicode="true" />
+          <Property Name="Address" Type="String" MaxLength="Max" FixedLength="false" Unicode="true" />
+          <Property Name="CreatedAt" Type="DateTime" Precision="3" />
+          <Property Name="IsDeleted" Type="Boolean" Nullable="false" />
+          <NavigationProperty Name="Children" Relationship="Self.FK__Child__Parent_ID__5535A963" FromRole="Parent" ToRole="Child" />
+          <NavigationProperty Name="Jobs" Relationship="Self.FK__Job__Parent_ID__5812160E" FromRole="Parent" ToRole="Job" />
+        </EntityType>
+        <EntityType Name="Review">
+          <Key>
+            <PropertyRef Name="Review_ID" />
+          </Key>
+          <Property Name="Review_ID" Type="Int32" Nullable="false" annotation:StoreGeneratedPattern="Identity" />
+          <Property Name="Job_ID" Type="Int32" />
+          <Property Name="Reviewer_ID" Type="Int32" Nullable="false" />
+          <Property Name="ReviewerRole" Type="String" MaxLength="20" FixedLength="false" Unicode="true" Nullable="false" />
+          <Property Name="ReviewFor_ID" Type="Int32" Nullable="false" />
+          <Property Name="ReviewForRole" Type="String" MaxLength="20" FixedLength="false" Unicode="true" Nullable="false" />
+          <Property Name="Rating" Type="Decimal" Precision="2" Scale="1" Nullable="false" />
+          <Property Name="Comment" Type="String" MaxLength="Max" FixedLength="false" Unicode="true" />
+          <Property Name="CreatedAt" Type="DateTime" Precision="3" />
+          <Property Name="IsDeleted" Type="Boolean" Nullable="false" />
+          <NavigationProperty Name="Job" Relationship="Self.FK__Review__Job_ID__3E1D39E1" FromRole="Review" ToRole="Job" />
+        </EntityType>
+        <EntityType Name="SitterAvailability">
+          <Key>
+            <PropertyRef Name="Availability_ID" />
+          </Key>
+          <Property Name="Availability_ID" Type="Int32" Nullable="false" annotation:StoreGeneratedPattern="Identity" />
+          <Property Name="Sitter_ID" Type="Int32" />
+          <Property Name="AvailableDate" Type="DateTime" Precision="0" />
+          <Property Name="Slot_ID" Type="Int32" />
+          <Property Name="City" Type="String" MaxLength="100" FixedLength="false" Unicode="true" />
+                    <Property Name="IsDeleted" Type="Boolean" Nullable="false" />
+          <Property Name="HourlyRate" Type="Decimal" Precision="10" Scale="2" />
+          <NavigationProperty Name="Babysitter" Relationship="Self.FK__SitterAva__Sitte__08B54D69" FromRole="SitterAvailability" ToRole="Babysitter" />
+          <NavigationProperty Name="TimeSlot" Relationship="Self.FK__SitterAva__Slot___09A971A2" FromRole="SitterAvailability" ToRole="TimeSlot" />
+        </EntityType>
+        <EntityType Name="TimeSlot">
+          <Key>
+            <PropertyRef Name="Slot_ID" />
+          </Key>
+          <Property Name="Slot_ID" Type="Int32" Nullable="false" annotation:StoreGeneratedPattern="Identity" />
+          <Property Name="StartTime" Type="Time" Precision="7" />
+          <Property Name="EndTime" Type="Time" Precision="7" />
+          <Property Name="IsDeleted" Type="Boolean" Nullable="false" />
+          <NavigationProperty Name="JobTimeSlots" Relationship="Self.FK__JobTimeSl__Slot___05D8E0BE" FromRole="TimeSlot" ToRole="JobTimeSlot" />
+          <NavigationProperty Name="SitterAvailabilities" Relationship="Self.FK__SitterAva__Slot___09A971A2" FromRole="TimeSlot" ToRole="SitterAvailability" />
+        </EntityType>
+        <Association Name="FK__Bid__Sitter_ID__628FA481">
+          <End Role="Babysitter" Type="Self.Babysitter" Multiplicity="0..1" />
+          <End Role="Bid" Type="Self.Bid" Multiplicity="*" />
+          <ReferentialConstraint>
+            <Principal Role="Babysitter">
+              <PropertyRef Name="Sitter_ID" />
+            </Principal>
+            <Dependent Role="Bid">
+              <PropertyRef Name="Sitter_ID" />
+            </Dependent>
+          </ReferentialConstraint>
+        </Association>
+        <Association Name="FK__Job__AssignedSit__0C85DE4D">
+          <End Role="Babysitter" Type="Self.Babysitter" Multiplicity="0..1" />
+          <End Role="Job" Type="Self.Job" Multiplicity="*" />
+          <ReferentialConstraint>
+            <Principal Role="Babysitter">
+              <PropertyRef Name="Sitter_ID" />
+            </Principal>
+            <Dependent Role="Job">
+              <PropertyRef Name="AssignedSitter_ID" />
+            </Dependent>
+          </ReferentialConstraint>
+        </Association>
+        <Association Name="FK__SitterAva__Sitte__08B54D69">
+          <End Role="Babysitter" Type="Self.Babysitter" Multiplicity="0..1" />
+          <End Role="SitterAvailability" Type="Self.SitterAvailability" Multiplicity="*" />
+          <ReferentialConstraint>
+            <Principal Role="Babysitter">
+              <PropertyRef Name="Sitter_ID" />
+            </Principal>
+            <Dependent Role="SitterAvailability">
+              <PropertyRef Name="Sitter_ID" />
+            </Dependent>
+          </ReferentialConstraint>
+        </Association>
+        <Association Name="FK__Bid__Job_ID__619B8048">
+          <End Role="Job" Type="Self.Job" Multiplicity="0..1" />
+          <End Role="Bid" Type="Self.Bid" Multiplicity="*" />
+          <ReferentialConstraint>
+            <Principal Role="Job">
+              <PropertyRef Name="Job_ID" />
+            </Principal>
+            <Dependent Role="Bid">
+              <PropertyRef Name="Job_ID" />
+            </Dependent>
+          </ReferentialConstraint>
+        </Association>
+        <Association Name="FK__Child__Parent_ID__5535A963">
+          <End Role="Parent" Type="Self.Parent" Multiplicity="0..1" />
+          <End Role="Child" Type="Self.Child" Multiplicity="*" />
+          <ReferentialConstraint>
+            <Principal Role="Parent">
+              <PropertyRef Name="Parent_ID" />
+            </Principal>
+            <Dependent Role="Child">
+              <PropertyRef Name="Parent_ID" />
+            </Dependent>
+          </ReferentialConstraint>
+        </Association>
+        <Association Name="FK__Job__Child_ID__59063A47">
+          <End Role="Child" Type="Self.Child" Multiplicity="0..1" />
+          <End Role="Job" Type="Self.Job" Multiplicity="*" />
+          <ReferentialConstraint>
+            <Principal Role="Child">
+              <PropertyRef Name="Child_ID" />
+            </Principal>
+            <Dependent Role="Job">
+              <PropertyRef Name="Child_ID" />
+            </Dependent>
+          </ReferentialConstraint>
+        </Association>
+        <Association Name="FK__Job__Parent_ID__5812160E">
+          <End Role="Parent" Type="Self.Parent" Multiplicity="0..1" />
+          <End Role="Job" Type="Self.Job" Multiplicity="*" />
+          <ReferentialConstraint>
+            <Principal Role="Parent">
+              <PropertyRef Name="Parent_ID" />
+            </Principal>
+            <Dependent Role="Job">
+              <PropertyRef Name="Parent_ID" />
+            </Dependent>
+          </ReferentialConstraint>
+        </Association>
+        <Association Name="FK__JobTimeSl__Job_I__04E4BC85">
+          <End Role="Job" Type="Self.Job" Multiplicity="0..1" />
+          <End Role="JobTimeSlot" Type="Self.JobTimeSlot" Multiplicity="*" />
+          <ReferentialConstraint>
+            <Principal Role="Job">
+              <PropertyRef Name="Job_ID" />
+            </Principal>
+            <Dependent Role="JobTimeSlot">
+              <PropertyRef Name="Job_ID" />
+            </Dependent>
+          </ReferentialConstraint>
+        </Association>
+        <Association Name="FK__Review__Job_ID__3E1D39E1">
+          <End Role="Job" Type="Self.Job" Multiplicity="0..1" />
+          <End Role="Review" Type="Self.Review" Multiplicity="*" />
+          <ReferentialConstraint>
+            <Principal Role="Job">
+              <PropertyRef Name="Job_ID" />
+            </Principal>
+            <Dependent Role="Review">
+              <PropertyRef Name="Job_ID" />
+            </Dependent>
+          </ReferentialConstraint>
+        </Association>
+        <Association Name="FK__JobTimeSl__Slot___05D8E0BE">
+          <End Role="TimeSlot" Type="Self.TimeSlot" Multiplicity="0..1" />
+          <End Role="JobTimeSlot" Type="Self.JobTimeSlot" Multiplicity="*" />
+          <ReferentialConstraint>
+            <Principal Role="TimeSlot">
+              <PropertyRef Name="Slot_ID" />
+            </Principal>
+            <Dependent Role="JobTimeSlot">
+              <PropertyRef Name="Slot_ID" />
+            </Dependent>
+          </ReferentialConstraint>
+        </Association>
+        <Association Name="FK__SitterAva__Slot___09A971A2">
+          <End Role="TimeSlot" Type="Self.TimeSlot" Multiplicity="0..1" />
+          <End Role="SitterAvailability" Type="Self.SitterAvailability" Multiplicity="*" />
+          <ReferentialConstraint>
+            <Principal Role="TimeSlot">
+              <PropertyRef Name="Slot_ID" />
+            </Principal>
+            <Dependent Role="SitterAvailability">
+              <PropertyRef Name="Slot_ID" />
+            </Dependent>
+          </ReferentialConstraint>
+        </Association>
+        <EntityType Name="UserSession">
+          <Key>
+            <PropertyRef Name="Token" />
+          </Key>
+          <Property Name="Token" Type="String" Nullable="false" MaxLength="128" Unicode="true" FixedLength="false" />
+          <Property Name="UserId" Type="Int32" Nullable="false" />
+          <Property Name="Role" Type="String" Nullable="false" MaxLength="50" Unicode="true" FixedLength="false" />
+          <Property Name="CreatedAt" Type="DateTime" Nullable="false" Precision="3" />
+          <Property Name="ExpiresAt" Type="DateTime" Nullable="false" Precision="3" />
+        </EntityType>
+        <EntityContainer Name="BabySitterBooking_and_BabyMinderEntities" annotation:LazyLoadingEnabled="true">
+          <EntitySet Name="Babysitters" EntityType="Self.Babysitter" />
+          <EntitySet Name="Bids" EntityType="Self.Bid" />
+          <EntitySet Name="Children" EntityType="Self.Child" />
+          <EntitySet Name="Jobs" EntityType="Self.Job" />
+          <EntitySet Name="JobTimeSlots" EntityType="Self.JobTimeSlot" />
+          <EntitySet Name="Notifications" EntityType="Self.Notification" />
+          <EntitySet Name="Parents" EntityType="Self.Parent" />
+          <EntitySet Name="Reviews" EntityType="Self.Review" />
+          <EntitySet Name="SitterAvailabilities" EntityType="Self.SitterAvailability" />
+          <EntitySet Name="TimeSlots" EntityType="Self.TimeSlot" />
+          <AssociationSet Name="FK__Bid__Sitter_ID__628FA481" Association="Self.FK__Bid__Sitter_ID__628FA481">
+            <End Role="Babysitter" EntitySet="Babysitters" />
+            <End Role="Bid" EntitySet="Bids" />
+          </AssociationSet>
+          <AssociationSet Name="FK__Job__AssignedSit__0C85DE4D" Association="Self.FK__Job__AssignedSit__0C85DE4D">
+            <End Role="Babysitter" EntitySet="Babysitters" />
+            <End Role="Job" EntitySet="Jobs" />
+          </AssociationSet>
+          <AssociationSet Name="FK__SitterAva__Sitte__08B54D69" Association="Self.FK__SitterAva__Sitte__08B54D69">
+            <End Role="Babysitter" EntitySet="Babysitters" />
+            <End Role="SitterAvailability" EntitySet="SitterAvailabilities" />
+          </AssociationSet>
+          <AssociationSet Name="FK__Bid__Job_ID__619B8048" Association="Self.FK__Bid__Job_ID__619B8048">
+            <End Role="Job" EntitySet="Jobs" />
+            <End Role="Bid" EntitySet="Bids" />
+          </AssociationSet>
+          <AssociationSet Name="FK__Child__Parent_ID__5535A963" Association="Self.FK__Child__Parent_ID__5535A963">
+            <End Role="Parent" EntitySet="Parents" />
+            <End Role="Child" EntitySet="Children" />
+          </AssociationSet>
+          <AssociationSet Name="FK__Job__Child_ID__59063A47" Association="Self.FK__Job__Child_ID__59063A47">
+            <End Role="Child" EntitySet="Children" />
+            <End Role="Job" EntitySet="Jobs" />
+          </AssociationSet>
+          <AssociationSet Name="FK__Job__Parent_ID__5812160E" Association="Self.FK__Job__Parent_ID__5812160E">
+            <End Role="Parent" EntitySet="Parents" />
+            <End Role="Job" EntitySet="Jobs" />
+          </AssociationSet>
+          <AssociationSet Name="FK__JobTimeSl__Job_I__04E4BC85" Association="Self.FK__JobTimeSl__Job_I__04E4BC85">
+            <End Role="Job" EntitySet="Jobs" />
+            <End Role="JobTimeSlot" EntitySet="JobTimeSlots" />
+          </AssociationSet>
+          <AssociationSet Name="FK__Review__Job_ID__3E1D39E1" Association="Self.FK__Review__Job_ID__3E1D39E1">
+            <End Role="Job" EntitySet="Jobs" />
+            <End Role="Review" EntitySet="Reviews" />
+          </AssociationSet>
+          <AssociationSet Name="FK__JobTimeSl__Slot___05D8E0BE" Association="Self.FK__JobTimeSl__Slot___05D8E0BE">
+            <End Role="TimeSlot" EntitySet="TimeSlots" />
+            <End Role="JobTimeSlot" EntitySet="JobTimeSlots" />
+          </AssociationSet>
+          <AssociationSet Name="FK__SitterAva__Slot___09A971A2" Association="Self.FK__SitterAva__Slot___09A971A2">
+            <End Role="TimeSlot" EntitySet="TimeSlots" />
+            <End Role="SitterAvailability" EntitySet="SitterAvailabilities" />
+          </AssociationSet>
+          <EntitySet Name="CryAlerts" EntityType="Model.CryAlert" />
+          <EntitySet Name="UserSessions" EntityType="Model.UserSession" />
+        </EntityContainer>
+        <EntityType Name="CryAlert">
+          <Key>
+            <PropertyRef Name="Id" />
+          </Key>
+          <Property Name="Id" Type="Guid" Nullable="false" />
+          <Property Name="Timestamp" Type="DateTime" Nullable="false" Precision="3" />
+          <Property Name="Level" Type="String" Nullable="false" MaxLength="50" FixedLength="false" Unicode="true" />
+          <Property Name="RoomName" Type="String" Nullable="false" MaxLength="100" FixedLength="false" Unicode="true" />
+          <Property Name="JobId" Type="Int32" />
+          <Property Name="ParentId" Type="Int32" />
+          <Property Name="BabysitterId" Type="Int32" />
+          <Property Name="CreatedAt" Type="DateTime" Precision="3" />
+          <Property Name="IsDeleted" Type="Boolean" Nullable="false" />
+        </EntityType>
+      </Schema>
+    </edmx:ConceptualModels>
+    <!-- C-S mapping content -->
+    <edmx:Mappings>
+      <Mapping Space="C-S" xmlns="http://schemas.microsoft.com/ado/2009/11/mapping/cs">
+        <EntityContainerMapping StorageEntityContainer="ModelStoreContainer" CdmEntityContainer="BabySitterBooking_and_BabyMinderEntities">
+          <EntitySetMapping Name="Babysitters">
+            <EntityTypeMapping TypeName="Model.Babysitter">
+              <MappingFragment StoreEntitySet="Babysitter">
+                <ScalarProperty Name="Sitter_ID" ColumnName="Sitter_ID" />
+                <ScalarProperty Name="FullName" ColumnName="FullName" />
+                <ScalarProperty Name="EmailAddress" ColumnName="EmailAddress" />
+                <ScalarProperty Name="Username" ColumnName="Username" />
+                <ScalarProperty Name="Password" ColumnName="Password" />
+                <ScalarProperty Name="PhoneNumber" ColumnName="PhoneNumber" />
+                <ScalarProperty Name="PictureAddress" ColumnName="PictureAddress" />
+                <ScalarProperty Name="DOB" ColumnName="DOB" />
+                <ScalarProperty Name="ExperienceYears" ColumnName="ExperienceYears" />
+                <ScalarProperty Name="HourlyRate" ColumnName="HourlyRate" />
+                <ScalarProperty Name="AvailabilityStatus" ColumnName="AvailabilityStatus" />
+                <ScalarProperty Name="CreatedAt" ColumnName="CreatedAt" />
+                <ScalarProperty Name="IsDeleted" ColumnName="IsDeleted" />
+              </MappingFragment>
+            </EntityTypeMapping>
+          </EntitySetMapping>
+          <EntitySetMapping Name="Bids">
+            <EntityTypeMapping TypeName="Model.Bid">
+              <MappingFragment StoreEntitySet="Bid">
+                <ScalarProperty Name="Bid_ID" ColumnName="Bid_ID" />
+                <ScalarProperty Name="Job_ID" ColumnName="Job_ID" />
+                <ScalarProperty Name="Sitter_ID" ColumnName="Sitter_ID" />
+                <ScalarProperty Name="ProposedPrice" ColumnName="ProposedPrice" />
+                <ScalarProperty Name="BidStatus" ColumnName="BidStatus" />
+                <ScalarProperty Name="BidDate" ColumnName="BidDate" />
+                <ScalarProperty Name="IsDeleted" ColumnName="IsDeleted" />
+              </MappingFragment>
+            </EntityTypeMapping>
+          </EntitySetMapping>
+          <EntitySetMapping Name="Children">
+            <EntityTypeMapping TypeName="Model.Child">
+              <MappingFragment StoreEntitySet="Child">
+                <ScalarProperty Name="GuardianContact" ColumnName="GuardianContact" />
+                <ScalarProperty Name="GuardianRelation" ColumnName="GuardianRelation" />
+                <ScalarProperty Name="GuardianName" ColumnName="GuardianName" />
+                <ScalarProperty Name="Child_ID" ColumnName="Child_ID" />
+                <ScalarProperty Name="Parent_ID" ColumnName="Parent_ID" />
+                <ScalarProperty Name="ChildName" ColumnName="ChildName" />
+                <ScalarProperty Name="DOB" ColumnName="DOB" />
+                <ScalarProperty Name="Gender" ColumnName="Gender" />
+                <ScalarProperty Name="PictureAddress" ColumnName="PictureAddress" />
+                <ScalarProperty Name="SpecialRequirements" ColumnName="SpecialRequirements" />
+                <ScalarProperty Name="IsDeleted" ColumnName="IsDeleted" />
+              </MappingFragment>
+            </EntityTypeMapping>
+          </EntitySetMapping>
+          <EntitySetMapping Name="Jobs">
+            <EntityTypeMapping TypeName="Model.Job">
+              <MappingFragment StoreEntitySet="Job">
+                <ScalarProperty Name="Job_ID" ColumnName="Job_ID" />
+                <ScalarProperty Name="Parent_ID" ColumnName="Parent_ID" />
+                <ScalarProperty Name="Child_ID" ColumnName="Child_ID" />
+                <ScalarProperty Name="Title" ColumnName="Title" />
+                <ScalarProperty Name="Description" ColumnName="Description" />
+                <ScalarProperty Name="JobDate" ColumnName="JobDate" />
+                <ScalarProperty Name="Status" ColumnName="Status" />
+                <ScalarProperty Name="AssignedSitter_ID" ColumnName="AssignedSitter_ID" />
+                <ScalarProperty Name="Payment" ColumnName="Payment" />
+                <ScalarProperty Name="City" ColumnName="City" />
+                <ScalarProperty Name="IsDeleted" ColumnName="IsDeleted" />
+                <ScalarProperty Name="SessionStartedAt" ColumnName="SessionStartedAt" />
+                <ScalarProperty Name="SessionEndedAt" ColumnName="SessionEndedAt" />
+                <ScalarProperty Name="JobSeries_ID" ColumnName="JobSeries_ID" />
+                <ScalarProperty Name="SeriesOccurrenceIndex" ColumnName="SeriesOccurrenceIndex" />
+                <ScalarProperty Name="CancellationReason" ColumnName="CancellationReason" />
+                <ScalarProperty Name="CancelledAt" ColumnName="CancelledAt" />
+              </MappingFragment>
+            </EntityTypeMapping>
+          </EntitySetMapping>
+          <EntitySetMapping Name="JobTimeSlots">
+            <EntityTypeMapping TypeName="Model.JobTimeSlot">
+              <MappingFragment StoreEntitySet="JobTimeSlot">
+                <ScalarProperty Name="JobSlot_ID" ColumnName="JobSlot_ID" />
+                <ScalarProperty Name="Job_ID" ColumnName="Job_ID" />
+                <ScalarProperty Name="Slot_ID" ColumnName="Slot_ID" />
+              </MappingFragment>
+            </EntityTypeMapping>
+          </EntitySetMapping>
+          <EntitySetMapping Name="Notifications">
+            <EntityTypeMapping TypeName="Model.Notification">
+              <MappingFragment StoreEntitySet="Notification">
+                <ScalarProperty Name="Type" ColumnName="Type" />
+                <ScalarProperty Name="Notification_ID" ColumnName="Notification_ID" />
+                <ScalarProperty Name="UserID" ColumnName="UserID" />
+                <ScalarProperty Name="UserRole" ColumnName="UserRole" />
+                <ScalarProperty Name="Message" ColumnName="Message" />
+                <ScalarProperty Name="IsRead" ColumnName="IsRead" />
+                <ScalarProperty Name="CreatedAt" ColumnName="CreatedAt" />
+                <ScalarProperty Name="IsDeleted" ColumnName="IsDeleted" />
+              </MappingFragment>
+            </EntityTypeMapping>
+          </EntitySetMapping>
+          <EntitySetMapping Name="Parents">
+            <EntityTypeMapping TypeName="Model.Parent">
+              <MappingFragment StoreEntitySet="Parent">
+                <ScalarProperty Name="Parent_ID" ColumnName="Parent_ID" />
+                <ScalarProperty Name="FullName" ColumnName="FullName" />
+                <ScalarProperty Name="EmailAddress" ColumnName="EmailAddress" />
+                <ScalarProperty Name="Username" ColumnName="Username" />
+                <ScalarProperty Name="Password" ColumnName="Password" />
+                <ScalarProperty Name="PhoneNumber" ColumnName="PhoneNumber" />
+                <ScalarProperty Name="PictureAddress" ColumnName="PictureAddress" />
+                <ScalarProperty Name="Address" ColumnName="Address" />
+                <ScalarProperty Name="CreatedAt" ColumnName="CreatedAt" />
+                <ScalarProperty Name="IsDeleted" ColumnName="IsDeleted" />
+              </MappingFragment>
+            </EntityTypeMapping>
+          </EntitySetMapping>
+          <EntitySetMapping Name="Reviews">
+            <EntityTypeMapping TypeName="Model.Review">
+              <MappingFragment StoreEntitySet="Review">
+                <ScalarProperty Name="Review_ID" ColumnName="Review_ID" />
+                <ScalarProperty Name="Job_ID" ColumnName="Job_ID" />
+                <ScalarProperty Name="Reviewer_ID" ColumnName="Reviewer_ID" />
+                <ScalarProperty Name="ReviewerRole" ColumnName="ReviewerRole" />
+                <ScalarProperty Name="ReviewFor_ID" ColumnName="ReviewFor_ID" />
+                <ScalarProperty Name="ReviewForRole" ColumnName="ReviewForRole" />
+                <ScalarProperty Name="Rating" ColumnName="Rating" />
+                <ScalarProperty Name="Comment" ColumnName="Comment" />
+                <ScalarProperty Name="CreatedAt" ColumnName="CreatedAt" />
+                <ScalarProperty Name="IsDeleted" ColumnName="IsDeleted" />
+              </MappingFragment>
+            </EntityTypeMapping>
+          </EntitySetMapping>
+          <EntitySetMapping Name="SitterAvailabilities">
+            <EntityTypeMapping TypeName="Model.SitterAvailability">
+                            <MappingFragment StoreEntitySet="SitterAvailability">
+                <ScalarProperty Name="Availability_ID" ColumnName="Availability_ID" />
+                <ScalarProperty Name="Sitter_ID" ColumnName="Sitter_ID" />
+                <ScalarProperty Name="AvailableDate" ColumnName="AvailableDate" />
+                <ScalarProperty Name="Slot_ID" ColumnName="Slot_ID" />
+                <ScalarProperty Name="City" ColumnName="City" />
+                <ScalarProperty Name="IsDeleted" ColumnName="IsDeleted" />
+                <ScalarProperty Name="HourlyRate" ColumnName="HourlyRate" />
+              </MappingFragment>
+            </EntityTypeMapping>
+          </EntitySetMapping>
+          <EntitySetMapping Name="TimeSlots">
+            <EntityTypeMapping TypeName="Model.TimeSlot">
+              <MappingFragment StoreEntitySet="TimeSlot">
+                <ScalarProperty Name="Slot_ID" ColumnName="Slot_ID" />
+                <ScalarProperty Name="StartTime" ColumnName="StartTime" />
+                <ScalarProperty Name="EndTime" ColumnName="EndTime" />
+                <ScalarProperty Name="IsDeleted" ColumnName="IsDeleted" />
+              </MappingFragment>
+            </EntityTypeMapping>
+          </EntitySetMapping>
+          <EntitySetMapping Name="CryAlerts">
+            <EntityTypeMapping TypeName="Model.CryAlert">
+              <MappingFragment StoreEntitySet="CryAlert">
+                <ScalarProperty Name="CreatedAt" ColumnName="CreatedAt" />
+                <ScalarProperty Name="BabysitterId" ColumnName="BabysitterId" />
+                <ScalarProperty Name="ParentId" ColumnName="ParentId" />
+                <ScalarProperty Name="JobId" ColumnName="JobId" />
+                <ScalarProperty Name="RoomName" ColumnName="RoomName" />
+                <ScalarProperty Name="Level" ColumnName="Level" />
+                <ScalarProperty Name="Timestamp" ColumnName="Timestamp" />
+                <ScalarProperty Name="Id" ColumnName="Id" />
+                <ScalarProperty Name="IsDeleted" ColumnName="IsDeleted" />
+              </MappingFragment>
+            </EntityTypeMapping>
+          </EntitySetMapping>
+          <EntitySetMapping Name="UserSessions">
+            <EntityTypeMapping TypeName="Model.UserSession">
+              <MappingFragment StoreEntitySet="UserSessions">
+                <ScalarProperty Name="Token" ColumnName="Token" />
+                <ScalarProperty Name="UserId" ColumnName="UserId" />
+                <ScalarProperty Name="Role" ColumnName="Role" />
+                <ScalarProperty Name="CreatedAt" ColumnName="CreatedAt" />
+                <ScalarProperty Name="ExpiresAt" ColumnName="ExpiresAt" />
+              </MappingFragment>
+            </EntityTypeMapping>
+          </EntitySetMapping>
+        </EntityContainerMapping>
+      </Mapping>
+    </edmx:Mappings>
+  </edmx:Runtime>
+  <!-- EF Designer content (DO NOT EDIT MANUALLY BELOW HERE) -->
+  <Designer xmlns="http://schemas.microsoft.com/ado/2009/11/edmx">
+    <Connection>
+      <DesignerInfoPropertySet>
+        <DesignerProperty Name="MetadataArtifactProcessing" Value="EmbedInOutputAssembly" />
+      </DesignerInfoPropertySet>
+    </Connection>
+    <Options>
+      <DesignerInfoPropertySet>
+        <DesignerProperty Name="ValidateOnBuild" Value="true" />
+        <DesignerProperty Name="EnablePluralization" Value="true" />
+        <DesignerProperty Name="IncludeForeignKeysInModel" Value="true" />
+        <DesignerProperty Name="UseLegacyProvider" Value="false" />
+        <DesignerProperty Name="CodeGenerationStrategy" Value="None" />
+      </DesignerInfoPropertySet>
+    </Options>
+    <!-- Diagram content (shape and connector positions) -->
+    <Diagrams>
+    </Diagrams>
+  </Designer>
+</edmx:Edmx>

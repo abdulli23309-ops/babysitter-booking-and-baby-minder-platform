@@ -1,0 +1,104 @@
+/* ============================================================
+   Phase 1.7 — Round icon-only FABs (refactor from pill layout)
+   ============================================================ */
+
+.fabWrap {
+  position: fixed;
+  right: var(--space-4, 16px);
+  bottom: 105px;
+  bottom: calc(105px + env(safe-area-inset-bottom, 0px));
+  z-index: 1300;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3, 12px);
+  pointer-events: none;
+}
+
+.fabWrap > * {
+  pointer-events: auto;
+}
+
+/* ---- Round FAB base (icon-only, 52px circle) ---- */
+.fab {
+  width: 52px;
+  height: 52px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-radius: 999px;
+  background: var(--color-primary, #E8622A);
+  color: var(--color-primary-inverse, #FFFFFF);
+  border: none;
+  box-shadow: 0 8px 20px rgb(var(--primary-rgb) / 0.35), 0 2px 6px rgb(var(--shadow-ink-rgb) / 0.12);
+  cursor: pointer;
+  transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.18s ease, background-color 0.18s ease;
+  will-change: transform;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.fab svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.fab:hover {
+  transform: translateY(-3px) scale(1.05);
+  box-shadow: 0 12px 28px rgb(var(--primary-rgb) / 0.45), 0 2px 8px rgb(var(--shadow-ink-rgb) / 0.18);
+  background: var(--color-primary-hover, #FF7A45);
+}
+
+.fab:active {
+  transform: translateY(0) scale(0.96);
+  box-shadow: 0 4px 12px rgb(var(--primary-rgb) / 0.30);
+}
+
+.fab:focus-visible {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 3px;
+}
+
+/* ---- Secondary round FAB (info toast) ---- */
+.fabSecondary {
+  width: 44px;
+  height: 44px;
+  background: var(--color-surface, #FFFFFF);
+  color: var(--color-text, #1E293B);
+  border: 1px solid var(--color-border, #E2E8F0);
+  box-shadow: 0 6px 16px rgb(var(--shadow-ink-rgb) / 0.10), 0 1px 3px rgb(var(--shadow-ink-rgb) / 0.06);
+}
+
+.fabSecondary svg {
+  width: 18px;
+  height: 18px;
+}
+
+.fabSecondary:hover {
+  background: var(--color-surface-hover, #F8FAFC);
+  box-shadow: 0 10px 22px rgb(var(--shadow-ink-rgb) / 0.14);
+  transform: translateY(-2px) scale(1.04);
+}
+
+.fabSecondary:active {
+  transform: translateY(0) scale(0.96);
+}
+
+.fabSecondary:focus-visible {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 3px;
+}
+
+/* ---- Respect reduced motion ---- */
+@media (prefers-reduced-motion: reduce) {
+  .fab,
+  .fabSecondary {
+    transition: none;
+  }
+}

@@ -1,0 +1,403 @@
+.profileContainer {
+  min-height: 100vh;
+  max-width: 480px;
+  margin: 0 auto;
+  width: 100%;
+  padding: 16px 16px calc(84px + 20px);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  background: transparent;
+  overflow-x: hidden;
+}
+
+/* Top Bar */
+.topBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 4px;
+  width: 100%;
+}
+
+.pageTitle {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 800;
+  color: var(--color-text);
+  letter-spacing: -0.01em;
+}
+
+.editProfileBtn {
+  background: var(--color-primary-tint);
+  color: var(--color-primary);
+  border: 1.5px solid var(--color-primary-soft-strong);
+  border-radius: 999px;
+  padding: 7px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 8px rgb(var(--primary-rgb) / 0.08);
+}
+
+.editProfileBtn:hover {
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  border-color: var(--color-primary);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgb(var(--primary-rgb) / 0.2);
+}
+
+/* Hero Profile Card */
+.heroCard {
+  background: rgb(var(--surface-rgb) / 0.9);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-radius: 24px;
+  padding: 22px 20px;
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 10px 30px rgb(var(--ink-rgb) / 0.05);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 10px;
+}
+
+.avatarWrapper {
+  position: relative;
+  width: 96px;
+  height: 96px;
+  margin-bottom: 2px;
+}
+
+.avatarImg {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3.5px solid var(--glass-border);
+  box-shadow: 0 8px 24px rgb(var(--primary-rgb) / 0.22);
+  display: block;
+}
+
+.avatarFallback {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  background: var(--color-primary-tint);
+  color: var(--color-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 38px;
+  font-weight: 800;
+  border: 3.5px solid var(--glass-border);
+  box-shadow: 0 8px 24px rgb(var(--primary-rgb) / 0.22);
+}
+
+.verifiedBadge {
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  width: 24px;
+  height: 24px;
+  background: var(--color-success);
+  color: var(--color-text-inverse);
+  border-radius: 50%;
+  border: 2px solid var(--glass-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 800;
+  box-shadow: 0 2px 6px rgb(var(--success-rgb) / 0.35);
+}
+
+.nameGroup {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.caregiverName {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--color-text);
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.roleBadgePill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border-subtle);
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+/* Stat Pills (Hourly Rate & Experience) */
+.statsGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  width: 100%;
+  margin-top: 6px;
+}
+
+.statPillPeach {
+  background: var(--color-primary-tint);
+  border: 1px solid var(--color-primary-soft-strong);
+  border-radius: 16px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+
+.statPillSlate {
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 16px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+
+.statLabel {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+}
+
+.statValueOrange {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--color-primary);
+  margin: 0;
+}
+
+.statValueDark {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--color-text);
+  margin: 0;
+}
+
+/* Contact Info Card */
+.infoCard {
+  background: rgb(var(--surface-rgb) / 0.9);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-radius: 20px;
+  padding: 16px 18px;
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 6px 20px rgb(var(--ink-rgb) / 0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.infoRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.infoIconWrap {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  background: var(--color-surface-sunken);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-tertiary);
+  flex-shrink: 0;
+}
+
+.infoTextGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.infoLabel {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--color-text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.infoValue {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.infoDivider {
+  height: 1px;
+  background: var(--color-surface-sunken);
+  width: 100%;
+}
+
+/* Action Tiles (Reviews & Earnings) */
+.actionsSection {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.actionTile {
+  background: rgb(var(--surface-rgb) / 0.9);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-radius: 18px;
+  padding: 14px 18px;
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 4px 16px rgb(var(--ink-rgb) / 0.04);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  user-select: none;
+}
+
+.actionTile:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgb(var(--primary-rgb) / 0.1);
+  border-color: var(--color-warning-border);
+}
+
+.actionTileLeft {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.actionIconOrange {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  background: var(--color-primary-tint);
+  color: var(--color-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.actionIconPeach {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  background: var(--color-success-tint);
+  color: var(--color-success);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.actionTileText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.actionTitle {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.actionSubtitle {
+  font-size: 11px;
+  color: var(--color-text-tertiary);
+}
+
+.chevronIcon {
+  color: var(--color-text-faint);
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+
+.actionTile:hover .chevronIcon {
+  transform: translateX(2px);
+  color: var(--color-primary);
+}
+
+/* Footer Buttons (Sign Out & Deactivate) */
+.footerActions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.signOutBtn {
+  width: 100%;
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 1.5px solid var(--color-border-subtle);
+  border-radius: 999px;
+  padding: 13px 20px;
+  font-size: 14px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgb(var(--ink-rgb) / 0.04);
+  transition: all 0.2s ease;
+}
+
+.signOutBtn:hover {
+  background: var(--color-surface-muted);
+  color: var(--color-text);
+  border-color: var(--color-border-strong);
+  transform: translateY(-1px);
+}
+
+.deactivateBtn {
+  width: 100%;
+  background: var(--color-danger-tint);
+  color: var(--color-danger);
+  border: 1.5px solid var(--color-danger-border-strong);
+  border-radius: 999px;
+  padding: 12px 20px;
+  font-size: 13.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.deactivateBtn:hover {
+  background: var(--color-danger-tint);
+  color: var(--color-danger-strong);
+  border-color: var(--color-danger-border-strong);
+}

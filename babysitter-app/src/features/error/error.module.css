@@ -1,0 +1,70 @@
+/* Glassmorphism 2.0 Error & 404 Styles */
+
+.wrapper {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4, 16px);
+  background: var(--gradient-auth-pastel);
+  background-attachment: fixed;
+  max-width: var(--shell-max-width, 480px);
+  margin: 0 auto;
+  box-sizing: border-box;
+  font-family: var(--font-family-base, 'Plus Jakarta Sans', system-ui, sans-serif);
+}
+
+.card {
+  background: rgb(var(--surface-rgb) / 0.75);
+  border-radius: var(--radius-2xl, 20px);
+  padding: var(--space-8, 32px) var(--space-6, 24px);
+  text-align: center;
+  width: 100%;
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 12px 40px rgb(var(--shadow-ink-rgb) / 0.06);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3, 12px);
+}
+
+.code {
+  font-size: clamp(4rem, 12vw, 5.5rem);
+  font-weight: 900;
+  color: var(--color-primary, #E8622A);
+  line-height: 1;
+  letter-spacing: -0.04em;
+  margin: 0;
+  text-shadow: 0 4px 16px rgb(var(--primary-rgb) / 0.15);
+}
+
+.iconCircle {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: var(--color-danger-tint);
+  color: var(--color-danger);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+  margin-bottom: var(--space-2, 8px);
+}
+
+.title {
+  font-size: var(--font-size-xl, 20px);
+  color: var(--color-text, #1E293B);
+  margin: 0;
+  font-weight: 800;
+}
+
+.message {
+  color: var(--color-text-secondary, #64748B);
+  margin: 0 0 var(--space-3, 12px);
+  font-size: var(--font-size-sm, 14px);
+  line-height: 1.6;
+  max-width: 320px;
+}
+

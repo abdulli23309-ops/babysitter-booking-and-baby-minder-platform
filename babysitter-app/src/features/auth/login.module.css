@@ -1,0 +1,127 @@
+/* Login — Phase F4.1 / Phase F-UI. Premium auth card built on F2 tokens. */
+
+.page {
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: var(--gradient-auth-pastel, linear-gradient(160deg, #FBD5E5 0%, #E6DCF5 45%, #CCE6FF 100%));
+  background-attachment: fixed;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-6) var(--space-4);
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.container {
+  width: 100%;
+  max-width: 440px;
+  margin: 0 auto;
+  text-align: center;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.appTitle {
+  font-size: clamp(2rem, 6vw, 2.5rem);
+  font-weight: var(--font-weight-extrabold);
+  color: var(--color-text);
+  margin: 0 0 var(--space-2);
+}
+
+.subtitle {
+  font-size: var(--font-size-md);
+  color: var(--color-text-secondary);
+  margin: 0 0 var(--space-6);
+}
+
+.card {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  background: rgb(var(--surface-rgb) / 0.88);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-2xl, 24px);
+  padding: var(--space-8) var(--space-6);
+  box-shadow: 0 10px 30px rgb(var(--ink-rgb) / 0.08);
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.cardTitle {
+  margin: 0 0 var(--space-2);
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text);
+  text-align: center;
+}
+
+.roleGroup {
+  display: flex;
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.rolePill {
+  flex: 1;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-full);
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-surface-alt);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  box-sizing: border-box;
+  transition: all var(--transition-base);
+}
+
+.rolePill:hover {
+  border-color: var(--color-primary);
+}
+
+.rolePill:focus-visible {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.rolePillActive {
+  background: var(--color-primary-soft);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  font-weight: var(--font-weight-semibold);
+}
+
+.footerText {
+  margin: var(--space-3) 0 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  text-align: center;
+}
+
+.link {
+  color: var(--color-primary);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+  text-decoration: underline;
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: inherit;
+  font-family: inherit;
+}
+
+.link:focus-visible {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+

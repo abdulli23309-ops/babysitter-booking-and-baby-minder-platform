@@ -1,0 +1,429 @@
+/* ============================================================
+   Set Availability — Weekly Timetable Grid Styles
+   ============================================================ */
+
+.availContainer {
+  min-height: 100vh;
+  max-width: 480px;
+  margin: 0 auto;
+  width: 100%;
+  position: relative;
+  padding: 16px 16px calc(84px + 16px);
+  background: var(--gradient-auth-pastel, linear-gradient(160deg, #FBD5E5 0%, #E6DCF5 45%, #CCE6FF 100%));
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  overflow-x: hidden;
+}
+
+/* Top Bar: BackButton on left, centered title, spacer on right */
+.topBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 4px;
+}
+
+.headerCenter {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  flex: 1;
+}
+
+.pageTitle {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 700;
+  color: #1A1D2E;
+  color: var(--color-text);
+  text-align: center;
+}
+
+.topBarSpacer {
+  width: 42px;
+}
+
+.subtitle {
+  margin: 0;
+  font-size: 13px;
+  color: #5A6072;
+  color: var(--color-text-secondary);
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+/* Weekly Timetable Card */
+.timetableCard {
+  background: #FFFFFF;
+  background: var(--color-surface);
+  border-radius: 24px;
+  padding: 16px 12px;
+  box-shadow: 0 6px 24px rgba(26, 29, 46, 0.05);
+  box-shadow: 0 6px 24px rgb(var(--ink-rgb) / 0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.timetableHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.bulkActionsRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.bulkBtn {
+  padding: 5px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 999px;
+  border: 1px solid #E2E8F0;
+  background: #F8FAFC;
+  color: #475569;
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-surface-muted);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-sizing: border-box;
+}
+
+.bulkBtn:hover {
+  background: #F1F5F9;
+  border-color: #CBD5E1;
+  color: #1E293B;
+  background: var(--color-surface-sunken);
+  border-color: var(--color-border-strong);
+  color: var(--color-text);
+}
+
+.bulkBtn:active {
+  transform: scale(0.97);
+}
+
+/* Horizontal scroll wrapper for mobile (< 640px) */
+.timetableScrollContainer {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 8px;
+  box-sizing: border-box;
+}
+
+/* Weekly timetable grid: 8 columns (1 sticky time column + 7 day columns) */
+.timetableGrid {
+  display: grid;
+  grid-template-columns: max-content repeat(7, 32px);
+  grid-template-rows: 28px repeat(7, 32px);
+  row-gap: 6px;
+  column-gap: 4px;
+  box-sizing: border-box;
+  align-items: center;
+  width: max-content;
+  min-width: 100%;
+}
+
+/* Sticky time column on left */
+.stickyCol {
+  position: sticky;
+  left: 0;
+  z-index: 10;
+  background-color: #FFFFFF;
+  background-color: var(--color-surface);
+  padding-right: 8px;
+  box-shadow: 2px 0 4px rgba(0, 0, 0, 0.05);
+  box-shadow: 2px 0 4px rgb(var(--shadow-ink-rgb) / 0.05);
+  box-sizing: border-box;
+}
+
+/* Day header text: Mon, Tue, Wed, Thu, Fri, Sat, Sun */
+.gridHeaderCell {
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: bold;
+  text-transform: uppercase;
+  color: #1A1D2E;
+  background-color: #FFFFFF;
+  color: var(--color-text);
+  background-color: var(--color-surface);
+  text-align: center;
+  box-sizing: border-box;
+}
+
+/* Time column text: 08:00 AM – 10:00 AM */
+.timeLabelCell {
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  font-size: 10px;
+  font-weight: 600;
+  color: #64748B;
+  background-color: #FFFFFF;
+  color: var(--color-text-tertiary);
+  background-color: var(--color-surface);
+  padding-left: 2px;
+  white-space: nowrap;
+  box-sizing: border-box;
+}
+
+/* Cell Toggle States (Micro-sized checkboxes) */
+.slotCell {
+  width: 32px;
+  height: 32px;
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  color: transparent;
+  transition: all 0.15s ease;
+  padding: 0;
+  outline: none;
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+
+.slotCell:hover {
+  background: #F1F5F9;
+  border-color: #CBD5E1;
+  background: var(--color-surface-sunken);
+  border-color: var(--color-border-strong);
+}
+
+.slotCellActive {
+  background: #E8622A !important;
+  border: 1px solid #E8622A !important;
+  color: #FFFFFF !important;
+  background: var(--color-primary) !important;
+  border: 1px solid var(--color-primary) !important;
+  color: var(--color-text-inverse) !important;
+  font-weight: 700 !important;
+  box-shadow: 0 2px 6px rgba(232, 98, 42, 0.35);
+  box-shadow: 0 2px 6px rgb(var(--primary-rgb) / 0.35);
+}
+
+/* Section Title */
+.sectionTitle {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: #1A1D2E;
+  color: var(--color-text);
+}
+
+/* Preferred Work Area Section */
+.areaSection {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+}
+
+/* Smart Geocoded Area Input */
+.smartAreaWrapper {
+  background: #FFFFFF;
+  background: var(--color-surface);
+  border-radius: 999px;
+  padding: 10px 18px;
+  box-shadow: 0 4px 16px rgba(26, 29, 46, 0.04);
+  box-shadow: 0 4px 16px rgb(var(--ink-rgb) / 0.04);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1.5px solid transparent;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.smartAreaWrapper:focus-within {
+  border-color: #FED7AA;
+  box-shadow: 0 4px 16px rgba(232, 98, 42, 0.1);
+  border-color: var(--color-warning-border);
+  box-shadow: 0 4px 16px rgb(var(--primary-rgb) / 0.1);
+}
+
+.smartAreaPin {
+  color: #E8622A;
+  color: var(--color-primary);
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.smartAreaInput {
+  flex: 1;
+  border: none;
+  background: transparent;
+  font-size: 14px;
+  font-weight: 600;
+  color: #1A1D2E;
+  color: var(--color-text);
+  outline: none;
+  font-family: inherit;
+  cursor: default;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.smartAreaBadge {
+  background: #FEECE5;
+  color: #E05822;
+  background: var(--color-primary-tint);
+  color: var(--color-primary-active);
+  font-size: 10px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+
+/* Save Button */
+.saveBtn {
+  width: 100%;
+  background: #E8622A;
+  color: #FFFFFF;
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  border-radius: 999px;
+  padding: 16px;
+  font-size: 16px;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 6px 20px rgba(232, 98, 42, 0.35);
+  box-shadow: 0 6px 20px rgb(var(--primary-rgb) / 0.35);
+  transition: transform 0.15s ease, background 0.15s ease;
+  outline: none;
+  text-align: center;
+  margin-top: 4px;
+}
+
+.saveBtn:hover {
+  background: #D5541E;
+  background: var(--color-primary-active);
+}
+
+.saveBtn:active {
+  transform: scale(0.98);
+}
+
+.saveBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Locked (booked) cell — rendered grey and non-interactive, with a padlock overlay */
+.cellLocked {
+  background: #E5E7EB !important;
+  border-color: #D1D5DB !important;
+  color: #6B7280 !important;
+  background: var(--color-surface-sunken) !important;
+  border-color: var(--color-border-strong) !important;
+  color: var(--color-text-secondary) !important;
+  cursor: not-allowed !important;
+  position: relative;
+}
+
+.cellLocked::after {
+  content: '🔒';
+  font-size: 12px;
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  opacity: 0.7;
+}
+
+/* Persistent lockout banner — shown while the sitter is under a 3-hour lockout */
+.lockoutBanner {
+  background: #FEE2E2;
+  color: #991B1B;
+  border: 1px solid #FCA5A5;
+  background: var(--color-danger-tint);
+  color: var(--color-danger-strong);
+  border: 1px solid var(--color-danger-border-strong);
+  border-radius: 12px;
+  padding: 12px 16px;
+  margin-bottom: 12px;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+/* Rate Per Hour Section */
+.rateSection {
+  background: var(--color-surface);
+  border-radius: 24px;
+  padding: 18px 16px;
+  box-shadow: 0 6px 24px rgb(var(--ink-rgb) / 0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-sizing: border-box;
+}
+
+.rateInputWrapper {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--color-surface-muted);
+  border: 1.5px solid var(--color-border-subtle);
+  border-radius: 16px;
+  padding: 12px 16px;
+  box-sizing: border-box;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.rateInputWrapper:focus-within {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgb(var(--primary-rgb) / 0.15);
+}
+
+.rateCurrencyBadge {
+  font-weight: 700;
+  color: var(--color-primary);
+  font-size: 14px;
+  background: var(--color-primary-tint);
+  padding: 4px 10px;
+  border-radius: 8px;
+}
+
+.rateInput {
+  flex: 1;
+  border: none;
+  background: transparent;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-text);
+  outline: none;
+  font-family: inherit;
+}
+

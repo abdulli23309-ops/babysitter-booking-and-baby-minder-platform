@@ -1,0 +1,357 @@
+/* ============================================================
+   Phase F2 & Phase F-UI-2 — Design Tokens
+   Semantic CSS Custom Properties.
+   ============================================================ */
+
+:root {
+  /* ---- Brand ---- */
+  --color-primary: #E8622A;
+  --color-primary-hover: #D4541F;
+  --color-primary-active: #B94A1B;
+  --color-primary-soft: rgba(232, 98, 42, 0.12);
+
+  /* ---- Neutrals ---- */
+  --color-surface: #FFFFFF;
+  --color-surface-alt: #F7F9FC;
+  --color-background: transparent;
+  --color-border: #F0F4F8;
+  --color-border-strong: #E1E7EF;
+
+  /* ---- Text ---- */
+  --color-text: #1A1D2E;
+  --color-text-secondary: #5A6072;
+  --color-text-muted: #8E9AAF;
+  --color-text-inverse: #FFFFFF;
+
+  /* ---- Semantic ---- */
+  --color-success: #27AE60;
+  --color-success-soft: rgba(39, 174, 96, 0.12);
+  --color-error: #E74C3C;
+  --color-error-soft: rgba(231, 76, 60, 0.12);
+  --color-danger: #E74C3C;
+  --color-danger-hover: #C0392B;
+  --color-danger-soft: rgba(231, 76, 60, 0.12);
+  --color-danger-border: rgba(231, 76, 60, 0.25);
+  --color-danger-bg: rgba(231, 76, 60, 0.04);
+  --color-warning: #F39C12;
+  --color-warning-soft: rgba(243, 156, 18, 0.12);
+  --color-info: #3B82F6;
+  --color-info-soft: rgba(59, 130, 246, 0.12);
+
+  /* ---- Typography ---- */
+  --font-sans: 'DM Sans', 'Nunito', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+  --font-weight-extrabold: 800;
+  --font-size-xs: 0.75rem;   /* 12px */
+  --font-size-sm: 0.875rem;  /* 14px */
+  --font-size-md: 1rem;      /* 16px */
+  --font-size-lg: 1.125rem;  /* 18px */
+  --font-size-xl: 1.25rem;   /* 20px */
+  --line-height-tight: 1.2;
+  --line-height-normal: 1.5;
+
+  /* ---- Spacing scale (4px base) ---- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* ---- Border radius scale ---- */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-2xl: 24px;
+  --radius-full: 999px;
+
+  /* ---- Shadow scale ---- */
+  --shadow-sm: 0 1px 3px rgba(26, 29, 46, 0.08);
+  --shadow-md: 0 4px 12px rgba(26, 29, 46, 0.08);
+  --shadow-lg: 0 8px 24px rgba(26, 29, 46, 0.12);
+  --shadow-primary: 0 8px 24px rgba(232, 98, 42, 0.35);
+
+  /* ---- Motion ---- */
+  --transition-fast: 120ms ease;
+  --transition-base: 180ms ease;
+  --transition-slow: 280ms ease;
+
+  /* ---- Z-index layers ---- */
+  --z-bottom-nav: 1000;
+  --z-header: 1040;
+  --z-dropdown: 1050;
+  --z-modal-overlay: 1100;
+  --z-modal: 1110;
+  --z-drawer-overlay: 1150;
+  --z-drawer: 1160;
+  --z-toast: 1200;
+  --z-scroll-progress: 1300;
+  --z-skip-link: 1400;
+
+  /* ---- Layout & Shell ---- */
+  --shell-max-width: 480px;
+  --shell-max-width-wide: 1024px;
+  --header-height: 56px;
+
+  /* ---- App shell backgrounds (theme-aware, consumed by index.css) ---- */
+  --app-body-bg: #EAF0F8;
+  --app-shell-bg: var(--gradient-auth-pastel);
+
+  /* ---- App chrome (sticky header / drawer / progress bar) ---- */
+  --chrome-bg: rgba(255, 255, 255, 0.72);
+  --chrome-bg-scrolled: rgba(255, 255, 255, 0.88);
+  --chrome-border: rgba(226, 232, 240, 0.75);
+  --chrome-shadow: 0 6px 24px rgba(26, 29, 46, 0.10);
+
+  /* ---- Interaction accents ---- */
+  --color-primary-soft-strong: rgba(232, 98, 42, 0.20);
+  --shadow-primary-hover: 0 12px 28px rgba(232, 98, 42, 0.42);
+
+  /* ---- Overlay backdrop ---- */
+  --color-backdrop: rgba(26, 29, 46, 0.45);
+
+  /* ---- Glassmorphism 2.0 ---- */
+  --glass-bg: rgba(255, 255, 255, 0.78);
+  --glass-bg-subtle: rgba(255, 255, 255, 0.60);
+  --glass-bg-elevated: rgba(255, 255, 255, 0.92);
+  --glass-border: rgba(255, 255, 255, 0.70);
+  --glass-border-subtle: rgba(230, 235, 245, 0.60);
+  --glass-blur: blur(14px);
+  --glass-blur-lg: blur(20px);
+  --glass-shadow: 0 10px 30px rgba(26, 29, 46, 0.06);
+
+  /* ---- Bento & Gradients ---- */
+  --gradient-coral: linear-gradient(135deg, #FF6B4A 0%, #E8622A 100%);
+  --gradient-coral-soft: linear-gradient(135deg, #FFF5F0 0%, #FFEBE1 100%);
+  --gradient-teal-soft: linear-gradient(135deg, #F0FDF4 0%, #DCFCE7 100%);
+  --gradient-blue-soft: linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%);
+  --gradient-purple-soft: linear-gradient(135deg, #FAF5FF 0%, #F3E8FF 100%);
+  --gradient-amber-soft: linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%);
+
+  /* ---- Premium Pastel Gradients ---- */
+  --gradient-auth-pastel: linear-gradient(160deg, #FBD5E5 0%, #E6DCF5 45%, #CCE6FF 100%);
+  --gradient-pastel-soft: linear-gradient(160deg, #FBD5E5 0%, #E6DCF5 45%, #CCE6FF 100%);
+
+  /* ---- Status & Badges ---- */
+  --badge-success-bg: #E8F8F0;
+  --badge-success-text: #1E824C;
+  --badge-warning-bg: #FFF3EB;
+  --badge-warning-text: #C8521A;
+  --badge-info-bg: #EBF4FF;
+  --badge-info-text: #2563EB;
+  --badge-purple-bg: #F5EEFD;
+  --badge-purple-text: #7C3AED;
+
+  /* ============================================================
+     Phase F-UI-11 / 1.5 — Extended semantic palette
+     ------------------------------------------------------------
+     Added by the token-migration sweep so the colors the screens
+     actually used can be expressed as tokens instead of literals.
+
+     Rule: every LIGHT value here is identical to the literal it
+     replaces, so the verified light theme stays pixel-for-pixel
+     unchanged; only the dark overrides change.
+
+     `-rgb` channel tokens exist for colors the screens compose with
+     varying opacity (shadows, veils, glows). Consumers keep their own
+     alpha:  rgb(var(--primary-rgb) / 0.35) === rgba(232,98,42,0.35)
+     ============================================================ */
+
+  /* ---- Extended neutral ramp ---- */
+  --color-text-tertiary: #64748B;
+  --color-text-faint: #94A3B8;
+  --color-surface-muted: #F8FAFC;
+  --color-surface-sunken: #F1F5F9;
+  --color-border-subtle: #E2E8F0;
+  --color-surface-inverse: #111827;
+  --color-text-warm: #8C7A70;
+  /* Referenced (with fallbacks) by pre-existing screen CSS — now live tokens. */
+  --color-surface-hover: #F8FAFC;
+  --color-primary-dark: #C24D1B;
+
+  /* ---- Extended status ramp ---- */
+  --color-success-strong: #16A34A;
+  --color-warning-strong: #D97706;
+  --color-danger-strong: #DC2626;
+  --color-info-strong: #0284C7;
+  --color-success-tint: #ECFDF5;
+  --color-danger-tint: #FEF2F2;
+  --color-warning-tint: #FEF3C7;
+  --color-info-tint: #EFF6FF;
+  --color-primary-tint: #FFF5EE;
+  --color-primary-tint-light: #FFF7ED;
+  --color-primary-tint-soft: #FFF5EF;
+
+  /* ---- Pastel accent tints (standalone bg use, e.g. auth/gradient screens) ---- */
+  --color-pastel-coral-soft: #FBD5E5;
+  --color-pastel-lavender: #E6DCF5;
+  --color-pastel-sky: #CCE6FF;
+
+  /* ---- Extended status borders ---- */
+  --color-success-border: #BBF7D0;
+  --color-danger-border-strong: #FECACA;
+  --color-warning-border: #FDE68A;
+  --color-info-border: #DBEAFE;
+
+  /* ---- Media / decoration (theme-independent by design) ---- */
+  --color-media-canvas: #000000;
+
+  /* ---- Alpha-composed channel tokens ---- */
+  --primary-rgb: 232 98 42;
+  --ink-rgb: 26 29 46;
+  --shadow-ink-rgb: 0 0 0;
+  --surface-rgb: 255 255 255;
+  --edge-rgb: 255 255 255;
+  --neu-soft-rgb: 163 177 198;
+  --purple-rgb: 190 170 210;
+  --success-rgb: 22 163 74;
+  --warning-rgb: 245 158 11;
+  --danger-rgb: 220 38 38;
+  --info-rgb: 2 132 199;
+}
+
+/* ============================================================
+   Phase F-UI-11 (Phase 1) — Dark theme token overrides
+   ------------------------------------------------------------
+   The theme is selected by [data-theme] on <html> (set pre-paint by the
+   bootstrap script in index.html, then kept in sync by ThemeProvider).
+   Only *semantic* tokens are redefined here, so every component that
+   consumes tokens switches automatically — no per-component dark rules.
+   ============================================================ */
+[data-theme='dark'] {
+  /* ---- Brand (brightened for contrast on dark surfaces) ---- */
+  --color-primary: #FF7A45;
+  --color-primary-hover: #FF9264;
+  --color-primary-active: #E8622A;
+  --color-primary-soft: rgba(255, 122, 69, 0.16);
+  --color-primary-soft-strong: rgba(255, 122, 69, 0.24);
+
+  /* ---- Neutrals ---- */
+  --color-surface: #1A1E2C;
+  --color-surface-alt: #232838;
+  --color-background: transparent;
+  --color-border: #2B3143;
+  --color-border-strong: #3A4258;
+
+  /* ---- Text ---- */
+  --color-text: #F3F5F9;
+  --color-text-secondary: #B4BCCD;
+  --color-text-muted: #838DA3;
+  --color-text-inverse: #FFFFFF;
+
+  /* ---- Semantic ---- */
+  --color-success: #34D399;
+  --color-success-soft: rgba(52, 211, 153, 0.16);
+  --color-error: #F87171;
+  --color-error-soft: rgba(248, 113, 113, 0.16);
+  --color-danger: #F87171;
+  --color-danger-hover: #EF5B5B;
+  --color-danger-soft: rgba(248, 113, 113, 0.16);
+  --color-danger-border: rgba(248, 113, 113, 0.35);
+  --color-danger-bg: rgba(248, 113, 113, 0.10);
+  --color-warning: #FBBF24;
+  --color-warning-soft: rgba(251, 191, 36, 0.16);
+  --color-info: #60A5FA;
+  --color-info-soft: rgba(96, 165, 250, 0.16);
+
+  /* ---- Status & badges ---- */
+  --badge-success-bg: #14301F;
+  --badge-success-text: #6EE7A8;
+  --badge-warning-bg: #3A2415;
+  --badge-warning-text: #FFB877;
+  --badge-info-bg: #16233D;
+  --badge-info-text: #93C5FD;
+  --badge-purple-bg: #2A1F3D;
+  --badge-purple-text: #C4A6FF;
+
+  /* ---- Extended semantic palette (Phase F-UI-11 / 1.5) ---- */
+  --color-text-tertiary: #8A94AA;
+  --color-text-faint: #6E7889;
+  --color-text-warm: #B9A79C;
+  --color-surface-hover: #232838;
+  --color-primary-dark: #E8622A;
+  --color-surface-muted: #161A26;
+  --color-surface-sunken: #232838;
+  --color-border-subtle: #2B3143;
+  --color-surface-inverse: #232838;
+
+  --color-success-strong: #34D399;
+  --color-warning-strong: #FBBF24;
+  --color-danger-strong: #F87171;
+  --color-info-strong: #60A5FA;
+  --color-success-tint: #123024;
+  --color-danger-tint: #3A1D1D;
+  --color-warning-tint: #3A2415;
+  --color-info-tint: #16233D;
+  --color-primary-tint: #2A1D18;
+  --color-primary-tint-light: #2A1D18;
+  --color-primary-tint-soft: #2A1D18;
+
+  --color-success-border: #1F5B3E;
+  --color-danger-border-strong: #6B2A2A;
+  --color-warning-border: #5C4416;
+  --color-info-border: #1E3A6B;
+
+  --primary-rgb: 255 122 69;
+  --ink-rgb: 0 0 0;
+  --shadow-ink-rgb: 0 0 0;
+  --surface-rgb: 26 30 44;
+  --edge-rgb: 255 255 255;
+  --neu-soft-rgb: 0 0 0;
+  --purple-rgb: 196 166 255;
+  --success-rgb: 52 211 153;
+  --warning-rgb: 251 191 36;
+  --danger-rgb: 248 113 113;
+  --info-rgb: 96 165 250;
+
+  /* ---- Shadows (deeper, since dark surfaces swallow soft shadows) ---- */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.50);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.55);
+  --shadow-primary: 0 8px 24px rgba(255, 122, 69, 0.30);
+  --shadow-primary-hover: 0 12px 28px rgba(255, 122, 69, 0.38);
+
+  /* ---- Glassmorphism ---- */
+  --glass-bg: rgba(26, 30, 44, 0.78);
+  --glass-bg-subtle: rgba(26, 30, 44, 0.62);
+  --glass-bg-elevated: rgba(26, 30, 44, 0.94);
+  --glass-border: rgba(255, 255, 255, 0.09);
+  --glass-border-subtle: rgba(255, 255, 255, 0.06);
+  --glass-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+
+  /* ---- Pastel gradients become deep, desaturated tints ---- */
+  --gradient-coral-soft: linear-gradient(135deg, #2A1D18 0%, #33231C 100%);
+  --gradient-teal-soft: linear-gradient(135deg, #10231B 0%, #14301F 100%);
+  --gradient-blue-soft: linear-gradient(135deg, #131C2E 0%, #16233D 100%);
+  --gradient-purple-soft: linear-gradient(135deg, #1E1830 0%, #2A1F3D 100%);
+  --gradient-amber-soft: linear-gradient(135deg, #2A2113 0%, #3A2415 100%);
+  --gradient-auth-pastel: linear-gradient(160deg, #151A2B 0%, #1B1730 45%, #101C2B 100%);
+  --gradient-pastel-soft: linear-gradient(160deg, #151A2B 0%, #1B1730 45%, #101C2B 100%);
+
+  /* ---- Pastel accent tints (dark-mode counterparts) ---- */
+  --color-pastel-coral-soft: #2A1D18;
+  --color-pastel-lavender: #2A1F3D;
+  --color-pastel-sky: #101C2B;
+
+  /* ---- App shell ---- */
+  --app-body-bg: #07090F;
+  --app-shell-bg: var(--gradient-auth-pastel);
+
+  /* ---- App chrome ---- */
+  --chrome-bg: rgba(20, 24, 36, 0.72);
+  --chrome-bg-scrolled: rgba(20, 24, 36, 0.90);
+  --chrome-border: rgba(255, 255, 255, 0.09);
+  --chrome-shadow: 0 6px 24px rgba(0, 0, 0, 0.50);
+
+  /* ---- Overlay backdrop ---- */
+  --color-backdrop: rgba(0, 0, 0, 0.62);
+}
+

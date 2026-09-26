@@ -1,0 +1,351 @@
+.cryContainer {
+  min-height: 100vh;
+  padding: var(--space-4) var(--space-4) calc(80px + var(--space-6));
+  background: var(--color-background);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  max-width: var(--shell-max-width, 480px);
+  margin: 0 auto;
+  transition: background var(--transition-base);
+}
+
+.cryContainerAlarmed {
+  background: var(--color-danger-tint);
+  animation: alarmPulse 1.6s ease-in-out infinite alternate;
+}
+
+@keyframes alarmPulse {
+  0% {
+    background: var(--color-danger-tint);
+  }
+  100% {
+    background: var(--color-danger-tint);
+  }
+}
+
+.topBar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding-top: var(--space-2);
+}
+
+.backBtn {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-full);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text);
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: all var(--transition-fast);
+}
+
+.backBtn:hover {
+  background: var(--color-surface-alt);
+  transform: translateY(-1px);
+}
+
+.pageTitle {
+  margin: 0;
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text);
+  flex: 1;
+}
+
+/* Radar & Waveform Hero Card */
+.radarCard {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-5);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.radarCardAlarmed {
+  border-color: var(--color-danger);
+  box-shadow: 0 8px 24px rgb(var(--danger-rgb) / 0.18);
+}
+
+/* Radar Pulse Visualization */
+.radarWrapper {
+  width: 120px;
+  height: 120px;
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  margin: var(--space-3) 0 var(--space-4);
+}
+
+.radarRing1,
+.radarRing2,
+.radarRing3 {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-full);
+  border: 2px solid var(--color-primary);
+  opacity: 0;
+}
+
+.radarActive .radarRing1 {
+  animation: radarRipple 2s cubic-bezier(0, 0.2, 0.8, 1) infinite;
+}
+
+.radarActive .radarRing2 {
+  animation: radarRipple 2s cubic-bezier(0, 0.2, 0.8, 1) infinite;
+  animation-delay: 0.6s;
+}
+
+.radarActive .radarRing3 {
+  animation: radarRipple 2s cubic-bezier(0, 0.2, 0.8, 1) infinite;
+  animation-delay: 1.2s;
+}
+
+.radarCenter {
+  width: 64px;
+  height: 64px;
+  border-radius: var(--radius-full);
+  background: var(--gradient-coral-soft);
+  color: var(--color-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow-md);
+  z-index: 2;
+  transition: all var(--transition-base);
+}
+
+.radarCenterAlarmed {
+  background: var(--color-danger-tint);
+  color: var(--color-danger-strong);
+  box-shadow: 0 0 20px rgb(var(--danger-rgb) / 0.4);
+}
+
+@keyframes radarRipple {
+  0% {
+    transform: scale(0.5);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+}
+
+/* Status Pill */
+.statusBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px;
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.statusCalm {
+  background: var(--badge-success-bg);
+  color: var(--badge-success-text);
+}
+
+.statusListening {
+  background: var(--badge-info-bg);
+  color: var(--badge-info-text);
+}
+
+.statusCry {
+  background: var(--color-danger-tint);
+  color: var(--color-danger-strong);
+  animation: pulseBadge 1s ease-in-out infinite;
+}
+
+@keyframes pulseBadge {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+.statusText {
+  margin: var(--space-2) 0 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  font-weight: 500;
+}
+
+/* Canvas Waveform */
+.waveformBox {
+  width: 100%;
+  margin-top: var(--space-4);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--color-surface-alt);
+  padding: 4px;
+}
+
+/* Timer Countdown Bar */
+.timerCard {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-3) var(--space-4);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.timerHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+}
+
+.timerBarTrack {
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--color-surface-alt);
+  overflow: hidden;
+}
+
+.timerBarFill {
+  height: 100%;
+  border-radius: var(--radius-full);
+  background: var(--color-primary);
+  transition: width 0.3s ease;
+}
+
+/* 4-Bento Metrics Grid */
+.metricsGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-3);
+}
+
+.metricCard {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-3) var(--space-4);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.metricLabel {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+}
+
+.metricVal {
+  margin: 0;
+  font-size: var(--font-size-lg);
+  font-weight: 800;
+  color: var(--color-text);
+}
+
+.metricSub {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+}
+
+/* Activity Log */
+.logCard {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-3) var(--space-4);
+  box-shadow: var(--shadow-sm);
+}
+
+.logTitle {
+  margin: 0 0 var(--space-2);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+}
+
+.logList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+.logItem {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.logItem:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+/* Jitsi Native Responsive Container */
+.jitsiWrapper {
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  box-shadow: var(--shadow-lg);
+  border: 1px solid var(--color-border);
+  background: var(--color-media-canvas);
+  position: relative;
+  aspect-ratio: 16 / 9;
+  width: 100%;
+}
+
+.liveBadge {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 10;
+  background: rgb(var(--shadow-ink-rgb) / 0.7);
+  backdrop-filter: blur(8px);
+  color: var(--color-text-inverse);
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.liveDot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--color-danger);
+  animation: pulseBadge 1s infinite;
+}
+

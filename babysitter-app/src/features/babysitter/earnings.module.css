@@ -1,0 +1,266 @@
+/* ============================================================
+   Earnings — Frame 14 Strict Replication
+   ============================================================ */
+
+.earningsContainer {
+  min-height: 100vh;
+  max-width: 480px;
+  margin: 0 auto;
+  width: 100%;
+  position: relative;
+  padding: 16px 16px calc(84px + 16px);
+  background: var(--gradient-auth-pastel, linear-gradient(160deg, #FBD5E5 0%, #E6DCF5 45%, #CCE6FF 100%));
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow-x: hidden;
+}
+
+/* Top Bar: BackButton on left, centered title, circular more button on right */
+.topBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 4px;
+}
+
+.pageTitle {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--color-text);
+  text-align: center;
+  flex: 1;
+}
+
+.moreBtn {
+  width: 42px;
+  height: 42px;
+  min-width: 42px;
+  min-height: 42px;
+  border-radius: 50%;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  box-shadow: 0 2px 8px rgb(var(--shadow-ink-rgb) / 0.06);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text);
+  cursor: pointer;
+  transition: transform 0.15s ease;
+  outline: none;
+}
+
+.moreBtn:active {
+  transform: scale(0.95);
+}
+
+/* Floating Available Balance Hero Card (Frame 14) */
+.balanceCard {
+  background: var(--color-surface);
+  border-radius: 28px;
+  padding: 26px 20px 22px;
+  box-shadow: 0 6px 24px rgb(var(--ink-rgb) / 0.05);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 6px;
+  position: relative;
+  overflow: hidden;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.cardAccentCircle {
+  position: absolute;
+  top: -20px;
+  right: -20px;
+  width: 110px;
+  height: 110px;
+  border-radius: 50%;
+  background: var(--color-primary-tint);
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.balanceLabel {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text-tertiary);
+  position: relative;
+  z-index: 1;
+}
+
+.balanceAmount {
+  margin: 2px 0 6px;
+  font-size: 2.25rem;
+  font-weight: 800;
+  color: var(--color-text);
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  position: relative;
+  z-index: 1;
+}
+
+.totalEarningsLink {
+  color: var(--color-primary);
+  font-size: 14px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  text-decoration: none;
+  cursor: pointer;
+  position: relative;
+  z-index: 1;
+}
+
+/* Two Side-by-Side Pill Cards (Completed 12 Jobs / Total Hours 48 hrs) */
+.metricsGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  width: 100%;
+}
+
+.metricPill {
+  background: var(--color-surface);
+  border-radius: 24px;
+  padding: 16px 18px;
+  box-shadow: 0 4px 16px rgb(var(--ink-rgb) / 0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  box-sizing: border-box;
+}
+
+.metricLabel {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--color-text-tertiary);
+  letter-spacing: 0.04em;
+}
+
+.metricValue {
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--color-text);
+}
+
+/* Recent Payments Section (Frame 14) */
+.historySection {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 4px;
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.seeAllLink {
+  color: var(--color-primary);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.paymentsList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Pill-shaped list item */
+.paymentCard {
+  background: var(--color-surface);
+  border-radius: 24px;
+  padding: 14px 18px;
+  box-shadow: 0 4px 16px rgb(var(--ink-rgb) / 0.04);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-sizing: border-box;
+  width: 100%;
+  border: 1px solid var(--color-border);
+}
+
+.paymentLeft {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.avatarImg {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.avatarFallback {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--color-primary-tint);
+  color: var(--color-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.parentName {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.paymentDate {
+  margin: 2px 0 0;
+  font-size: 11px;
+  color: var(--color-text-faint);
+}
+
+.paymentRight {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.paymentAmount {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--color-text);
+}
+
+.paidBadge {
+  background: var(--badge-success-bg);
+  color: var(--color-success-strong);
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 2px 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  display: inline-block;
+}

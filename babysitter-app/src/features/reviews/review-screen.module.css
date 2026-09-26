@@ -1,0 +1,574 @@
+.reviewContainer {
+  min-height: 100vh;
+  padding: var(--space-4) var(--space-4) calc(80px + var(--space-6));
+  background: var(--color-background);
+  padding: 16px 16px calc(84px + 16px);
+  background: transparent;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  gap: 16px;
+}
+
+.topBar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding-top: var(--space-2);
+  justify-content: space-between;
+  padding-top: 4px;
+}
+
+.backBtn {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-full);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+}
+
+.topBarLeft {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text);
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: all var(--transition-fast);
+  gap: 12px;
+}
+
+.pageTitle {
+  margin: 0;
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--color-text);
+  letter-spacing: -0.01em;
+}
+
+/* Sitter Summary Hero */
+.heroCard {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-5);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Completion Hero Banner (Mockup Frame 9) */
+.completionHero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--space-2);
+  padding: 12px 8px 4px;
+  gap: 8px;
+}
+
+.successCheckCircle {
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  background: var(--color-success-tint);
+  border: 2px solid var(--color-success-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-success-strong);
+  box-shadow: 0 6px 18px rgb(var(--success-rgb) / 0.18);
+  margin-bottom: 2px;
+}
+
+.heroHeading {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--color-text);
+  letter-spacing: -0.02em;
+}
+
+.heroSubtitle {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text-tertiary);
+}
+
+/* Bento Summary Grid (Frame 9: Total Earnings & Duration) */
+.bentoGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.bentoCard {
+  background: var(--color-surface);
+  border-radius: 18px;
+  padding: 14px 16px;
+  border: 1px solid var(--color-border);
+  box-shadow: 0 4px 14px rgb(var(--shadow-ink-rgb) / 0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.bentoHeader {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.bentoValue {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--color-text);
+  margin-top: 2px;
+}
+
+.bentoSubtext {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--color-text-faint);
+}
+
+/* Time Capsule Strip */
+.timeCapsule {
+  background: rgb(var(--surface-rgb) / 0.85);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  box-shadow: 0 2px 8px rgb(var(--shadow-ink-rgb) / 0.03);
+}
+
+.timeCapsuleDivider {
+  color: var(--color-text-faint);
+}
+
+/* Sitter Hero Summary */
+.sitterCard {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 20px;
+  padding: 14px 16px;
+  box-shadow: 0 4px 14px rgb(var(--shadow-ink-rgb) / 0.04);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.avatarCircle {
+  width: 70px;
+  height: 70px;
+  border-radius: var(--radius-full);
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: var(--shadow-md);
+  border: 2px solid var(--color-surface);
+  background: var(--color-surface-alt);
+  box-shadow: 0 2px 8px rgb(var(--shadow-ink-rgb) / 0.08);
+  border: 2px solid var(--color-surface-sunken);
+  background: var(--color-surface-muted);
+  flex-shrink: 0;
+}
+
+.sitterInfo {
+  display: flex;
+  flex-direction: column;
+}
+
+.sitterName {
+  margin: 0;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+/* sitterRole kept; unused .sessionDuration block (corruption artifact) removed. */
+.sitterRole {
+  margin: 0;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text-tertiary);
+}
+
+/* Star Rating Picker */
+.ratingPickerCard {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-5);
+  box-shadow: var(--shadow-sm);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 20px;
+  padding: 18px 16px;
+  box-shadow: 0 4px 14px rgb(var(--shadow-ink-rgb) / 0.04);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  gap: 12px;
+  text-align: center;
+}
+
+.promptTitle {
+  margin: 0;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.starsRow {
+  display: flex;
+  gap: var(--space-2);
+  gap: 8px;
+}
+
+.starBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  color: var(--color-text-faint);
+  transition: transform var(--transition-fast), color var(--transition-fast);
+  color: var(--color-text-faint);
+  transition: transform 0.15s ease, color 0.15s ease;
+  outline: none;
+}
+
+.starBtn:hover {
+  transform: scale(1.15);
+  transform: scale(1.18);
+}
+
+.starBtnActive {
+  color: var(--color-warning);
+}
+
+/* Feedback Textarea */
+.feedbackCard {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-4);
+  box-shadow: var(--shadow-sm);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 20px;
+  padding: 16px;
+  box-shadow: 0 4px 14px rgb(var(--shadow-ink-rgb) / 0.04);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  gap: 8px;
+}
+
+.feedbackLabel {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.feedbackInput {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  border: 1.5px solid var(--color-border-subtle);
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+  font-size: 13px;
+  color: var(--color-text);
+  font-family: inherit;
+  outline: none;
+  resize: vertical;
+  transition: border-color var(--transition-fast);
+  background: var(--color-surface-muted);
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.feedbackInput:focus {
+  border-color: var(--color-primary);
+  border-color: var(--color-primary);
+  background: var(--color-surface);
+}
+
+/* Submit Action Button */
+.submitBtn {
+  width: 100%;
+  padding: 13px 20px;
+  border-radius: 999px;
+  border: none;
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow: 0 4px 14px rgb(var(--primary-rgb) / 0.35);
+  transition: all 0.2s ease;
+  outline: none;
+}
+
+.submitBtn:hover {
+  background: var(--color-primary-hover);
+  box-shadow: 0 6px 18px rgb(var(--primary-rgb) / 0.45);
+  transform: translateY(-1px);
+}
+
+.submitBtn:active {
+  transform: scale(0.98);
+}
+
+.submitBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* ------------------------------------------------------------------
+   Single-card review layout (Post-Session Summary Card)
+   ------------------------------------------------------------------ */
+
+.reviewPage {
+  min-height: 100vh;
+  padding: 24px 16px 100px;
+  display: flex;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+.summaryCard {
+  width: 100%;
+  max-width: 480px;
+  background: var(--color-surface);
+  border-radius: 24px;
+  box-shadow: var(--shadow-md, 0 8px 32px rgba(0, 0, 0, 0.08));
+  padding: 24px;
+  box-sizing: border-box;
+}
+
+.headerBlock {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.checkBadge {
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 12px;
+  border-radius: 50%;
+  background: #DCFCE7;
+  color: #16A34A;
+  font-size: 28px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.completedTitle {
+  margin: 0 0 4px;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.completedSubtitle {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.durationBlock {
+  text-align: center;
+  padding: 20px 0;
+  border-top: 1px solid var(--color-surface-sunken);
+  border-bottom: 1px solid var(--color-surface-sunken);
+  margin-bottom: 20px;
+}
+
+.durationLabel {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--color-text-faint);
+  text-transform: uppercase;
+  display: block;
+  margin-bottom: 6px;
+}
+
+.durationValue {
+  font-size: 32px;
+  font-weight: 800;
+  color: var(--color-text);
+  letter-spacing: 0.5px;
+}
+
+.participantsList {
+  margin-bottom: 16px;
+}
+
+.participantRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--color-surface-sunken);
+}
+
+.participantRow:last-child {
+  border-bottom: none;
+}
+
+.participantIcon {
+  font-size: 22px;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--color-primary-tint-soft, var(--color-primary-tint));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.participantLabel {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--color-text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.participantName {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text);
+  margin-top: 2px;
+}
+
+.participantBadge {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--color-text-faint);
+  margin-left: 6px;
+}
+
+.timeSplit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 14px 0 20px;
+  border-bottom: 1px solid var(--color-surface-sunken);
+}
+
+.timeCell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.timeLabel {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--color-text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.timeValue {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.timeDivider {
+  width: 1px;
+  height: 24px;
+  background: var(--color-border-strong, var(--color-border));
+}
+
+.earningsRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--color-surface-sunken);
+}
+
+.earningsLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.earningsValue {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--color-success-strong, var(--color-success));
+}
+
+.reviewSection {
+  padding-top: 20px;
+}
+
+.reviewHeading {
+  margin: 0 0 12px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.reviewTextarea {
+  width: 100%;
+  min-height: 90px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--color-border-subtle, var(--color-border));
+  background: var(--color-surface);
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--color-text);
+  resize: vertical;
+  margin-top: 10px;
+  margin-bottom: 16px;
+  box-sizing: border-box;
+}
+

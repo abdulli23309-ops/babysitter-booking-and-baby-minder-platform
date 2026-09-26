@@ -1,0 +1,200 @@
+/* ============================================================
+   Ratings & Feedback — Frame 8_2 Strict Replication
+   ============================================================ */
+
+/* Page shell: Strict 480px mobile containment */
+.ratingsContainer {
+  min-height: 100vh;
+  max-width: 480px;
+  margin: 0 auto;
+  width: 100%;
+  position: relative;
+  padding: 16px 16px calc(84px + 16px);
+  background: var(--gradient-auth-pastel, linear-gradient(160deg, #FBD5E5 0%, #E6DCF5 45%, #CCE6FF 100%));
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  overflow-x: hidden;
+}
+
+/* Top Bar: BackButton on left, centered title, circular menu on right */
+.topBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 4px;
+}
+
+.pageTitle {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--color-text);
+  text-align: center;
+  flex: 1;
+}
+
+.menuBtn {
+  width: 42px;
+  height: 42px;
+  min-width: 42px;
+  min-height: 42px;
+  border-radius: 50%;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  box-shadow: 0 2px 8px rgb(var(--shadow-ink-rgb) / 0.06);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text);
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  outline: none;
+}
+
+.menuBtn:active {
+  transform: scale(0.95);
+}
+
+/* Hero Score Card: Centered 4.93, 5 stars, reddish subtext, 24px border radius */
+.heroCard {
+  background: var(--color-surface);
+  border-radius: 24px;
+  padding: 24px 20px;
+  box-shadow: 0 6px 24px rgb(var(--ink-rgb) / 0.05);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 8px;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.scoreNumber {
+  font-size: 3rem;
+  font-weight: 800;
+  color: var(--color-text);
+  line-height: 1;
+  letter-spacing: -0.03em;
+  margin: 0;
+}
+
+.starsRow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: var(--color-warning);
+  margin: 2px 0;
+}
+
+.heroSubtext {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-primary-active);
+  margin: 0;
+  background: var(--color-primary-tint);
+  padding: 5px 14px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.reviewCountSub {
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+  margin: 0;
+}
+
+/* Parent Testimonials Section */
+.reviewsList {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.sectionHeading {
+  margin: 4px 0 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+/* Review Cards: 24px border radius, white background, soft shadow */
+.reviewCard {
+  background: var(--color-surface);
+  border-radius: 24px;
+  padding: 18px 20px;
+  box-shadow: 0 4px 16px rgb(var(--ink-rgb) / 0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-sizing: border-box;
+  width: 100%;
+  border: 1px solid var(--color-border);
+}
+
+.reviewHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.authorInfo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.avatarCircle {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-primary);
+  background: var(--color-primary-tint);
+  border: 1.5px solid var(--color-primary-soft-strong);
+}
+
+.authorName {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.reviewDate {
+  margin: 2px 0 0;
+  font-size: 11px;
+  color: var(--color-text-faint);
+  display: block;
+}
+
+.starPill {
+  background: var(--color-warning-tint);
+  border: 1px solid var(--color-warning-border);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-warning-strong);
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.commentText {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--color-text-secondary);
+  font-style: italic;
+}

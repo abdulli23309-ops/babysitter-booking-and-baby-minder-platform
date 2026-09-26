@@ -1,0 +1,200 @@
+/* Shared auth form styles — Phase F4.1 / Phase F-UI (Register + CreateAccount). */
+
+.page {
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: var(--gradient-auth-pastel, linear-gradient(160deg, #FBD5E5 0%, #E6DCF5 45%, #CCE6FF 100%));
+  background-attachment: fixed;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: var(--space-6) var(--space-4);
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.card {
+  box-sizing: border-box;
+  background: rgb(var(--surface-rgb) / 0.9);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-6);
+  width: 100%;
+  max-width: 500px;
+  box-shadow: 0 10px 30px rgb(var(--ink-rgb) / 0.08);
+  display: flex;
+  flex-direction: column;
+}
+
+.cardHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.backButton {
+  background: var(--color-surface-alt);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  width: 44px;
+  height: 44px;
+  font-size: 20px;
+  color: var(--color-primary);
+  cursor: pointer;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  transition: background var(--transition-fast);
+}
+
+.backButton:hover {
+  background: var(--color-primary-soft);
+}
+
+.backButton:focus-visible {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.title {
+  text-align: center;
+  margin: 0;
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text);
+  flex: 1;
+}
+
+.titleText {
+  display: block;
+  font-size: var(--font-size-lg);
+}
+
+.subtitle {
+  text-align: center;
+  margin: 0 0 var(--space-5);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+/* Avatar upload */
+.imageContainer {
+  display: flex;
+  justify-content: center;
+  margin-bottom: var(--space-6);
+  position: relative;
+  box-sizing: border-box;
+}
+
+.imageButton {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  position: relative;
+  border-radius: var(--radius-full);
+}
+
+.imageButton:focus-visible {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 3px;
+}
+
+.imageWrapper {
+  width: 100px;
+  height: 100px;
+  border-radius: var(--radius-full);
+  background: var(--color-primary-soft);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden;
+  border: 3px solid var(--color-surface);
+  box-shadow: var(--shadow-md);
+  box-sizing: border-box;
+}
+
+.image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.placeholderIcon {
+  font-size: 36px;
+}
+
+.cameraBadge {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  background: var(--color-primary);
+  border-radius: var(--radius-full);
+  padding: 6px;
+  font-size: 13px;
+  color: var(--color-text-inverse);
+  border: 2px solid var(--color-surface);
+}
+
+.formScroll {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Two-column fields on wider screens */
+.formGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-4);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.submitButton {
+  margin-top: var(--space-5);
+  box-sizing: border-box;
+}
+
+.successText {
+  color: var(--color-success);
+  text-align: center;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  margin: var(--space-3) 0 0;
+}
+
+@media (min-width: 768px) {
+  .page {
+    align-items: center;
+    padding: var(--space-10) var(--space-6);
+  }
+
+  .card {
+    padding: var(--space-8);
+  }
+
+  .formGrid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .formGrid > :first-child {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .backButton {
+    transition: none;
+  }
+}
+

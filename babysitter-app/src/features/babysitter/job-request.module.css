@@ -1,0 +1,395 @@
+/* ============================================================
+   Phase F-UI-5 — Matching Jobs (Strict Image 3 Alignment)
+   ============================================================ */
+
+.requestContainer {
+  min-height: 100vh;
+  padding: var(--space-4) var(--space-4) calc(80px + var(--space-6));
+  background: var(--color-background);
+  padding: 16px 16px calc(84px + 16px);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  gap: 16px;
+  background: transparent;
+}
+
+/* Header */
+.topBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: var(--space-2);
+  padding-top: 4px;
+}
+
+.backBtn {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-full);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.topBarRight {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.iconBtn {
+  width: 42px;
+  height: 42px;
+  min-width: 42px;
+  min-height: 42px;
+  border-radius: 50%;
+  background: var(--color-surface);
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 4px 12px rgb(var(--shadow-ink-rgb) / 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text);
+  color: var(--color-text);
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: all var(--transition-fast);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  padding: 0;
+  outline: none;
+}
+
+.iconBtn:hover {
+  transform: scale(1.04);
+  color: var(--color-primary);
+  box-shadow: 0 6px 16px rgb(var(--shadow-ink-rgb) / 0.12);
+}
+
+.iconBtn:active {
+  transform: scale(0.95);
+}
+
+.titleArea {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.pageTitle {
+  margin: 0;
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text);
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--color-text);
+  letter-spacing: -0.02em;
+}
+
+/* Request Cards List */
+.subtitle {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text-tertiary);
+}
+
+/* Matching Jobs Cards List */
+.requestsList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  gap: 14px;
+}
+
+.requestCard {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-4);
+  box-shadow: var(--shadow-sm);
+  background: var(--color-surface);
+  border-radius: 20px;
+  padding: 18px;
+  border: 1px solid var(--color-border);
+  box-shadow: 0 4px 16px rgb(var(--shadow-ink-rgb) / 0.04);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  transition: all var(--transition-base);
+  gap: 12px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  cursor: pointer;
+}
+
+.requestCard:hover {
+  box-shadow: var(--shadow-md);
+  border-color: var(--color-border-strong);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgb(var(--shadow-ink-rgb) / 0.07);
+}
+
+/* Card Header */
+.cardHeader {
+  display: flex;
+  align-items: center;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.parentInfo {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  gap: 12px;
+}
+
+.parentAvatar {
+  width: 46px;
+  height: 46px;
+  border-radius: var(--radius-full);
+  background: var(--gradient-coral-soft);
+  color: var(--color-primary);
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--color-surface-sunken);
+  background: var(--color-surface-muted);
+  flex-shrink: 0;
+}
+
+.parentTextMeta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: var(--font-weight-bold);
+  font-size: var(--font-size-md);
+  flex-direction: column;
+}
+
+.parentNameText {
+  margin: 0;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.parentSubText {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  margin-top: 2px;
+}
+
+.ratingText {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-warning);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  gap: 3px;
+  margin-top: 2px;
+}
+
+.paymentPill {
+  background: var(--badge-success-bg);
+  color: var(--badge-success-text);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-extrabold);
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+}
+
+.rateBox {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  text-align: right;
+}
+
+/* Details Box */
+.detailsBox {
+  background: var(--color-surface-alt);
+  border-radius: var(--radius-lg);
+  padding: var(--space-3);
+}
+
+.rateValue {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--color-primary);
+}
+
+.rateUnit {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+/* Card Meta Details */
+.cardDetailsList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  gap: 6px;
+  padding: 4px 0 2px;
+}
+
+.detailRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  gap: 8px;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  font-weight: 500;
+}
+
+.detailIcon {
+  font-size: 13px;
+  line-height: 1;
+}
+
+/* Card Actions Row (Image 3: View Details & Apply Now) */
+.cardActionRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.viewDetailsBtn {
+  padding: 10px 14px;
+  border-radius: 999px;
+  border: 1.5px solid var(--color-border-subtle);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  outline: none;
+}
+
+.viewDetailsBtn:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  background: var(--color-primary-tint);
+}
+
+.applyNowBtn {
+  padding: 10px 14px;
+  border-radius: 999px;
+  border: none;
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgb(var(--primary-rgb) / 0.3);
+  transition: all 0.2s ease;
+  outline: none;
+}
+
+.applyNowBtn:hover {
+  background: var(--color-primary-hover);
+  box-shadow: 0 6px 16px rgb(var(--primary-rgb) / 0.4);
+}
+
+.applyNowBtn:active {
+  transform: scale(0.98);
+
+/* ==================================================================
+   Invitation action buttons.
+   These three classes were referenced from JobRequest.jsx but were
+   NEVER defined in this module. CSS modules resolve an unknown class
+   name to `undefined`, so `className={styles.btnPrimary}` rendered as
+   `className={undefined}` and the Accept / Decline buttons rendered as
+   unstyled browser-default rectangles — no fill, no radius, no hover.
+   ================================================================== */
+
+.requestActions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+/* Accept — the app's primary button idiom (see .applyNowBtn). */
+.btnPrimary {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 12px;
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgb(var(--primary-rgb) / 0.25);
+  transition: background 0.2s ease, box-shadow 0.2s ease, transform 0.12s ease;
+  outline: none;
+}
+
+.btnPrimary:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+  box-shadow: 0 6px 16px rgb(var(--primary-rgb) / 0.35);
+}
+
+.btnPrimary:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+/* Decline — the app's secondary idiom: transparent, muted, hairline. */
+.btnOutlineRed {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 16px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+  outline: none;
+}
+
+.btnOutlineRed:hover:not(:disabled) {
+  background: var(--color-surface-muted);
+  border-color: var(--color-danger, #DC2626);
+  color: var(--color-danger, #DC2626);
+}
+
+.btnPrimary:disabled,
+.btnOutlineRed:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+}

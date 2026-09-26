@@ -1,0 +1,329 @@
+.dashboardContainer {
+  min-height: 100vh;
+  padding: var(--space-4) var(--space-4) calc(80px + var(--space-6));
+  background: var(--color-background);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  box-sizing: border-box;
+}
+
+/* Header */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: var(--space-2);
+}
+
+.greetingSection {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.greetingSub {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.greetingName {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: var(--font-weight-extrabold);
+  color: var(--color-text);
+  line-height: var(--line-height-tight);
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.iconBtn {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-full);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: all var(--transition-fast);
+}
+
+.iconBtn:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+  color: var(--color-primary);
+}
+
+.iconBtn:active {
+  transform: scale(0.95);
+}
+
+.pulseDot {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  box-shadow: 0 0 0 2px var(--color-surface);
+}
+
+.avatarBtn {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-full);
+  border: 2px solid var(--glass-border);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  cursor: pointer;
+  background: var(--color-primary-tint);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  color: var(--color-primary);
+  font-size: 16px;
+  transition: transform var(--transition-fast);
+}
+
+.avatarBtn:hover {
+  transform: scale(1.05);
+}
+
+.avatarImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.avatarFallback {
+  width: 100%;
+  height: 100%;
+  background: var(--color-primary-tint);
+  color: var(--color-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 16px;
+}
+
+/* Earnings Hero Bento Card */
+.earningsCard {
+  background: linear-gradient(135deg, var(--color-surface-inverse) 0%, var(--color-surface-inverse) 100%);
+  border-radius: var(--radius-xl);
+  padding: var(--space-5);
+  color: var(--color-text-inverse);
+  box-shadow: 0 10px 25px rgb(var(--ink-rgb) / 0.25);
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.earningsGlow {
+  position: absolute;
+  top: -30px;
+  right: -30px;
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  background: rgb(var(--primary-rgb) / 0.35);
+  filter: blur(35px);
+  pointer-events: none;
+}
+
+.earningsLabel {
+  font-size: 11px;
+  font-weight: var(--font-weight-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-text-faint);
+  margin: 0;
+}
+
+.earningsAmount {
+  font-size: 2rem;
+  font-weight: 800;
+  color: var(--color-text-inverse);
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+
+.earningsRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: var(--space-2);
+}
+
+.earningsTrend {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--font-size-xs);
+  color: var(--color-success);
+  font-weight: 600;
+}
+
+.viewEarningsBtn {
+  background: rgb(var(--edge-rgb) / 0.12);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgb(var(--edge-rgb) / 0.2);
+  color: var(--color-text-inverse);
+  padding: 6px 14px;
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.viewEarningsBtn:hover {
+  background: rgb(var(--edge-rgb) / 0.2);
+  transform: translateY(-1px);
+}
+
+/* Bento Grid */
+.bentoGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-3);
+}
+
+.bentoCard {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 120px;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: all var(--transition-base);
+  position: relative;
+  overflow: hidden;
+  text-align: left;
+}
+
+.bentoCard:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--color-border-strong);
+}
+
+.bentoCard:active {
+  transform: scale(0.98);
+}
+
+.bentoTop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.bentoIconWrapper {
+  width: 42px;
+  height: 42px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.badgePill {
+  font-size: 11px;
+  font-weight: var(--font-weight-extrabold);
+  padding: 3px 8px;
+  border-radius: var(--radius-full);
+}
+
+.bentoBottom {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: var(--space-3);
+}
+
+.bentoCardTitle {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text);
+}
+
+.bentoCardSubtitle {
+  margin: 0;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+
+/* Tools List */
+.toolsList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.toolItem {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.toolItem:hover {
+  transform: translateX(3px);
+  border-color: var(--color-border-strong);
+  box-shadow: var(--shadow-sm);
+}
+
+.toolItemLeft {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.toolIcon {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.toolTitle {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+}
+
+.toolDesc {
+  margin: 0;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
+

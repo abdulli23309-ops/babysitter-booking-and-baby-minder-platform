@@ -1,0 +1,147 @@
+/* ------------------------------------------------------------------
+   Phase 8c Feature 3 — "Series Complete" rollup.
+   Replaces the one-day-at-a-time history layout once every day in a
+   series is terminal. Token-only, so it follows the light/dark themes,
+   and mirrors the visual language of SeriesContractOverview.
+   ------------------------------------------------------------------ */
+
+.rollup {
+  margin-bottom: 16px;
+}
+
+/* --- Header badge --- */
+.hero {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: var(--color-surface);
+  border: 1px solid var(--badge-purple-bg, var(--color-border));
+  border-radius: 20px;
+  padding: 18px;
+  margin-bottom: 16px;
+  box-shadow: 0 4px 16px rgb(var(--ink-rgb) / 0.04);
+}
+
+.heroIcon {
+  font-size: 40px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.heroText {
+  min-width: 0;
+}
+
+.heroTitle {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 800;
+  color: var(--color-text);
+}
+
+.heroMeta {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--color-text-muted);
+  /* "24 Sept – 23 Oct 2026" must never push the badge wider than the card. */
+  overflow-wrap: anywhere;
+}
+
+/* --- Day list --- */
+.list {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 20px;
+  padding: 16px;
+  margin-top: var(--space-5, 20px);
+  box-shadow: 0 4px 16px rgb(var(--ink-rgb) / 0.04);
+}
+
+.listTitle {
+  margin: 0 0 var(--space-3, 12px);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+
+.listHeader {
+  display: grid;
+  grid-template-columns: 64px 1fr auto;
+  gap: 8px;
+  padding: 0 8px 8px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--color-text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+/* Long series scroll rather than stretching the page to 22 rows. */
+.listScroll {
+  max-height: 320px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 64px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 8px;
+  border-radius: 10px;
+  font-size: 13px;
+}
+
+.row + .row {
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.rowDay {
+  font-weight: 700;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+.rowDate {
+  color: var(--color-text);
+  font-weight: 500;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.pill {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.pillCompleted {
+  background: color-mix(in srgb, var(--color-success) 14%, transparent);
+  color: var(--color-success);
+}
+
+.pillCancelled {
+  background: color-mix(in srgb, var(--color-danger) 14%, transparent);
+  color: var(--color-danger);
+}
+
+.pillActive {
+  background: color-mix(in srgb, var(--color-warning) 16%, transparent);
+  color: var(--color-warning);
+}
+
+.pillPending {
+  background: var(--badge-purple-bg, var(--color-surface-muted, #f1f3f5));
+  color: var(--color-primary);
+}
+
+.pillNeutral {
+  background: var(--color-surface-muted, #f1f3f5);
+  color: var(--color-text-muted);
+}

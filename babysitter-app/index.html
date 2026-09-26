@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/little-care-icon.svg" />
+    <link rel="apple-touch-icon" href="/little-care-icon.svg" />
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="theme-color" content="#E8622A" />
+    <!-- Theme bootstrap (Phase F-UI-11, re-based by the Phase 5.2 Theme Default
+         Override): applies the persisted light/dark preference BEFORE first paint
+         so there is never a theme flash (FOUC).
+         DEFAULTS TO LIGHT MODE and ignores the OS preference entirely — the
+         `prefers-color-scheme` fallback has been removed, so a dark-themed
+         operating system can no longer force the app into dark mode. Dark mode is
+         opt-in only, via the in-app toggle.
+         Must stay in sync with STORAGE_KEY in src/components/ui/ThemeContext.jsx. -->
+    <script>
+      (function () {
+        try {
+          var stored = window.localStorage.getItem('littlecare:theme');
+          var resolved = stored === 'dark' ? 'dark' : 'light';
+          var root = document.documentElement;
+          root.setAttribute('data-theme', resolved);
+          root.style.colorScheme = resolved;
+        } catch (error) {
+          document.documentElement.setAttribute('data-theme', 'light');
+        }
+      })();
+    </script>
+    <script type="module" src="/src/theme-bootstrap.js"></script>
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Little Care" />
+    <meta name="description" content="Certified local babysitter booking and real-time AI baby cry detection platform." />
+    <title>Little Care — Childcare & Baby Minder</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
+

@@ -1,0 +1,52 @@
+# ── Node ──────────────────────────────────────────
+node_modules/
+*/node_modules/
+npm-debug.log*
+yarn-error.log*
+.pnpm-store/
+
+# ── Build output ──────────────────────────────────
+dist/
+*/dist/
+build/
+*/build/
+.vite/
+
+# ── .NET ──────────────────────────────────────────
+bin/
+*/bin/
+obj/
+*/obj/
+packages/
+*/packages/
+*.user
+*.suo
+.vs/
+*/.vs/
+
+# ── Local environment ─────────────────────────────
+.env
+.env.local
+*.local
+appsettings.Development.json
+
+# ── Editor ────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*~
+
+# ── OS ────────────────────────────────────────────
+Thumbs.db
+.DS_Store
+desktop.ini
+
+# ── Logs / temp ───────────────────────────────────
+*.log
+logs/
+tmp/
+scratch/
+
+# ── Test artifacts ────────────────────────────────
+coverage/
+.nyc_output/

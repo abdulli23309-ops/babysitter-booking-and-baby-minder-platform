@@ -1,0 +1,201 @@
+.dashboardContainer {
+  min-height: 100vh;
+  max-width: var(--shell-max-width, 480px);
+  margin: 0 auto;
+  padding: var(--space-4) var(--space-4) calc(84px + var(--space-5));
+  background: linear-gradient(175deg, var(--color-danger-tint) 0%, var(--badge-purple-bg) 35%, var(--color-info-tint) 70%, var(--color-surface-muted) 100%);
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  position: relative;
+}
+
+/* Top Brand Header */
+.brandHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: var(--space-2);
+  margin-bottom: var(--space-5);
+}
+
+.brandLeft {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.brandLogo {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--color-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-inverse);
+  box-shadow: 0 4px 12px rgb(var(--primary-rgb) / 0.28);
+  flex-shrink: 0;
+}
+
+.brandName {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--color-text);
+  letter-spacing: -0.01em;
+}
+
+.bellBtn {
+  position: relative;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: rgb(var(--surface-rgb) / 0.85);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--glass-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text);
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgb(var(--shadow-ink-rgb) / 0.04);
+  transition: all var(--transition-fast);
+}
+
+.bellBtn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgb(var(--shadow-ink-rgb) / 0.08);
+  color: var(--color-primary);
+}
+
+.bellBtn:active {
+  transform: scale(0.95);
+}
+
+.bellDot {
+  position: absolute;
+  top: 9px;
+  right: 10px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  box-shadow: 0 0 0 2px rgb(var(--surface-rgb) / 0.5);
+}
+
+/* Heading Section */
+.titleSection {
+  margin-bottom: var(--space-5);
+}
+
+.pageTitle {
+  margin: 0 0 4px 0;
+  font-size: 1.65rem;
+  font-weight: 800;
+  color: var(--color-text);
+  letter-spacing: -0.02em;
+  line-height: var(--line-height-tight);
+}
+
+.pageSubtitle {
+  margin: 0;
+  font-size: 0.925rem;
+  font-weight: 500;
+  color: var(--color-text-tertiary);
+  line-height: var(--line-height-normal);
+}
+
+/* 7 Vertical Menu Cards */
+.cardsList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.menuCard {
+  background: var(--color-surface);
+  border: 1px solid var(--glass-border);
+  border-radius: 20px;
+  padding: 14px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgb(var(--ink-rgb) / 0.04);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+  text-align: left;
+  user-select: none;
+}
+
+.menuCard:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgb(var(--ink-rgb) / 0.08);
+  border-color: rgb(var(--primary-rgb) / 0.25);
+}
+
+.menuCard:active {
+  transform: scale(0.985);
+}
+
+.cardLeft {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.iconCircle {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--color-primary-tint);
+  color: var(--color-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.cameraDot {
+  position: absolute;
+  top: 9px;
+  right: 9px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-danger);
+  box-shadow: 0 0 0 2px rgb(var(--primary-rgb) / 0.12);
+}
+
+.cardText {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.cardTitle {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--color-text);
+  line-height: 1.25;
+}
+
+.cardSubtitle {
+  margin: 0;
+  font-size: 0.8125rem;
+  font-weight: 400;
+  color: var(--color-text-muted);
+  line-height: 1.2;
+}
+
+.chevronIcon {
+  color: var(--color-text-faint);
+  flex-shrink: 0;
+  transition: transform 0.15s ease, color 0.15s ease;
+}
+
+.menuCard:hover .chevronIcon {
+  color: var(--color-primary);
+  transform: translateX(2px);
+}

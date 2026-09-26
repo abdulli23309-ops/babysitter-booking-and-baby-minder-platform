@@ -1,0 +1,141 @@
+/* ------------------------------------------------------------------
+   Phase 7.3 — Series "Contract Overview" metrics grid.
+   Shared by the parent BookingStatus and the sitter JobDetails /
+   UpcomingJobDetails screens, so both render identically.
+   Token-only, so it follows the light/dark themes.
+   ------------------------------------------------------------------ */
+
+.overview {
+  margin-top: var(--space-5, 20px);
+  padding-top: var(--space-4, 16px);
+  border-top: 1px solid var(--color-border);
+}
+
+.overviewTitle {
+  margin: 0 0 var(--space-3, 12px);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+
+.metricsGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-3, 12px);
+}
+
+.metric {
+  background: var(--color-surface-muted, #f8f9fa);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md, 12px);
+  padding: var(--space-4, 16px);
+  text-align: center;
+  min-width: 0;
+}
+
+.metricValue {
+  display: block;
+  font-size: 20px;
+  font-weight: 800;
+  line-height: var(--line-height-tight, 1.2);
+  color: var(--color-primary);
+  /* Long totals (e.g. "1230") must never blow out the 1fr column. */
+  overflow-wrap: anywhere;
+}
+
+.metricLabel {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--color-text-muted);
+}
+
+/* --- Repeating-day badges / date range --- */
+.metaRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3, 12px);
+  flex-wrap: wrap;
+  margin-top: var(--space-4, 16px);
+}
+
+.metaLabel {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+}
+
+.metaValue {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text);
+  text-align: right;
+}
+
+.dayBadges {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.dayBadge {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+  background: transparent;
+  color: var(--color-text-muted);
+  opacity: 0.5;
+  border: 1px solid var(--color-border-subtle);
+}
+
+.dayBadgeActive {
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  opacity: 1;
+  border-color: transparent;
+  box-shadow: var(--shadow-sm);
+}
+
+/* Screen-reader-only full weekday name next to the 1-letter badge. */
+.dayBadgeSr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.progressBlock {
+  margin-top: 12px;
+  padding-top: 12px;
+  padding-bottom: 16px;
+  border-top: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.progressRow {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+.progressRow > span:last-child {
+  font-weight: 600;
+  color: var(--color-text);
+}

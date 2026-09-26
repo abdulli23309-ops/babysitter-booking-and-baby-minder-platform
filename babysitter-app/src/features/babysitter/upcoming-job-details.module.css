@@ -1,0 +1,360 @@
+﻿/* ============================================================
+   Phase F-UI-5 — Upcoming Job Details (Strict Image 1 & 4 Alignment)
+   ============================================================ */
+
+.container {
+  min-height: 100vh;
+  max-width: 480px;
+  margin: 0 auto;
+  width: 100%;
+  position: relative;
+  padding: 16px 16px calc(84px + 16px);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  background: transparent;
+}
+
+/* Header */
+.topBar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-top: 4px;
+}
+
+.pageTitle {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--color-text);
+  letter-spacing: -0.01em;
+}
+
+/* Status Banner */
+.statusBannerCard {
+  background: var(--color-surface);
+  border-radius: 20px;
+  padding: 20px 16px;
+  border: 1px solid var(--color-border);
+  box-shadow: 0 4px 16px rgb(var(--shadow-ink-rgb) / 0.04);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 8px;
+}
+
+.statusPillPending {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--color-warning-tint);
+  border: 1.5px solid var(--color-warning-border);
+  border-radius: 999px;
+  padding: 6px 16px;
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--color-warning-strong);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.statusPillConfirmed {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--color-success-tint);
+  border: 1.5px solid var(--color-success-border);
+  border-radius: 999px;
+  padding: 6px 16px;
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--color-success-strong);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.bannerSubtext {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-text-tertiary);
+  font-weight: 500;
+}
+
+/* Parent Card */
+.parentCard {
+  background: var(--color-surface);
+  border-radius: 20px;
+  padding: 18px 18px;
+  border: 1px solid var(--color-border);
+  box-shadow: 0 4px 16px rgb(var(--shadow-ink-rgb) / 0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.parentHeaderRow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.parentAvatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--color-surface-sunken);
+  background: var(--color-surface-muted);
+  flex-shrink: 0;
+}
+
+.parentMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.parentName {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.ratingRow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+  font-weight: 500;
+}
+
+.messageBtn {
+  width: 100%;
+  padding: 12px 18px;
+  border-radius: 999px;
+  border: 1.5px solid var(--color-primary);
+  background: var(--color-surface);
+  color: var(--color-primary);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+  outline: none;
+}
+
+.messageBtn:hover {
+  background: var(--color-primary-tint);
+}
+
+.messageBtn:active {
+  transform: scale(0.98);
+}
+
+/* Details List Card */
+.detailsCard {
+  background: var(--color-surface);
+  border-radius: 20px;
+  padding: 8px 18px;
+  border: 1px solid var(--color-border);
+  box-shadow: 0 4px 16px rgb(var(--shadow-ink-rgb) / 0.04);
+  display: flex;
+  flex-direction: column;
+}
+
+.detailRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--color-surface-sunken);
+}
+
+.detailRow:last-child {
+  border-bottom: none;
+}
+
+.detailLeft {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--color-text-tertiary);
+  font-weight: 500;
+}
+
+.detailValue {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.earningsValue {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--color-primary);
+}
+
+/* Stepper Card */
+.stepperCard {
+  background: var(--color-surface);
+  border-radius: 20px;
+  padding: 18px 20px;
+  border: 1px solid var(--color-border);
+  box-shadow: 0 4px 16px rgb(var(--shadow-ink-rgb) / 0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.stepperTitle {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.stepperList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  position: relative;
+}
+
+.stepItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  position: relative;
+}
+
+.stepIconSuccess {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--color-success-tint);
+  color: var(--color-success-strong);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.stepIconActive {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--color-warning-tint);
+  color: var(--color-warning-strong);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.stepIconPending {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--color-surface-sunken);
+  color: var(--color-text-faint);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.stepContent {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-top: 4px;
+}
+
+.stepLabel {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.stepDesc {
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+  font-weight: 500;
+}
+
+/* Action Section */
+.actionSection {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.startJobBtnDisabled {
+  width: 100%;
+  padding: 15px 20px;
+  border-radius: 999px;
+  border: none;
+  background: var(--color-surface-sunken);
+  color: var(--color-text-faint);
+  font-size: 15px;
+  font-weight: 700;
+  cursor: not-allowed;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  outline: none;
+}
+
+.startJobBtnActive {
+  width: 100%;
+  padding: 15px 20px;
+  border-radius: 999px;
+  border: none;
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 14px rgb(var(--primary-rgb) / 0.35);
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.startJobBtnActive:hover {
+  background: var(--color-primary-hover);
+}
+
+.startJobBtnActive:active {
+  transform: scale(0.98);
+}
+
+.startJobHelper {
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+  text-align: center;
+  font-weight: 500;
+}

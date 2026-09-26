@@ -1,0 +1,74 @@
+/* ============================================================
+   Phase F-UI-2 — Core Global Styles & 480px App Shell
+   ============================================================ */
+
+html {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+  /* Anchor jumps (skip links) must not land underneath the sticky header. */
+  scroll-padding-top: var(--header-height, 56px);
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: var(--app-body-bg, #EAF0F8);
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  font-family: var(--font-sans, system-ui, -apple-system, sans-serif);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  width: 100%;
+  max-width: 480px;
+  min-height: 100vh;
+  min-height: 100dvh;
+  margin: 0 auto;
+  position: relative;
+  background: var(--app-shell-bg, var(--gradient-auth-pastel, linear-gradient(160deg, #FBD5E5 0%, #E6DCF5 45%, #CCE6FF 100%)));
+  background-attachment: fixed;
+  box-shadow: 0 0 50px rgba(0, 0, 0, 0.08);
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  overflow-x: hidden;
+}
+
+/* Glassmorphic card utility */
+.glass-card {
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow: 0 8px 32px rgba(26, 29, 46, 0.06);
+}
+
+p, h1, h2, h3, h4, h5, h6 {
+  margin: 0;
+}
+
+
+.global-screen-container {
+  max-width: 480px;
+  margin: 0 auto;
+  box-sizing: border-box;
+  padding: 16px;
+  width: 100%;
+  overflow-x: hidden;
+}
+
+.global-card {
+  background: var(--color-surface, #FFFFFF);
+  border-radius: 20px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+  padding: 16px;
+  margin-bottom: 14px;
+  box-sizing: border-box;
+  width: 100%;
+}

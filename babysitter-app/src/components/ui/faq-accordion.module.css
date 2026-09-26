@@ -1,0 +1,71 @@
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.item {
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md, 14px);
+  background: var(--color-surface);
+  overflow: hidden;
+}
+
+.trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border: none;
+  background: transparent;
+  color: var(--color-text);
+  font-size: 13px;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+
+.trigger:hover {
+  background: var(--color-surface-hover);
+}
+
+.chevron {
+  flex-shrink: 0;
+  color: var(--color-primary);
+  transition: transform var(--transition-base, 180ms ease);
+}
+
+.chevronOpen {
+  transform: rotate(180deg);
+}
+
+/* Smooth height animation via grid-template-rows trick (no JS measuring). */
+.panel {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--transition-base, 180ms ease);
+}
+
+.panel > .panelInner {
+  overflow: hidden;
+}
+
+.item:has(.trigger[aria-expanded='true']) .panel,
+.panel[style] {
+  grid-template-rows: 1fr;
+}
+
+.answer {
+  margin: 0;
+  padding: 0 14px 14px;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--color-text-secondary);
+}
+
+@media print {
+  .trigger { padding: 4px 0; }
+  .panel { grid-template-rows: 1fr; }
+}

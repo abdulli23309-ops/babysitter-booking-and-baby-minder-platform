@@ -1,0 +1,346 @@
+/* Live Babysitting Session Screen — Phase F-UI-12 Master Replica */
+
+.sessionContainer {
+  max-width: 480px;
+  margin: 0 auto;
+  min-height: 100vh;
+  background: linear-gradient(180deg, var(--color-danger-tint) 0%, var(--badge-purple-bg) 30%, var(--color-info-tint) 70%, var(--color-info-tint) 100%);
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  box-sizing: border-box;
+  overflow: hidden;
+  padding: 10px 18px 12px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Top Header Actions (BackButton + End Session option) ── */
+.topActions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.backBtn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgb(var(--surface-rgb) / 0.85);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--glass-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgb(var(--shadow-ink-rgb) / 0.05);
+  color: var(--color-text);
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.backBtn:hover {
+  transform: scale(1.05);
+  background: var(--color-surface);
+}
+
+.endSessionPill {
+  background: rgb(var(--danger-rgb) / 0.12);
+  color: var(--color-danger-strong);
+  border: 1px solid rgb(var(--danger-rgb) / 0.2);
+  padding: 6px 12px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.endSessionPill:hover {
+  background: var(--color-danger-strong);
+  color: var(--color-text-inverse);
+}
+
+/* ── Caregiver Banner Card ── */
+.caregiverCard {
+  background: var(--color-surface);
+  border-radius: 28px;
+  padding: 16px 20px;
+  box-shadow: 0 6px 24px rgb(var(--purple-rgb) / 0.12);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.avatarWrapper {
+  position: relative;
+  width: 60px;
+  height: 60px;
+  flex-shrink: 0;
+}
+
+.avatarImg {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--glass-border);
+  box-shadow: 0 2px 10px rgb(var(--shadow-ink-rgb) / 0.08);
+  display: block;
+}
+
+.avatarFallback {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: var(--color-primary-tint);
+  color: var(--color-primary);
+  font-size: 22px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--glass-border);
+  box-shadow: 0 2px 10px rgb(var(--shadow-ink-rgb) / 0.08);
+}
+
+.verifiedBadge {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--color-success);
+  border: 2.5px solid var(--glass-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgb(var(--shadow-ink-rgb) / 0.12);
+}
+
+.caregiverDetails {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.caregiverName {
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--color-text);
+  margin: 0 0 2px;
+  letter-spacing: -0.2px;
+}
+
+.caregiverId {
+  font-size: 12px;
+  color: var(--color-text-faint);
+  font-weight: 600;
+  margin: 0 0 7px;
+}
+
+.childPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--color-primary-tint);
+  color: var(--color-primary);
+  padding: 4px 12px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 700;
+  width: fit-content;
+}
+
+/* ── Circular Live Duration Section ── */
+.durationSection {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 20px 0 28px;
+}
+
+.ringOuter {
+  position: absolute;
+  width: 304px;
+  height: 304px;
+  border-radius: 50%;
+  border: 1.5px solid rgb(var(--purple-rgb) / 0.45);
+  pointer-events: none;
+}
+
+.ringInner {
+  position: absolute;
+  width: 270px;
+  height: 270px;
+  border-radius: 50%;
+  border: 1.5px solid rgb(var(--purple-rgb) / 0.55);
+  pointer-events: none;
+}
+
+.timerDisc {
+  position: relative;
+  z-index: 2;
+  width: 236px;
+  height: 236px;
+  border-radius: 50%;
+  background: var(--color-surface);
+  box-shadow: 0 16px 42px rgb(var(--purple-rgb) / 0.22);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.timerLabel {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--color-primary);
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
+  margin: 0 0 8px;
+}
+
+.timerDigits {
+  font-size: 38px;
+  font-weight: 800;
+  color: var(--color-text);
+  letter-spacing: 1px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+  margin: 0 0 10px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace;
+}
+
+.startedStatus {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  font-weight: 500;
+}
+
+.pulsingDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-success);
+  box-shadow: 0 0 0 3px rgb(var(--success-rgb) / 0.22);
+  animation: pulseDotAnim 2s infinite ease-in-out;
+}
+
+@keyframes pulseDotAnim {
+  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgb(var(--success-rgb) / 0.4); }
+  70% { transform: scale(1.1); box-shadow: 0 0 0 6px rgb(var(--success-rgb) / 0); }
+  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgb(var(--success-rgb) / 0); }
+}
+
+/* ── Location & Payment Info Card ── */
+.infoCard {
+  background: var(--color-surface);
+  border-radius: 28px;
+  padding: 18px 22px;
+  box-shadow: 0 6px 24px rgb(var(--purple-rgb) / 0.12);
+  margin-bottom: 24px;
+}
+
+.infoRow {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.iconCircleLocation {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--color-info-tint);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--color-info);
+}
+
+.iconCirclePayment {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--badge-success-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--color-success-strong);
+}
+
+.infoTextCol {
+  display: flex;
+  flex-direction: column;
+}
+
+.infoLabel {
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--color-text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  margin: 0 0 3px;
+}
+
+.infoValue {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--color-text);
+  margin: 0;
+}
+
+.cardDivider {
+  height: 1px;
+  background: var(--color-surface-sunken);
+  margin: 14px 0;
+  border: none;
+}
+
+/* ── Bottom App Nav ── */
+.bottomNav {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  padding: 10px 8px 4px;
+  margin-top: auto;
+}
+
+.navItem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  color: var(--color-text-faint);
+  cursor: pointer;
+  text-decoration: none;
+  font-size: 11px;
+  font-weight: 600;
+  background: none;
+  border: none;
+  padding: 4px;
+  transition: color 0.15s ease;
+}
+
+.navItem:hover,
+.navItemActive {
+  color: var(--color-info);
+}
+
+.homeIndicator {
+  width: 128px;
+  height: 4px;
+  background: var(--color-surface-inverse);
+  border-radius: 9999px;
+  margin: 10px auto 2px;
+}

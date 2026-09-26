@@ -1,0 +1,217 @@
+/* Phase 5.1 — `.wrap` is referenced by LocationPointPicker.jsx but was never
+   defined, so the search + "Use my location" rows had no wrapper class at all.
+   That is the block rendered at the top of the Find-a-Sitter filter card. */
+.wrap {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-width: 0;
+}
+
+.locateBtn {
+  position: absolute;
+  bottom: 26px;
+  left: 12px;
+  z-index: 1000;
+}
+
+.coords {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  margin-top: 6px;
+}
+
+.spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--color-border-strong);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: loc-spinner 0.6s linear infinite;
+  display: inline-block;
+  vertical-align: middle;
+  margin-right: 6px;
+}
+
+@keyframes loc-spinner {
+  to { transform: rotate(360deg); }
+}
+
+.realMapContainer {
+  flex: 1;
+  min-height: 200px;
+  border-radius: 12px;
+  overflow: hidden;
+  position: relative;
+}
+
+.searchRow {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.searchInputRow {
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+  width: 100%;
+}
+
+.searchInput {
+  flex: 1;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--color-border-strong);
+  font-size: 14px;
+  outline: none;
+}
+
+.searchBtn {
+  padding: 10px 16px;
+  border-radius: 10px;
+  background: var(--color-primary);
+  color: white;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.searchBtn:hover:not(:disabled) {
+  background: var(--color-primary-active);
+}
+
+.searchBtn:disabled {
+  background: var(--color-text-faint);
+  cursor: not-allowed;
+}
+
+/* GPS "Use my location" button — full width in its own row below search */
+.gpsBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 10px 16px;
+  background: rgb(var(--primary-rgb) / 0.08);
+  color: var(--color-primary);
+  border: 1px solid rgb(var(--primary-rgb) / 0.25);
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  transition: background 0.15s ease;
+}
+
+.gpsBtn:hover:not(:disabled) {
+  background: rgb(var(--primary-rgb) / 0.15);
+}
+
+.gpsBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Autocomplete dropdown — positioned below the search row */
+.searchDropdown {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 10px;
+  background: var(--color-surface);
+  max-height: 200px;
+  overflow-y: auto;
+  box-shadow: 0 4px 12px rgb(var(--shadow-ink-rgb) / 0.08);
+  z-index: 1000;
+  position: relative;
+}
+
+.searchDropdownItem {
+  padding: 10px 14px;
+  font-size: 12px;
+  color: var(--color-text);
+  cursor: pointer;
+  border-bottom: 1px solid var(--color-surface-sunken);
+  transition: background 0.1s ease;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.searchDropdownItem:last-child {
+  border-bottom: none;
+}
+
+.searchDropdownItem:hover {
+  background: var(--color-surface-muted);
+}
+
+/* Live Pin Display — rounded rectangle showing resolved address */
+.livePinDisplay {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  margin-bottom: 10px;
+  background: var(--color-surface-muted);
+  border-radius: 12px;
+  border: 1px solid var(--color-border-subtle);
+  min-height: 42px;
+}
+
+.livePinText {
+  flex: 1;
+  font-size: 13px;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.livePinBadge {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--color-primary);
+  background: rgb(var(--primary-rgb) / 0.1);
+  padding: 3px 8px;
+  border-radius: 999px;
+  letter-spacing: 0.5px;
+}
+
+/* Inline GPS button — used when showMap is false */
+.gpsBtnInline {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 16px;
+  margin-bottom: 10px;
+  background: rgb(var(--primary-rgb) / 0.08);
+  color: var(--color-primary);
+  border: 1px solid rgb(var(--primary-rgb) / 0.2);
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: background 0.15s ease;
+}
+
+.gpsBtnInline:hover:not(:disabled) {
+  background: rgb(var(--primary-rgb) / 0.15);
+}
+
+.gpsBtnInline:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.gpsBtnLabel {
+  font-size: 14px;
+  font-weight: 600;
+}

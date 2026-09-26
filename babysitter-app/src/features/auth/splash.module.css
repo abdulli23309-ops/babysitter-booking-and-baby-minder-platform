@@ -1,0 +1,75 @@
+/* Splash — Phase F4.1 / Phase F-UI. Warm, premium onboarding screen using F2 tokens. */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--gradient-auth-pastel, linear-gradient(160deg, #FBD5E5 0%, #E6DCF5 45%, #CCE6FF 100%));
+  background-attachment: fixed;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+.floatingIcon {
+  position: absolute;
+  color: var(--color-primary);
+  opacity: 0.35;
+  animation: float 6s ease-in-out infinite;
+}
+
+.floatingIcon:nth-child(2) { animation-delay: -1.5s; }
+.floatingIcon:nth-child(3) { animation-delay: -3s; }
+.floatingIcon:nth-child(4) { animation-delay: -4.5s; }
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-14px); }
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 0 var(--space-6);
+  max-width: 560px;
+  box-sizing: border-box;
+}
+
+.logoMark {
+  width: 72px;
+  height: 72px;
+  border-radius: var(--radius-xl);
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 34px;
+  box-shadow: var(--shadow-primary);
+  margin-bottom: var(--space-6);
+}
+
+.title {
+  font-weight: var(--font-weight-extrabold);
+  font-size: clamp(2rem, 6vw, 3rem);
+  line-height: var(--line-height-tight);
+  color: var(--color-text);
+  margin: 0;
+}
+
+.subtitle {
+  margin: var(--space-4) 0 0;
+  font-size: var(--font-size-lg);
+  color: var(--color-text-secondary);
+  letter-spacing: 0.04em;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .floatingIcon {
+    animation: none;
+  }
+}
+

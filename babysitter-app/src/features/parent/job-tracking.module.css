@@ -1,0 +1,202 @@
+.trackingContainer {
+  min-height: 100vh;
+  padding: var(--space-4) var(--space-4) calc(80px + var(--space-6));
+  background: var(--color-background);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.topBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: var(--space-2);
+}
+
+.backBtn {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-full);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text);
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: all var(--transition-fast);
+}
+
+.backBtn:hover {
+  transform: translateX(-2px);
+  border-color: var(--color-border-strong);
+}
+
+.pageTitle {
+  margin: 0;
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text);
+}
+
+/* Sitter Profile Banner Card */
+.sitterBannerCard {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-4);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.sitterAvatar {
+  width: 52px;
+  height: 52px;
+  border-radius: var(--radius-lg);
+  object-fit: cover;
+  background: var(--color-surface-alt);
+}
+
+.sitterBannerText {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sitterName {
+  margin: 0;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text);
+}
+
+.sitterIdText {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+
+.childBadge {
+  background: var(--color-surface-alt);
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+/* Live Timer Hero */
+.timerCard {
+  background: var(--gradient-coral-soft);
+  border: 1px solid rgb(var(--primary-rgb) / 0.15);
+  border-radius: var(--radius-xl);
+  padding: var(--space-6) var(--space-4);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  position: relative;
+  overflow: hidden;
+}
+
+.timerGlow {
+  position: absolute;
+  width: 180px;
+  height: 180px;
+  border-radius: 50%;
+  background: rgb(var(--primary-rgb) / 0.12);
+  filter: blur(25px);
+  pointer-events: none;
+}
+
+.liveBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--badge-success-bg);
+  color: var(--badge-success-text);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-extrabold);
+  padding: 4px 12px;
+  border-radius: var(--radius-full);
+}
+
+.pulsingDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--color-success-strong);
+  animation: pulseDotAnim 1.5s infinite;
+}
+
+@keyframes pulseDotAnim {
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.5); opacity: 0.5; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.timerDigits {
+  font-size: 2.5rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+  margin: var(--space-1) 0;
+}
+
+.timerSub {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+/* Action Chips Row */
+.actionGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-3);
+}
+
+.actionBtn {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-3) var(--space-4);
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: all var(--transition-fast);
+  color: var(--color-text);
+  font-weight: var(--font-weight-bold);
+  font-size: var(--font-size-xs);
+  text-decoration: none;
+}
+
+.actionBtn:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--color-border-strong);
+}
+
+.actionBtn:active {
+  transform: scale(0.97);
+}
+
+.actionIcon {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+

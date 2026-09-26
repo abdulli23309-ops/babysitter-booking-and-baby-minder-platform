@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<edmx:Edmx Version="3.0" xmlns:edmx="http://schemas.microsoft.com/ado/2009/11/edmx">
+ <!-- EF Designer content (DO NOT EDIT MANUALLY BELOW HERE) -->
+  <edmx:Designer xmlns="http://schemas.microsoft.com/ado/2009/11/edmx">
+    <!-- Diagram content (shape and connector positions) -->
+    <edmx:Diagrams>
+      <Diagram DiagramId="5f36118a02c54da198a4f8ed40b44d6e" Name="Diagram1" ZoomLevel="66">
+        <EntityTypeShape EntityType="Model.Babysitter" Width="1.5" PointX="0.75" PointY="5.5" IsExpanded="true" />
+        <EntityTypeShape EntityType="Model.Bid" Width="1.5" PointX="3" PointY="6.25" IsExpanded="true" />
+        <EntityTypeShape EntityType="Model.Child" Width="1.5" PointX="3.75" PointY="11.125" IsExpanded="true" />
+        <EntityTypeShape EntityType="Model.Job" Width="1.5" PointX="6" PointY="5.375" IsExpanded="true" />
+        <EntityTypeShape EntityType="Model.JobTimeSlot" Width="1.5" PointX="8.25" PointY="5.5" IsExpanded="true" />
+        <EntityTypeShape EntityType="Model.Notification" Width="1.5" PointX="5.75" PointY="0.75" IsExpanded="true" />
+        <EntityTypeShape EntityType="Model.Parent" Width="1.5" PointX="1.5" PointY="10.875" IsExpanded="true" />
+        <EntityTypeShape EntityType="Model.Review" Width="1.5" PointX="8.25" PointY="8.75" IsExpanded="true" />
+        <EntityTypeShape EntityType="Model.SitterAvailability" Width="1.5" PointX="3" PointY="2.25" IsExpanded="true" />
+        <EntityTypeShape EntityType="Model.TimeSlot" Width="1.5" PointX="0.75" PointY="2.5" IsExpanded="true" />
+        <AssociationConnector Association="Model.FK__Bid__Sitter_ID__628FA481" ManuallyRouted="false" />
+        <AssociationConnector Association="Model.FK__Job__AssignedSit__0C85DE4D" ManuallyRouted="false" />
+        <AssociationConnector Association="Model.FK__SitterAva__Sitte__08B54D69" ManuallyRouted="false" />
+        <AssociationConnector Association="Model.FK__Bid__Job_ID__619B8048" ManuallyRouted="false" />
+        <AssociationConnector Association="Model.FK__Child__Parent_ID__5535A963" ManuallyRouted="false" />
+        <AssociationConnector Association="Model.FK__Job__Child_ID__59063A47" ManuallyRouted="false" />
+        <AssociationConnector Association="Model.FK__Job__Parent_ID__5812160E" ManuallyRouted="false" />
+        <AssociationConnector Association="Model.FK__JobTimeSl__Job_I__04E4BC85" ManuallyRouted="false" />
+        <AssociationConnector Association="Model.FK__Review__Job_ID__3E1D39E1" ManuallyRouted="false" />
+        <AssociationConnector Association="Model.FK__JobTimeSl__Slot___05D8E0BE" ManuallyRouted="false" />
+        <AssociationConnector Association="Model.FK__SitterAva__Slot___09A971A2" ManuallyRouted="false" />
+        <EntityTypeShape EntityType="Model.CryAlert" Width="1.5" PointX="8.375" PointY="0.75" />
+      </Diagram>
+    </edmx:Diagrams>
+  </edmx:Designer>
+</edmx:Edmx>

@@ -1,0 +1,100 @@
+.button {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  font-family: inherit;
+  font-weight: var(--font-weight-bold);
+  border: none;
+  cursor: pointer;
+  transition: background-color var(--transition-fast), color var(--transition-fast),
+    border-color var(--transition-fast), box-shadow var(--transition-fast),
+    transform var(--transition-fast), filter var(--transition-fast);
+  white-space: nowrap;
+}
+
+.button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.button:focus-visible {
+  outline: 2px solid var(--color-primary-active);
+  outline-offset: 2px;
+}
+
+/* ---- Variants ---- */
+.primary {
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  box-shadow: var(--shadow-primary);
+}
+.primary:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+  box-shadow: var(--shadow-primary-hover, 0 12px 28px rgba(232, 98, 42, 0.42));
+}
+
+.secondary {
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+}
+.secondary:hover:not(:disabled) {
+  background: var(--color-primary-soft-strong, rgba(232, 98, 42, 0.2));
+}
+
+.outlined {
+  background: transparent;
+  color: var(--color-primary);
+  border: 2px solid var(--color-primary);
+}
+.outlined:hover:not(:disabled) {
+  background: var(--color-primary-soft);
+}
+
+.danger {
+  background: var(--color-error);
+  color: var(--color-text-inverse);
+}
+.danger:hover:not(:disabled) {
+  background: var(--color-danger-hover);
+}
+
+/* ---- Phase F-UI-11 (Phase 1) — Hover / press polish ----
+   Hover states are gated behind (hover: hover) so touch devices never get a
+   "stuck" hover; press feedback is universal (mouse, touch, pen). */
+@media (hover: hover) and (pointer: fine) {
+  .button:hover:not(:disabled) {
+    transform: translateY(-1px);
+  }
+}
+
+.button:active:not(:disabled) {
+  transform: translateY(0) scale(0.985);
+}
+
+.button:disabled {
+  box-shadow: none;
+  transform: none;
+}
+
+/* ---- Sizes ---- */
+.sm { padding: 8px 14px; font-size: var(--font-size-sm); border-radius: var(--radius-md); }
+.md { padding: 12px 20px; font-size: var(--font-size-md); border-radius: var(--radius-lg); }
+.lg { padding: 16px 24px; font-size: var(--font-size-md); border-radius: var(--radius-xl); }
+.block { width: 100%; box-sizing: border-box; }
+
+/* ---- Loading spinner inside button ---- */
+.spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgb(var(--edge-rgb) / 0.4);
+  border-top-color: var(--glass-border);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+

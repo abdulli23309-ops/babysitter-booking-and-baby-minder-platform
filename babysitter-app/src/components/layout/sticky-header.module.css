@@ -1,0 +1,134 @@
+/* ============================================================
+   Sticky Header — permanently visible, pinned top app bar
+   ------------------------------------------------------------
+   Pinned to the top of the viewport across the entire application
+   (both Parent and Babysitter views). The header stays visible at all
+   times with backdrop-blur and an elevated z-index so it floats above
+   scrolling content.
+   ============================================================ */
+
+.header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  max-width: var(--shell-max-width, 480px);
+  z-index: 1200;
+  box-sizing: border-box;
+}
+
+.inner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, 8px);
+  height: var(--header-height, 56px);
+  padding: 0 var(--space-3, 12px) 0 var(--space-2, 8px);
+  box-sizing: border-box;
+  background: var(--chrome-bg, rgba(255, 255, 255, 0.72));
+  -webkit-backdrop-filter: var(--glass-blur-lg, blur(20px));
+  backdrop-filter: var(--glass-blur-lg, blur(20px));
+  border-bottom: 1px solid var(--chrome-border, rgba(226, 232, 240, 0.75));
+  transition: background-color var(--transition-base, 180ms ease), box-shadow var(--transition-base, 180ms ease);
+}
+
+/* ---- Brand ---- */
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2, 8px);
+  flex: 0 1 auto;
+  min-width: 0;
+  padding: 5px 6px;
+  border: none;
+  border-radius: var(--radius-md, 12px);
+  background: transparent;
+  color: var(--color-text, #1A1D2E);
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.brandMark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  flex: 0 0 auto;
+  border-radius: 9px;
+  background: var(--gradient-coral, linear-gradient(135deg, #FF6B4A 0%, #E8622A 100%));
+  color: var(--color-text-inverse);
+  box-shadow: 0 4px 10px rgb(var(--primary-rgb) / 0.28);
+}
+
+.brandText {
+  font-size: var(--font-size-sm, 14px);
+  font-weight: var(--font-weight-extrabold, 800);
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+.divider {
+  width: 1px;
+  height: 18px;
+  flex: 0 0 auto;
+  background: var(--color-border-strong, #E1E7EF);
+}
+
+/* ---- Current page title ---- */
+.title {
+  flex: 0 1 auto;
+  min-width: 0;
+  font-size: var(--font-size-sm, 14px);
+  font-weight: var(--font-weight-bold, 700);
+  color: var(--color-text-secondary, #5A6072);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* ---- Right-hand controls ---- */
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1, 4px);
+  margin-left: auto;
+  flex: 0 0 auto;
+}
+
+.menuButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 auto;
+  padding: 0;
+  border-radius: var(--radius-full, 999px);
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.7));
+  background: var(--glass-bg-subtle, rgba(255, 255, 255, 0.6));
+  color: var(--color-text, #1A1D2E);
+  cursor: pointer;
+}
+
+.menuButton:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.menuButton:active {
+  transform: scale(0.94);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .menuButton:hover {
+    color: var(--color-primary, #E8622A);
+    border-color: var(--color-primary, #E8622A);
+  }
+}
+
+/* Keep the bar legible on very narrow phones (320–380px). */
+@media (max-width: 380px) {
+  .brandText {
+    display: none;
+  }
+}

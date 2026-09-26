@@ -1,0 +1,62 @@
+/* ============================================================
+   Dark mode toggle — Phase F-UI-11 (Phase 1)
+   Token-driven so it re-skins itself with the active theme.
+   ============================================================ */
+
+.toggle {
+  width: 36px;
+  height: 36px;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-radius: var(--radius-full, 999px);
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.7));
+  background: var(--glass-bg-subtle, rgba(255, 255, 255, 0.6));
+  color: var(--color-text-secondary, #5A6072);
+  cursor: pointer;
+  transition: background-color var(--transition-base, 180ms ease),
+    color var(--transition-base, 180ms ease),
+    border-color var(--transition-base, 180ms ease),
+    transform var(--transition-fast, 120ms ease);
+}
+
+.toggle:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* Active (dark) state — the switch reads as "on". */
+.toggle[aria-checked='true'] {
+  background: var(--color-primary-soft, rgba(232, 98, 42, 0.12));
+  border-color: var(--color-primary-soft-strong, rgba(232, 98, 42, 0.2));
+  color: var(--color-primary, #E8622A);
+}
+
+.toggle:active {
+  transform: scale(0.94);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .toggle:hover {
+    color: var(--color-primary, #E8622A);
+    border-color: var(--color-primary, #E8622A);
+  }
+}
+
+.icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.icon svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}

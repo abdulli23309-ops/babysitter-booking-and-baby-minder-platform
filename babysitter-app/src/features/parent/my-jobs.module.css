@@ -1,0 +1,413 @@
+/* My Jobs — parent job list, optimized for the 480px app shell. */
+
+.jobsContainer {
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: var(--space-4) var(--space-4) calc(84px + var(--space-6));
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  background: transparent;
+}
+
+/* Header */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: var(--space-2);
+}
+
+.headerLeft {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.title {
+  margin: 0;
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-extrabold);
+  color: var(--color-text);
+  letter-spacing: -0.01em;
+}
+
+/* Filter action button */
+.filterBtn {
+  width: 42px;
+  height: 42px;
+  min-width: 42px;
+  min-height: 42px;
+  border-radius: 50%;
+  background: var(--color-surface-alt);
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 4px 12px rgb(var(--shadow-ink-rgb) / 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  padding: 0;
+  outline: none;
+}
+
+.filterBtn:hover {
+  transform: scale(1.04);
+  color: var(--color-primary);
+  box-shadow: 0 6px 16px rgb(var(--shadow-ink-rgb) / 0.12);
+}
+
+.filterBtn:active {
+  transform: scale(0.95);
+}
+/* Phase 5.1 fix — the tab row must NEVER wrap: four labelled tabs with badges
+   ("Active 3" / "Open 1" / "Upcoming 2" / "History 8") are wider than the 480px
+   shell at some zoom levels, which used to push "History" onto a second line.
+   The container now stays on one line and scrolls horizontally if it must,
+   with the scrollbar hidden for a native app feel. */
+.segmentedContainer {
+  background: rgb(var(--surface-rgb) / 0.85);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-radius: var(--radius-full);
+  border: 1px solid var(--color-border);
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 4px;
+  padding: 4px;
+  box-shadow: 0 2px 8px rgb(var(--shadow-ink-rgb) / 0.04);
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none; /* Firefox */
+}
+
+.segmentedContainer::-webkit-scrollbar {
+  display: none; /* Chrome / Safari / Edge */
+}
+
+.segmentedTab {
+  flex: 1 0 auto;
+  min-width: 0;
+  padding: 10px 12px;
+  border: none;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  outline: none;
+  white-space: nowrap;
+  text-overflow: clip;
+}
+
+.segmentedTab:hover {
+  color: var(--color-text);
+}
+
+.segmentedTabActive {
+  background: var(--color-primary);
+  color: var(--color-text-inverse) !important;
+  box-shadow: 0 4px 12px rgb(var(--primary-rgb) / 0.35);
+}
+
+.tabBadge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgb(var(--shadow-ink-rgb) / 0.06);
+  color: var(--color-text-tertiary);
+}
+
+.segmentedTabActive .tabBadge {
+  background: rgb(var(--edge-rgb) / 0.25);
+  color: var(--color-text-inverse);
+}
+
+/* Job list */
+.jobsList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.jobCard {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-4);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.jobCard:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--color-border-strong);
+}
+
+.jobCardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.sitterInfo {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.sitterAvatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--color-surface-alt);
+  border: 2px solid var(--color-surface-sunken);
+  flex-shrink: 0;
+}
+
+.sitterText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.sitterName {
+  margin: 0;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.childTag {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  font-weight: 500;
+  margin-top: 1px;
+}
+
+/* Neutral placeholder shown when a job has no assigned sitter yet */
+.emptyAvatarPlaceholder {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--color-surface-sunken, #F1F5F9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-tertiary, #94A3B8);
+  flex-shrink: 0;
+}
+
+.sitterNameMuted {
+  color: var(--color-text-tertiary, #94A3B8);
+  font-style: italic;
+  font-size: 13px;
+}
+/* Status badges */
+.statusActive {
+  background: var(--badge-success-bg);
+  color: var(--badge-success-text);
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  font-size: 11px;
+  font-weight: var(--font-weight-bold);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
+.statusUpcoming {
+  background: var(--badge-info-bg);
+  color: var(--badge-info-text);
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.statusCompleted {
+  background-color: var(--color-success-tint);
+  color: var(--color-success-strong);
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.statusCancelled {
+  background-color: var(--color-danger-tint);
+  color: var(--color-danger-strong);
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.pulsingDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-success-strong);
+  box-shadow: 0 0 0 2px rgb(var(--success-rgb) / 0.2);
+  animation: pulseAnim 1.8s infinite;
+}
+
+@keyframes pulseAnim {
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.4); opacity: 0.6; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* Details strip */
+.detailsStrip {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  background: var(--color-surface-alt);
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+}
+
+.stripItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+}
+
+.stripDivider {
+  color: var(--color-text-faint);
+}
+
+/* Action button */
+.cardActionBtn {
+  width: 100%;
+  padding: 11px 18px;
+  border-radius: 999px;
+  border: 1.5px solid var(--color-primary);
+  background: var(--color-surface);
+  color: var(--color-primary);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+  outline: none;
+}
+
+.cardActionBtn:hover {
+  background: var(--color-primary-tint);
+}
+
+.cardActionBtnPrimary {
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  border: none;
+  box-shadow: 0 4px 12px rgb(var(--primary-rgb) / 0.3);
+}
+
+.cardActionBtnPrimary:hover {
+  background: var(--color-primary-hover);
+}
+/* Premium empty state (Phase F-UI-13: matches SearchBabySitter standard) */
+.emptyState {
+  background: var(--color-surface);
+  border-radius: 28px;
+  padding: 40px 24px;
+  box-shadow: 0 6px 24px rgb(var(--ink-rgb) / 0.05);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.emptyCircle {
+  width: 64px;
+  height: 64px;
+  background: var(--color-primary-tint);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+
+.emptyTitle {
+  margin: 0 0 8px 0;
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--color-text);
+}
+
+.emptySubtitle {
+  margin: 0 0 20px 0;
+  font-size: 14px;
+  color: var(--color-text-tertiary);
+  line-height: 1.5;
+  max-width: 280px;
+}
+
+.emptyAction {
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  border: none;
+  border-radius: 999px;
+  padding: 12px 28px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 6px 20px rgb(var(--primary-rgb) / 0.38);
+  transition: all var(--transition-fast);
+  font-family: inherit;
+}
+
+.emptyAction:hover {
+  background: var(--color-primary-hover);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgb(var(--primary-rgb) / 0.45);
+}

@@ -1,0 +1,93 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  box-sizing: border-box;
+  background-color: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  animation: fadeIn var(--transition-fast) ease;
+}
+
+.modal {
+  border-radius: 20px;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-lg, 0 16px 48px rgba(0, 0, 0, 0.18));
+  width: 100%;
+  max-width: 420px;
+  max-height: 82vh;
+  overflow-y: auto;
+  animation: slideUp var(--transition-base) ease;
+}
+
+.modal::-webkit-scrollbar {
+  width: 4px;
+}
+
+.modal::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.modal::-webkit-scrollbar-thumb {
+  background: rgb(var(--ink-rgb) / 0.15);
+  border-radius: 4px;
+}
+
+.modal::-webkit-scrollbar-thumb:hover {
+  background: rgb(var(--ink-rgb) / 0.3);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(12px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+/* ------------------------------------------------------------------
+   Compact pop dialog (opt-in via <Modal variant="compact">)
+
+   Scoped instead of re-shaping .modal: this module is shared by five
+   screens (ParentActiveJobScreen, ParentUpcomingJobScreen,
+   ParentProfileScreen, BabySitterDetails, babysitterprofilescreen),
+   and the short 340px confirmation card would cramp the others.
+   ------------------------------------------------------------------ */
+
+.modalCompact {
+  width: 100%;
+  max-width: 340px;
+  margin: 0 auto;
+  padding: 24px;
+  border-radius: 24px;
+  background: var(--color-surface);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+  animation: modalPop 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  box-sizing: border-box;
+  text-align: center;
+}
+
+.modalCompact h3 {
+  margin: 0 0 8px;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.modalCompact p {
+  margin: 0 0 20px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--color-text-secondary);
+}
+
+@keyframes modalPop {
+  0%   { opacity: 0; transform: scale(0.95); }
+  100% { opacity: 1; transform: scale(1); }
+}

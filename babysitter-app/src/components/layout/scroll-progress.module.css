@@ -1,0 +1,30 @@
+/* ============================================================
+   Scroll Progress Bar — Phase F-UI-11 (Phase 1)
+   Fixed to the top edge of the 480px app shell, above all other chrome.
+   ============================================================ */
+
+.track {
+  position: fixed;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: var(--shell-max-width, 480px);
+  height: 3px;
+  z-index: var(--z-scroll-progress, 1300);
+  pointer-events: none;
+  background: transparent;
+}
+
+.bar {
+  display: block;
+  width: 100%;
+  height: 100%;
+  transform: scaleX(0);
+  transform-origin: 0 50%;
+  opacity: 0;
+  background: linear-gradient(90deg, var(--color-primary, #E8622A) 0%, var(--color-primary-hover, #D4541F) 100%);
+  box-shadow: 0 0 10px rgb(var(--primary-rgb) / 0.5);
+  transition: opacity var(--transition-base, 180ms ease), transform 90ms linear;
+  will-change: transform;
+}
