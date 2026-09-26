@@ -149,6 +149,14 @@ export const API = {
   // ---- Parent: job list + single job fetch (used by MyJobs and BookingStatus) ----
   getParentJobs: (parentId) => apiGet(`/parent/jobs/${parentId}`),
   getJobById: (jobId) => apiGet(`/parent/job/${jobId}`),
+
+  // ---- Parent self-service profile (GET/PUT api/parent/{parentId}/profile; PascalCase JSON) ----
+  // GET returns ParentProfileDto { Parent_ID, FullName, EmailAddress, Username,
+  // PhoneNumber, PictureAddress, Address }; PUT accepts UpdateParentProfileDto
+  // { FullName, PhoneNumber, PictureAddress, Address }.
+  getParentProfile: (parentId) => apiGet(`/parent/${parentId}/profile`),
+  updateParentProfile: (parentId, payload) =>
+    apiPut(`/parent/${parentId}/profile`, payload),
 };
 
 export default API;

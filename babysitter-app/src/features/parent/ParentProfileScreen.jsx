@@ -57,7 +57,28 @@ export default function ParentProfileScreen() {
       <div className={styles.topBar}>
         <BackButton />
         <h1 className={styles.pageTitle}>Account Profile</h1>
-        <div style={{ width: 42 }} />
+        {/* Entry point for the editable profile screen. The former 42px spacer div was
+            load-bearing only for symmetry, so it is replaced (marginLeft:auto keeps the
+            button hard-right without disturbing the back button + title). */}
+        <button
+          type="button"
+          onClick={() => navigate('/update-parent-profile')}
+          aria-label="Edit Parent Profile"
+          style={{
+            marginLeft: 'auto',
+            flexShrink: 0,
+            background: 'var(--color-primary-tint)',
+            color: 'var(--color-primary)',
+            border: 'none',
+            borderRadius: '20px',
+            padding: '6px 14px',
+            fontSize: '12px',
+            fontWeight: 'bold',
+            cursor: 'pointer',
+          }}
+        >
+          Edit Profile
+        </button>
       </div>
 
       {/* Hero Card */}

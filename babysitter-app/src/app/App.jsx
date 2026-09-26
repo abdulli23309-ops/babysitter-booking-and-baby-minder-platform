@@ -23,6 +23,7 @@ import SearchBabysitter from '../features/parent/SearchBabySitter';
 import MyJobsScreen from '../features/parent/MyJobsScreen';
 import BookingStatus from '../features/parent/BookingStatus';
 import UpdateChildProfileScreen from '../features/parent/UpdateChildProfileScreen';
+import UpdateParentProfile from '../features/parent/UpdateParentProfile';
 import ParentActiveJobScreen from '../features/parent/ParentActiveJobScreen';
 import ParentUpcomingJobScreen from '../features/parent/ParentUpcomingJobScreen';
 import MyProfile from '../features/babysitter/babysitterprofilescreen';
@@ -123,7 +124,7 @@ function App() {
               <Route path="/monitor" element={<Navigate to="/baby-monitoring" replace />} />
               <Route path="/child-job-profile" element={<Navigate to="/child-profile" replace />} />
               <Route path="/sitter-profile" element={<Navigate to="/search-babysitter" replace />} />
-              <Route path="/update-parent-profile" element={<Navigate to="/parent-profile" replace />} />
+              <Route path="/update-parent-profile" element={<ProtectedRoute allowedRoles={['parent']}><UpdateParentProfile /></ProtectedRoute>} />
               <Route path="/messages" element={<Navigate to="/babysitter-notifications" replace />} />
               <Route path="/notifications" element={<Navigate to="/babysitter-notifications" replace />} />
                             <Route path="/more" element={<Navigate to="/parent-dashboard" replace />} />
