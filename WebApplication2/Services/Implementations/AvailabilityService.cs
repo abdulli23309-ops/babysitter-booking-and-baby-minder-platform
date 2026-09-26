@@ -114,7 +114,7 @@ namespace WebApplication2.Services.Implementations
             }
         }
 
-        public IEnumerable<SitterAvailabilityItemDto> GetSitterAvailability(int sitterId)
+        public SitterAvailabilityResponseDto GetSitterAvailability(int sitterId)
         {
             var today = DateTime.Today;
             var result = _db.SitterAvailabilities
@@ -175,7 +175,21 @@ namespace WebApplication2.Services.Implementations
                 }
             }
 
-            return result;
+            // Phase 8Q: hand the client the raw booked set (date + slot) so it can
+            // lock a whole (weekday, slot) grid cell across the next 4 weeks. The
+            // date-exact IsLocked / LockedByJobId above is kept for compatibility.
+            return new SitterAvailabilityResponseDto
+            {
+                Items = result,
+                BookedSlots = booked
+                    .Where(b => b.JobDate != null)
+                    .Select(b => new BookedSlotDto
+                    {
+                        JobDate = b.JobDate.Value,
+                        Slot_ID = b.SlotId,
+                    })
+                    .ToList(),
+            };
         }
 
         public int ClearAllAvailability(int sitterId)

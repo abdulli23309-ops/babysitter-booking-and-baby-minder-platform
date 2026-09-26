@@ -68,6 +68,17 @@ const getNext4WeekDates = (weekdayName) => {
   return dates;
 };
 
+// Phase 8Q: weekday name for a local YYYY-MM-DD key (0 = Sunday, matching
+// Date#getDay). Translates a booked/availability date into a grid column key.
+const DAY_KEYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+const weekdayKeyFromISO = (isoDate) => {
+  if (!isoDate) return null;
+  const d = new Date(`${String(isoDate).slice(0, 10)}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return null;
+  return DAY_KEYS[d.getDay()] ?? null;
+};
+
 export default function SetAvailability() {
   const { userId } = useAuth();
   const toast = useToast();
@@ -138,8 +149,13 @@ export default function SetAvailability() {
   const [availabilityLoading, setAvailabilityLoading] = useState(false);
   const hydratedRef = useRef(false);
 
-  // Locked (booked) cells from the server: key "YYYY-MM-DD|slotId" -> LockedByJobId
-  const [lockedMap, setLockedMap] = useState({});
+  // Phase 8Q: locked (booked) cells from the server, keyed "weekday|slotId"
+  // (e.g. "Tuesday|1"). Derived from the raw booked set the endpoint returns, so
+  // a cell locks when ANY upcoming booking in the next 4 weeks lands on that
+  // weekday+slot. The grid renders one representative date per weekday, so a
+  // date-exact key could only ever lock one occurrence per weekday and left
+  // every other booked cell showing a checkmark.
+  const [lockedWeekdaySlotSet, setLockedWeekdaySlotSet] = useState(() => new Set());
 
   // Sitter-level 3-hour lockout from Babysitter.SitterLockedUntil (via profile endpoint)
   const [lockoutUntil, setLockoutUntil] = useState(null);
@@ -245,13 +261,16 @@ export default function SetAvailability() {
   // Bulk actions
   const handleSelectToday = () => {
     const jsDay = new Date().getDay();
-    const DAY_KEYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     const todayKey = DAY_KEYS[jsDay];
     if (!todayKey) return;
 
     const ALL_SLOT_IDS = [1, 2, 3, 4, 5, 8];
     const cellDate = getNext4WeekDates(todayKey)[0];
-    const availableSlots = ALL_SLOT_IDS.filter((id) => !lockedMap[`${cellDate}|${id}`]);
+    // Phase 8Q: skip any cell booked on this weekday within the next 4 weeks.
+    const weekday = weekdayKeyFromISO(cellDate) ?? todayKey;
+    const availableSlots = ALL_SLOT_IDS.filter(
+      (id) => !lockedWeekdaySlotSet.has(`${weekday}|${id}`)
+    );
 
     setWeeklyGrid((prev) => {
       const next = { ...prev };
@@ -263,11 +282,15 @@ export default function SetAvailability() {
   };
 
   const handleSelectAll = () => {
-        const allSlotIds = [1, 2, 3, 4, 5, 8];
+    const allSlotIds = [1, 2, 3, 4, 5, 8];
     const nextGrid = {};
     DAYS_OF_WEEK.forEach((day) => {
       const cellDate = getNext4WeekDates(day.key)[0];
-      nextGrid[day.key] = allSlotIds.filter((id) => !lockedMap[`${cellDate}|${id}`]);
+      // Phase 8Q: skip any cell booked on this weekday within the next 4 weeks.
+      const weekday = weekdayKeyFromISO(cellDate) ?? day.key;
+      nextGrid[day.key] = allSlotIds.filter(
+        (id) => !lockedWeekdaySlotSet.has(`${weekday}|${id}`)
+      );
     });
     setWeeklyGrid(nextGrid);
   };
@@ -415,8 +438,13 @@ export default function SetAvailability() {
     }
     if (!bg) setAvailabilityLoading(true);
     try {
-      const rows = await API.getSitterAvailability(userId);
-      const list = Array.isArray(rows) ? rows : rows?.data ? rows.data : [];
+      // Phase 8Q: the endpoint returns { Items, BookedSlots }. Older builds
+      // returned a bare array, so accept both shapes defensively.
+      const raw = await API.getSitterAvailability(userId);
+      const list = Array.isArray(raw)
+        ? raw
+        : (Array.isArray(raw?.Items) ? raw.Items : (Array.isArray(raw?.data) ? raw.data : []));
+      const bookedSlots = Array.isArray(raw?.BookedSlots) ? raw.BookedSlots : [];
 
       // Ignore any past-dated rows defensively (backend already filters them)
       const today = new Date();
@@ -429,17 +457,28 @@ export default function SetAvailability() {
 
       setExistingAvailability(futureRows);
 
-      const lockedAccumulator = {};
-      futureRows.forEach((r) => {
-        if (r.IsLocked) {
-          const ld = String(r.AvailableDate).slice(0, 10);
-          const sid = Number(r.Slot_ID);
-          if (ld && sid >= 1 && sid <= 8) {
-            lockedAccumulator[`${ld}|${sid}`] = r.LockedByJobId;
-          }
+      // Phase 8Q: lock a (weekday, slot) cell if ANY upcoming booking in the
+      // next 4 weeks matches that weekday+slot. This is a lookahead
+      // approximation: the grid renders one date per weekday, so an exact-date
+      // match could only lock 1/28 of the booked cells. Locking the whole
+      // weekday+slot is the conservative choice — it stops the sitter from
+      // un-selecting a cell that will be booked on some occurrence of that day.
+      const lockedCellPairs = new Set();
+
+      const horizon = new Date(today);
+      horizon.setDate(horizon.getDate() + 28); // 4 weeks
+
+      bookedSlots.forEach((b) => {
+        const d = new Date(b.JobDate);
+        if (Number.isNaN(d.getTime())) return;
+        if (d < today || d > horizon) return;
+        const key = weekdayKeyFromISO(b.JobDate);
+        const sid = Number(b.Slot_ID);
+        if (key && sid >= 1 && sid <= 8) {
+          lockedCellPairs.add(`${key}|${sid}`);
         }
       });
-      setLockedMap(lockedAccumulator);
+      setLockedWeekdaySlotSet(lockedCellPairs);
 
       if (!hydratedRef.current) {
         hydratedRef.current = true;
@@ -649,9 +688,11 @@ export default function SetAvailability() {
                 </div>
                 {DAYS_OF_WEEK.map((day) => {
                   const isSelected = Boolean(weeklyGrid[day.key]?.includes(slot.id));
-                  const cellDate = getNext4WeekDates(day.key)[0];
-                  const lockKey = `${cellDate}|${slot.id}`;
-                  const isLocked = Boolean(lockedMap[lockKey]) || Boolean(lockoutUntil);
+                  // Phase 8Q: locked when any of the next 4 weeks has a booking
+                  // on this weekday+slot (see lockedWeekdaySlotSet above).
+                  const isLocked =
+                    lockedWeekdaySlotSet.has(`${day.key}|${slot.id}`) ||
+                    Boolean(lockoutUntil);
                   return (
                     <button
                       key={`${day.key}-${slot.id}`}

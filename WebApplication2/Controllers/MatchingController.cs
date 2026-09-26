@@ -172,8 +172,8 @@ namespace WebApplication2.Controllers
 
             try
             {
-                var rows = _availabilityService.GetSitterAvailability(sitterId);
-                return Ok(rows);
+                var response = _availabilityService.GetSitterAvailability(sitterId);
+                return Ok(response);
             }
             catch (Exception ex)
             {

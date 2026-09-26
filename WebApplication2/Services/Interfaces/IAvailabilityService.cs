@@ -6,7 +6,7 @@ namespace WebApplication2.Services.Interfaces
     public interface IAvailabilityService
     {
         void SaveAvailability(AvailabilityDto dto);
-        IEnumerable<SitterAvailabilityItemDto> GetSitterAvailability(int sitterId);
+        SitterAvailabilityResponseDto GetSitterAvailability(int sitterId);
         int ClearAllAvailability(int sitterId);
 
         Dictionary<int, SitterAvailabilityCoordsDto> GetAvailabilityLocations(IEnumerable<int> availabilityIds);

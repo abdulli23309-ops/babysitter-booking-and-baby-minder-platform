@@ -58,6 +58,32 @@ namespace WebApplication2.DTOs
     }
 
     /// <summary>
+    /// One booked (job date, time slot) pair for this sitter, taken from an
+    /// Assigned / InProgress job. Returned alongside the availability rows so the
+    /// client can derive weekday+slot locks without needing an exact-date match.
+    /// </summary>
+    public class BookedSlotDto
+    {
+        public DateTime JobDate { get; set; }
+        public int Slot_ID { get; set; }
+    }
+
+    /// <summary>
+    /// Response of GET /matching/availability/{sitterId}.
+    ///   Items       — the sitter's future availability rows (each still carries its
+    ///                 date-exact IsLocked / LockedByJobId for backward compatibility).
+    ///   BookedSlots — the raw booked set (date + slot). The Set Availability grid
+    ///                 renders one representative date per weekday, so it locks a
+    ///                 whole (weekday, slot) cell when ANY booked date in the next
+    ///                 4 weeks falls on that weekday+slot.
+    /// </summary>
+    public class SitterAvailabilityResponseDto
+    {
+        public List<SitterAvailabilityItemDto> Items { get; set; }
+        public List<BookedSlotDto> BookedSlots { get; set; }
+    }
+
+    /// <summary>
     /// Job coordinates returned by raw-SQL geo queries.
     /// Column names match the SELECT projection exactly.
     /// </summary>
