@@ -10,6 +10,12 @@ namespace WebApplication2.DTOs
     /// RoomName is deliberately NOT part of this DTO: the media room is reserved
     /// for a later phase and must not be exposed (Phase 2 DDL: "no room
     /// exposure through APIs").
+    ///
+    /// Phase 4 (presence): the raw participant heartbeat stamps are exposed to
+    /// the authorized polling client plus the connection state each stamp
+    /// derives to ("Connected" / "Lost"). The state is computed on every read
+    /// from server UTC time vs MonitoringHeartbeatTimeoutSeconds - it is never
+    /// stored as a column and there is no separate connection table.
     /// </summary>
     public class MonitorSessionDto
     {
@@ -19,6 +25,13 @@ namespace WebApplication2.DTOs
         public string Status { get; set; }
         public DateTime StartedAtUtc { get; set; }
         public DateTime? EndedAtUtc { get; set; }
+
+        // Phase 4 - two independent participant connections of THIS session.
+        // NULL stamp = that participant has never sent a heartbeat yet.
+        public DateTime? ParentHeartbeatUtc { get; set; }
+        public DateTime? SitterHeartbeatUtc { get; set; }
+        public string ParentConnection { get; set; }   // "Connected" | "Lost"
+        public string SitterConnection { get; set; }   // "Connected" | "Lost"
     }
 
     /// <summary>
@@ -40,5 +53,31 @@ namespace WebApplication2.DTOs
     {
         public int JobId { get; set; }
         public int ChildId { get; set; }
+    }
+
+    /// <summary>
+    /// Request body for POST api/monitoring/session/heartbeat (Phase 4).
+    /// Deliberately ONLY job + child: the caller is identified by the bearer
+    /// token (SessionAuthorize) and the heartbeat column is chosen from that
+    /// authenticated role, so the body can never select "Parent" vs "Sitter"
+    /// and can never carry a forged timestamp - there is no such field, and
+    /// any extra JSON properties (heartbeatUtc, role, sessionId, ...) are
+    /// silently ignored by the model binder. Server UTC time is authoritative.
+    /// </summary>
+    public class HeartbeatMonitoringRequest
+    {
+        public int JobId { get; set; }
+        public int ChildId { get; set; }
+    }
+
+    /// <summary>
+    /// Minimal heartbeat acknowledgement (Phase 4). Carries only an ok flag and
+    /// the authoritative server UTC clock - no RoomName, no tokens, no session
+    /// ids or other database internals (response hygiene rule from Phase 3).
+    /// </summary>
+    public class HeartbeatResponse
+    {
+        public bool Ok { get; set; }
+        public DateTime ServerTimeUtc { get; set; }
     }
 }

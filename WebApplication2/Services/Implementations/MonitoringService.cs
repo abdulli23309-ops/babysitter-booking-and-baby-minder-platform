@@ -1,7 +1,9 @@
 using System;
+using System.Configuration;
 using System.Diagnostics;
 using System.Linq;
 using WebApplication2.DTOs;
+using WebApplication2.Enums;
 using WebApplication2.Infrastructure;
 using WebApplication2.Models;
 using WebApplication2.Services.Interfaces;
@@ -14,6 +16,24 @@ namespace WebApplication2.Services.Implementations
     /// ChildGuardian are intentionally not in Model1.edmx (frozen by Phase 2).
     /// Pattern follows CryAlertService (dual ctor, context ownership flag,
     /// Trace.TraceError logging, caller identity passed in explicitly).
+    ///
+    /// Phase 4 - heartbeat & connection-loss detection (E2E flow, documentation
+    /// requirement):
+    ///   Authenticated user
+    ///           ↓ MonitoringAccess.Check (same chain for every entry point)
+    ///   Active MonitorSession (job + child)
+    ///           ↓ SendHeartbeat (POST session/heartbeat, client sends job+child only)
+    ///   Server UTC timestamp (ParentHeartbeatUtc / SitterHeartbeatUtc by token role)
+    ///           ↓ stale check on the next authorized GET poll (sweep-on-poll)
+    ///   ConnectionLost / ConnectionRestored (MonitorEvent, transitions only)
+    ///
+    /// Key rules: heartbeat ≠ session lifecycle (it can never create, extend,
+    /// end or reopen a session and never changes Job status), heartbeat ≠ cry
+    /// detection (no cry/escalation is started here), there is no background
+    /// timer (the server never claims the exact disconnect moment - it only
+    /// judges "no beat within MonitoringHeartbeatTimeoutSeconds"), and a lost
+    /// connection of ONE participant never ends the session while the other
+    /// participant is still fine (parent and sitter are independent).
     /// </summary>
     public class MonitoringService : IMonitoringService, IDisposable
     {
@@ -29,6 +49,17 @@ namespace WebApplication2.Services.Implementations
             _db = db ?? throw new ArgumentNullException(nameof(db));
             _ownsContext = ownsContext;
         }
+
+        // ---------------------------------------------------------------------
+        // Phase 4 - connection state constants (DERIVED, never persisted).
+        // The server computes Connected/Lost from "now - last heartbeat vs
+        // MonitoringHeartbeatTimeoutSeconds" on every read. There is no
+        // Connection table, no status column change and no state machine:
+        // the MonitorSession itself stays Active even while a participant's
+        // connection is Lost (temporary network loss must not kill a session).
+        // ---------------------------------------------------------------------
+        private const string ConnectionConnected = "Connected";
+        private const string ConnectionLost = "Lost";
 
         public MonitorSessionDto StartSession(int jobId, int childId, int currentUserId, string currentRole)
         {
@@ -90,6 +121,17 @@ namespace WebApplication2.Services.Implementations
             if (!sessionId.HasValue)
                 return null; // controller maps to 404
 
+            // Phase 4 sweep-on-poll: this authorized GET is also the lightweight
+            // stale-heartbeat check (NO background timer exists anywhere). It
+            // detects browser closed / phone off / network gone / page stopped
+            // beating purely from the absence of fresh timestamps, and audits
+            // at most one ConnectionLost per side per staleness episode. Only an
+            // ACTIVE session has live participant connections to lose - an Ended
+            // session is never swept and never re-audited.
+            int? activeSessionId = FindActiveSessionId(jobId, childId);
+            if (activeSessionId.HasValue)
+                SweepConnections(jobId, childId, activeSessionId.Value);
+
             return GetSessionById(sessionId.Value);
         }
 
@@ -128,6 +170,91 @@ namespace WebApplication2.Services.Implementations
         }
 
         // ---------------------------------------------------------------------
+        // Phase 4 - heartbeat entry point
+        // ---------------------------------------------------------------------
+
+        /// <summary>
+        /// Records one heartbeat for the authenticated participant on the ACTIVE
+        /// MonitorSession of job + child.
+        ///
+        /// What a heartbeat IS: proof that this monitoring participant is still
+        /// communicating. It stamps one UTC column and, only when appropriate,
+        /// audits the Lost → Connected transition.
+        ///
+        /// What a heartbeat IS NOT (lifecycle rules): it never creates a
+        /// MonitorSession, never extends or reopens an Ended session (guarded by
+        /// the Status='Active' UPDATE), never bypasses authorization, never
+        /// changes Job status, never starts cry detection and never triggers
+        /// parent escalation.
+        ///
+        /// Security: authorization is the centralized MonitoringAccess chain
+        /// (identical to start/get/end - nothing duplicated here); WHICH column
+        /// is stamped comes only from the authenticated role in the token, never
+        /// from the request body; the timestamp is server UTC time, so a client
+        /// cannot backdate a beat to fake a healthy connection (the request DTO
+        /// has no timestamp/role/sessionId fields at all).
+        ///
+        /// Audit policy: ordinary beats update the timestamp ONLY - no
+        /// MonitorEvent row (a beat every few seconds would otherwise grow the
+        /// append-only audit table forever). Only the meaningful transition
+        /// Lost → Connected is audited (ConnectionRestored); Connected → Lost is
+        /// audited by SweepConnections during the next authorized GET poll.
+        /// </summary>
+        public HeartbeatResponse SendHeartbeat(int jobId, int childId, int currentUserId, string currentRole)
+        {
+            ValidateIds(jobId, childId);
+
+            // Active session first (same pattern as End): when no Active session
+            // exists the id stays null, but the full authorization chain STILL
+            // runs first, so unauthorized callers get 403 + audit instead of
+            // learning session state from the 404 (leak prevention).
+            int? sessionId = FindActiveSessionId(jobId, childId);
+
+            var denial = MonitoringAccess.Check(_db, currentUserId, currentRole, jobId, childId, sessionId);
+            if (denial != MonitoringDenial.Allowed)
+            {
+                AuditAccessDenied(jobId, childId, currentUserId, currentRole, denial);
+                throw new MonitoringAccessException(denial);
+            }
+
+            // Ended/never-started session: 404. The heartbeat does NOT reopen it.
+            if (!sessionId.HasValue)
+                throw new MonitoringAccessException(MonitoringDenial.SessionNotFound);
+
+            // Column choice comes ONLY from the authenticated role. Both names are
+            // compile-time constants (never client input) - the value stays safely
+            // parameterized below.
+            bool isSitter = string.Equals(currentRole, UserRole.Sitter.ToDisplayString(), StringComparison.OrdinalIgnoreCase);
+            string heartbeatColumn = isSitter ? "SitterHeartbeatUtc" : "ParentHeartbeatUtc";
+            string side = isSitter ? "Sitter" : "Parent";
+
+            // Read the PREVIOUS stamp BEFORE overwriting so the Lost → Connected
+            // transition can be detected (the only case this beat audits).
+            DateTime? previousUtc = _db.Database.SqlQuery<DateTime?>(
+                "SELECT " + heartbeatColumn + " FROM MonitorSession WHERE MonitorSession_ID = @p0 AND IsDeleted = 0",
+                sessionId.Value).FirstOrDefault();
+
+            var serverUtc = DateTime.UtcNow; // authoritative clock (UTC)
+            int rows = _db.Database.ExecuteSqlCommand(
+                "UPDATE MonitorSession SET " + heartbeatColumn + " = @p0 " +
+                "WHERE MonitorSession_ID = @p1 AND Status = 'Active' AND IsDeleted = 0",
+                serverUtc, sessionId.Value);
+            if (rows == 0)
+                throw new MonitoringAccessException(MonitoringDenial.SessionNotFound); // ended concurrently
+
+            // Lost → Connected: a previous beat existed AND already exceeded the
+            // timeout. A first-ever beat connects silently (nothing to "restore",
+            // so no audit spam for brand-new sessions).
+            if (previousUtc.HasValue && IsStale(previousUtc.Value, serverUtc, GetHeartbeatTimeout()))
+            {
+                WriteAudit(jobId, childId, "ConnectionRestored", currentUserId, currentRole,
+                    "{\"side\":\"" + side + "\",\"sessionId\":" + sessionId.Value + "}");
+            }
+
+            return new HeartbeatResponse { Ok = true, ServerTimeUtc = serverUtc };
+        }
+
+        // ---------------------------------------------------------------------
         // Private helpers - all raw SQL (Phase 2 freeze: no EDMX changes).
         // ---------------------------------------------------------------------
 
@@ -159,13 +286,143 @@ namespace WebApplication2.Services.Implementations
                 jobId, childId).FirstOrDefault();
         }
 
-        /// <summary>Reads a MonitorSession row as the public DTO (RoomName deliberately excluded).</summary>
+        /// <summary>
+        /// Reads a MonitorSession row as the public DTO (RoomName deliberately
+        /// excluded) and derives the Phase 4 connection state for BOTH
+        /// participants of this one session from the raw heartbeat stamps just
+        /// read. Derivation clock is server UTC time; the "Lost/Connected"
+        /// decision is never stored, so it can never go out of sync with the
+        /// configured timeout.
+        /// </summary>
         private MonitorSessionDto GetSessionById(int monitorSessionId)
         {
-            return _db.Database.SqlQuery<MonitorSessionDto>(
-                "SELECT MonitorSession_ID, Job_ID, Child_ID, Status, StartedAtUtc, EndedAtUtc " +
+            var dto = _db.Database.SqlQuery<MonitorSessionDto>(
+                "SELECT MonitorSession_ID, Job_ID, Child_ID, Status, StartedAtUtc, EndedAtUtc, " +
+                "ParentHeartbeatUtc, SitterHeartbeatUtc " +
                 "FROM MonitorSession WHERE MonitorSession_ID = @p0 AND IsDeleted = 0",
                 monitorSessionId).FirstOrDefault();
+
+            if (dto != null)
+            {
+                var nowUtc = DateTime.UtcNow;
+                var timeout = GetHeartbeatTimeout();
+                dto.ParentConnection = DeriveConnection(dto.ParentHeartbeatUtc, nowUtc, timeout);
+                dto.SitterConnection = DeriveConnection(dto.SitterHeartbeatUtc, nowUtc, timeout);
+            }
+            return dto;
+        }
+
+        // ---------------------------------------------------------------------
+        // Phase 4 - connection-loss detection (sweep-on-poll, no timers)
+        // ---------------------------------------------------------------------
+
+        /// <summary>
+        /// Timeout rule as CONFIGURATION (Web.config MonitoringHeartbeatTimeoutSeconds),
+        /// default 15s when the key is missing or invalid - no magic numbers are
+        /// scattered through the code. A heartbeat older than this window is
+        /// stale, i.e. that participant's connection is considered LOST:
+        /// "if the server has not received a heartbeat within the timeout, the
+        /// connection is lost". The server does NOT and CANNOT know the exact
+        /// moment a device disconnected - it only knows the last time it HEARD
+        /// from the participant and judges at the moment of each authorized poll.
+        /// </summary>
+        private static TimeSpan GetHeartbeatTimeout()
+        {
+            const int defaultSeconds = 15;
+            int seconds = defaultSeconds;
+            string raw = ConfigurationManager.AppSettings["MonitoringHeartbeatTimeoutSeconds"];
+            int parsed;
+            if (!string.IsNullOrWhiteSpace(raw) && int.TryParse(raw.Trim(), out parsed) && parsed > 0)
+                seconds = parsed;
+            return TimeSpan.FromSeconds(seconds);
+        }
+
+        private static bool IsStale(DateTime lastHeartbeatUtc, DateTime nowUtc, TimeSpan timeout)
+        {
+            return nowUtc - lastHeartbeatUtc > timeout;
+        }
+
+        /// <summary>
+        /// Derived presence of ONE participant - never persisted, recomputed on
+        /// every read: fresh beat (within timeout) = Connected, otherwise Lost.
+        /// NULL = never beaten = by definition not connected (a simple two-state
+        /// model for the client; no third "Unknown" state to keep the contract
+        /// easy to explain and test).
+        /// </summary>
+        private static string DeriveConnection(DateTime? lastHeartbeatUtc, DateTime nowUtc, TimeSpan timeout)
+        {
+            if (!lastHeartbeatUtc.HasValue)
+                return ConnectionLost;
+            return IsStale(lastHeartbeatUtc.Value, nowUtc, timeout) ? ConnectionLost : ConnectionConnected;
+        }
+
+        /// <summary>
+        /// Sweep-on-poll (Phase 4): runs inside the authorized GetSession GET
+        /// and checks BOTH participant connections of the Active session for
+        /// staleness - browser closed, phone powered off, network gone, crashed
+        /// tab or a page that simply stopped beating all look the same: no new
+        /// timestamp. No background service, no timer, no in-memory state: the
+        /// append-only MonitorEvent table itself remembers what was already
+        /// reported (dedupe in SweepSide), so repeated polls never duplicate
+        /// audits. The two connections are independent - losing one side never
+        /// suppresses or audits the other side.
+        /// </summary>
+        private void SweepConnections(int jobId, int childId, int monitorSessionId)
+        {
+            SweepSide(jobId, childId, monitorSessionId, "ParentHeartbeatUtc", "Parent");
+            SweepSide(jobId, childId, monitorSessionId, "SitterHeartbeatUtc", "Sitter");
+        }
+
+        /// <summary>Staleness check for ONE of the two independent connections.</summary>
+        private void SweepSide(int jobId, int childId, int monitorSessionId, string heartbeatColumn, string side)
+        {
+            DateTime? lastBeatUtc = _db.Database.SqlQuery<DateTime?>(
+                "SELECT " + heartbeatColumn + " FROM MonitorSession WHERE MonitorSession_ID = @p0 AND IsDeleted = 0",
+                monitorSessionId).FirstOrDefault();
+
+            // Never beaten = nothing was ever connected, so there is no
+            // Connected → Lost transition to audit (a future first beat simply
+            // connects). Keeps brand-new sessions free of bogus ConnectionLost rows.
+            if (!lastBeatUtc.HasValue)
+                return;
+
+            if (!IsStale(lastBeatUtc.Value, DateTime.UtcNow, GetHeartbeatTimeout()))
+                return; // healthy - the common path is two tiny reads and nothing else
+
+            // Duplicate-poll guard: exactly ONE ConnectionLost per side per
+            // staleness episode. The episode memory is the timestamp itself -
+            // a NEWER heartbeat starts a new episode (its stamp post-dates any
+            // previous ConnectionLost row for that side), while repeated polls
+            // of the SAME stale beat keep matching here and stay silent. Uses
+            // only the append-only MonitorEvent table - no extra column, no
+            // in-memory state, no state machine to drift out of sync.
+            int alreadyReported = _db.Database.SqlQuery<int>(
+                "SELECT COUNT(*) FROM MonitorEvent " +
+                "WHERE Job_ID = @p0 AND Child_ID = @p1 AND EventType = 'ConnectionLost' " +
+                "AND ActorRole = @p2 AND AtUtc >= @p3",
+                jobId, childId, side, lastBeatUtc.Value).Single();
+            if (alreadyReported > 0)
+                return;
+
+            // Best-effort: a failed audit must never break the GET poll that
+            // triggered the sweep (the client still receives the session state).
+            // ActorUserId = 0 marks "detected by the server" (the participant is
+            // by definition not talking, so there is no human actor to record);
+            // ActorRole carries WHICH of the two connections was lost. The
+            // payload holds no secrets, room names or personal data.
+            try
+            {
+                WriteAudit(jobId, childId, "ConnectionLost", 0, side,
+                    "{\"side\":\"" + side + "\",\"sessionId\":" + monitorSessionId +
+                    ",\"lastHeartbeatUtc\":\"" + lastBeatUtc.Value.ToString("o") +
+                    "\",\"timeoutSeconds\":" + (int)GetHeartbeatTimeout().TotalSeconds + "}");
+            }
+            catch (Exception ex)
+            {
+                Trace.TraceError(
+                    "MonitoringService: could not record ConnectionLost for job {0}, child {1}, side {2}: {3}",
+                    jobId, childId, side, ex);
+            }
         }
 
         /// <summary>

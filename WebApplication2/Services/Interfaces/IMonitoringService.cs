@@ -29,5 +29,17 @@ namespace WebApplication2.Services.Interfaces
         /// Throws MonitoringAccessException when access is denied or no Active session exists.
         /// </summary>
         MonitorSessionDto EndSession(int jobId, int childId, int currentUserId, string currentRole);
+
+        /// <summary>
+        /// Phase 4 heartbeat: records that the authenticated participant is still
+        /// communicating with the ACTIVE MonitorSession of job + child
+        /// (parent -> ParentHeartbeatUtc, sitter -> SitterHeartbeatUtc, chosen from
+        /// the token role, stamped with server UTC time). Runs the same centralized
+        /// MonitoringAccess chain as start/get/end; writes a MonitorEvent only for
+        /// the Lost -> Connected transition (ConnectionRestored), never per beat.
+        /// Throws MonitoringAccessException when access is denied or no Active
+        /// session exists (an Ended session is never reopened by a heartbeat).
+        /// </summary>
+        HeartbeatResponse SendHeartbeat(int jobId, int childId, int currentUserId, string currentRole);
     }
 }

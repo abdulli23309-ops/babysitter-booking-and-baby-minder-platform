@@ -70,6 +70,53 @@ namespace WebApplication2.Controllers
             }
         }
 
+        // POST api/monitoring/session/heartbeat   body: { "jobId": 171, "childId": 27 }
+        // Phase 4: proves the monitoring phone/browser is still talking to the
+        // server. The client sends ONLY job + child; the caller identity comes
+        // from the bearer token ([SessionAuthorize]) and the timestamp is SERVER
+        // UTC time - there is no sessionId, role or heartbeatUtc field to forge.
+        // Authorization is the exact Phase 3 MonitoringAccess chain (implemented
+        // once in the service, nothing duplicated here): job InProgress (both
+        // spellings), assigned-sitter/guardian, JobChildren membership and an
+        // existing Active MonitorSession. A heartbeat never creates, extends or
+        // reopens a session and never changes Job status.
+        [HttpPost]
+        [Route("session/heartbeat")]
+        public IHttpActionResult Heartbeat([FromBody] HeartbeatMonitoringRequest request)
+        {
+            if (request == null)
+                return BadRequest("Request body is required.");
+            if (request.JobId <= 0 || request.ChildId <= 0)
+                return BadRequest("JobId and ChildId must be positive integers.");
+
+            try
+            {
+                var result = _monitoringService.SendHeartbeat(
+                    request.JobId,
+                    request.ChildId,
+                    ClaimsPrincipalHelper.GetUserId(),
+                    ClaimsPrincipalHelper.GetRole());
+                return Ok(result);
+            }
+            catch (MonitoringAccessException ex)
+            {
+                return MonitoringError(ex);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                // SECURITY (Phase 1 Fix B): no exception details to the client.
+                Trace.TraceError(
+                    "MonitoringController: heartbeat failed for job {0}, child {1}: {2}",
+                    request.JobId, request.ChildId, ex);
+                return Content(HttpStatusCode.InternalServerError,
+                    "A server error occurred while recording the monitoring heartbeat.");
+            }
+        }
+
         // GET api/monitoring/session?jobId=171&childId=27
         // Returns the latest session for the child (Active, or Ended after end so
         // clients can display state); 404 when no session exists at all.
