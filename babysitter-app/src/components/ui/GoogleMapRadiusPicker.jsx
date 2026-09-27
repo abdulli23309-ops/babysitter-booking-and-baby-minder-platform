@@ -69,9 +69,28 @@ function MapEvents({ onClick }) {
 
 function Recenter({ position, trigger }) {
   const map = useMap();
+  // Phase 8R: react-leaflet's MapContainer `center` prop is mount-only, so this
+  // effect is the ONLY thing that can move an already-created map. It must
+  // therefore follow the PIN (`position`), not just `trigger`: the pin can
+  // change with no trigger bump at all (the "Use my location" success handler
+  // sets it directly), and once userMovedRef is true the [center] effect above
+  // can never bump the trigger again — which left the view stuck on the
+  // Islamabad centre the map mounted with while the marker sat at the saved
+  // location. Following `position` makes the view self-heal on every new pin.
+  // Both refs are seeded from the first render, because MapContainer has already
+  // mounted on that position — the first run has nothing to move.
+  const centredKeyRef = useRef(position ? `${position.lat},${position.lng}` : null);
+  const lastTriggerRef = useRef(trigger);
   useEffect(() => {
-    if (position && trigger) map.setView([position.lat, position.lng], 14);
-  }, [trigger]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (!position) return undefined;
+    const key = `${position.lat},${position.lng}`;
+    const triggered = trigger !== lastTriggerRef.current;
+    lastTriggerRef.current = trigger;
+    if (key === centredKeyRef.current && !triggered) return undefined;
+    centredKeyRef.current = key;
+    map.setView([position.lat, position.lng], 14);
+    return undefined;
+  }, [map, position, trigger]);
   return null;
 }
 
