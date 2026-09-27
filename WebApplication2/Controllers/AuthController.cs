@@ -18,7 +18,10 @@ namespace WebApplication2.Controllers
     /// </summary>
     [SessionAuthorize]
     [RoutePrefix("api/auth")]
-    [EnableCors(origins: "*", headers: "*", methods: "*")]
+    // CORS (Phase 1 Fix C): intentionally NO per-controller [EnableCors] here.
+    // A per-controller attribute would override the single global config-driven
+    // policy in WebApiConfig.Register (Web.config key "AllowedCorsOrigins") —
+    // that is exactly how wildcard ("*","*","*") CORS survived before Phase 1.
     public class AuthController : ApiController
     {
         /// <summary>
@@ -44,6 +47,36 @@ namespace WebApplication2.Controllers
             });
         }
 
+        /// <summary>
+        /// API PURPOSE:
+        /// Revokes the caller's server-side session (the UserSessions row behind
+        /// the Bearer token) so the token dies immediately instead of staying
+        /// valid for its full configured SessionExpiryDays lifetime.
+        ///
+        /// AUTHORIZATION:
+        /// [SessionAuthorize] on the controller — only a holder of a valid token
+        /// can revoke it; the token read here is the one from the request's
+        /// Authorization header (never a client-supplied body field).
+        ///
+        /// LOGOUT FLOW:
+        /// React logout action (AuthContext.logout)
+        ///     ↓
+        /// DELETE /api/auth/logout  (Bearer token attached by apiClient)
+        ///     ↓
+        /// Server deletes the UserSessions row → session revoked
+        ///     ↓
+        /// Frontend clears local authentication state (always, even on failure)
+        ///     ↓
+        /// User returned to /login
+        ///
+        /// SIDE EFFECT:
+        /// Deleting the row makes every subsequent request with this token fail
+        /// SessionAuthorize with 401, which is exactly the intent.
+        ///
+        /// FAILURE:
+        /// Returns 200 even when no token was supplied (nothing to revoke) so
+        /// the client can always complete its local cleanup.
+        /// </summary>
         [HttpDelete]
         [Route("logout")]
         public IHttpActionResult Logout()
@@ -111,7 +144,13 @@ namespace WebApplication2.Controllers
                     var token = Guid.NewGuid().ToString("N")
                               + Guid.NewGuid().ToString("N");
                     var now = DateTime.UtcNow;
-                    var exp = now.AddDays(7);
+                    // SESSION EXPIRY (Phase 1 Fix F): session lifetime comes from
+                    // the configured SessionExpiryDays (Web.config appSettings) via
+                    // Infrastructure/SessionSettings.cs — never a hardcoded number.
+                    // BUSINESS RULE: ExpiresAt = CreatedAt + configured days, and
+                    // SessionAuthorizeAttribute rejects the token once ExpiresAt <= UtcNow.
+                    int sessionExpiryDays = SessionSettings.GetSessionExpiryDays();
+                    var exp = now.AddDays(sessionExpiryDays);
                     db.Database.ExecuteSqlCommand(
                         "INSERT INTO UserSessions " +
                         "(Token, UserId, Role, CreatedAt, ExpiresAt) " +
@@ -157,7 +196,11 @@ namespace WebApplication2.Controllers
                     var token = Guid.NewGuid().ToString("N")
                               + Guid.NewGuid().ToString("N");
                     var now = DateTime.UtcNow;
-                    var exp = now.AddDays(7);
+                    // SESSION EXPIRY (Phase 1 Fix F): same configured lifetime as
+                    // the parent login above — single source of truth in
+                    // Infrastructure/SessionSettings.cs (Web.config SessionExpiryDays).
+                    int sessionExpiryDays = SessionSettings.GetSessionExpiryDays();
+                    var exp = now.AddDays(sessionExpiryDays);
                     db.Database.ExecuteSqlCommand(
                         "INSERT INTO UserSessions " +
                         "(Token, UserId, Role, CreatedAt, ExpiresAt) " +

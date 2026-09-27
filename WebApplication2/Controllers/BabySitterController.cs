@@ -17,7 +17,10 @@ using WebApplication2.Services.Interfaces;
 namespace WebApplication2.Controllers
 {
     [RoutePrefix("api/babysitter")]
-    [EnableCors(origins: "*", headers: "*", methods: "*")]
+    // CORS (Phase 1 Fix C): intentionally NO per-controller [EnableCors] here.
+    // A per-controller attribute would override the single global config-driven
+    // policy in WebApiConfig.Register (Web.config key "AllowedCorsOrigins") —
+    // that is exactly how wildcard ("*","*","*") CORS survived before Phase 1.
     [SessionAuthorize(Roles = "Sitter")] // B5: sitter-exclusive controller; login/register are [AllowAnonymous] below
     public class BabysitterController : ApiController
     {
@@ -204,7 +207,13 @@ namespace WebApplication2.Controllers
                     // Issue an opaque session token backed by the UserSessions table.
                     var token = Guid.NewGuid().ToString("N") + Guid.NewGuid().ToString("N");
                     var sessionCreated = DateTime.UtcNow;
-                    var sessionExpires = sessionCreated.AddDays(7);
+                    // SESSION EXPIRY (Phase 1 Fix F): lifetime comes from the
+                    // configured SessionExpiryDays (Web.config appSettings) via
+                    // Infrastructure/SessionSettings.cs — do NOT hardcode a number
+                    // here. This is the sitter-role login endpoint; the unified
+                    // login lives in AuthController.Login and uses the same source.
+                    int sessionExpiryDays = SessionSettings.GetSessionExpiryDays();
+                    var sessionExpires = sessionCreated.AddDays(sessionExpiryDays);
                     db.Database.ExecuteSqlCommand(
                         "INSERT INTO UserSessions (Token, UserId, Role, CreatedAt, ExpiresAt) VALUES (@p0, @p1, @p2, @p3, @p4)",
                         token, sitter.Sitter_ID, UserRole.Sitter.ToDisplayString(), sessionCreated, sessionExpires);
@@ -223,7 +232,11 @@ namespace WebApplication2.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest("Login Error: " + ex.Message);
+                // SECURITY (Phase 1 Fix B): never echo exception details to the
+                // client — they can contain SQL text, table/column names or
+                // connection details. Full details go to the server trace log.
+                System.Diagnostics.Trace.TraceError("BabySitterController.Login failed: {0}", ex);
+                return BadRequest("Login failed. Please try again.");
             }
         }
 

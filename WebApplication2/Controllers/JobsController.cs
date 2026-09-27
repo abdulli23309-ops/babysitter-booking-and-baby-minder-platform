@@ -12,7 +12,10 @@ using WebApplication2.Services.Interfaces;
 namespace WebApplication2.Controllers
 {
     [RoutePrefix("api/jobs")]
-    [EnableCors(origins: "*", headers: "*", methods: "*")]
+    // CORS (Phase 1 Fix C): intentionally NO per-controller [EnableCors] here.
+    // A per-controller attribute would override the single global config-driven
+    // policy in WebApiConfig.Register (Web.config key "AllowedCorsOrigins") —
+    // that is exactly how wildcard ("*","*","*") CORS survived before Phase 1.
     [SessionAuthorize] // B5: all job endpoints require a valid session token (both roles may browse open jobs)
     public class JobsController : ApiController
     {
@@ -216,8 +219,31 @@ namespace WebApplication2.Controllers
             }
         }
 
-        // GET api/jobs/active
-        // GET api/jobs/active?babysitterId=19
+        /// <summary>
+        /// API PURPOSE:
+        /// Returns the currently relevant job for the authenticated user.
+        ///
+        /// ENDPOINTS:
+        /// GET api/jobs/active
+        /// GET api/jobs/active?babysitterId=19   (sitter's own id only — see IDOR guard)
+        ///
+        /// AUTHORIZATION:
+        /// Requires a valid authenticated session ([SessionAuthorize]); the
+        /// user id and role come from the server-side session claims.
+        ///
+        /// FLOW:
+        /// Controller (claims) → JobService.GetActiveJob → database → ActiveJobResultDto.
+        ///
+        /// IMPORTANT (Phase 1 Fix A):
+        /// This endpoint may return a job in SitterArrived state so the sitter
+        /// still sees the job they have travelled to. It does NOT authorize
+        /// Child Monitoring — monitoring requires Job.Status == InProgress and
+        /// is enforced by a separate authorization layer (future MonitoringAccess).
+        ///
+        /// FAILURE:
+        /// 404 when no active job exists; 403 when a sitter asks for another
+        /// sitter's id; 400 for unverifiable identity.
+        /// </summary>
         [HttpGet]
         [Route("active")]
         public IHttpActionResult GetActiveJobForSitter(int? babysitterId = null)

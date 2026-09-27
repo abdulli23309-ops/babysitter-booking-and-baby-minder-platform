@@ -11,7 +11,10 @@ using WebApplication2.Services.Interfaces;
 namespace WebApplication2.Controllers
 {
     [RoutePrefix("api/matching")]
-    [EnableCors(origins: "*", headers: "*", methods: "*")]
+    // CORS (Phase 1 Fix C): intentionally NO per-controller [EnableCors] here.
+    // A per-controller attribute would override the single global config-driven
+    // policy in WebApiConfig.Register (Web.config key "AllowedCorsOrigins") —
+    // that is exactly how wildcard ("*","*","*") CORS survived before Phase 1.
     [SessionAuthorize]
     public class MatchingController : ApiController
     {

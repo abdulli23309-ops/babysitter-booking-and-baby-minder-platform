@@ -1486,6 +1486,37 @@ namespace WebApplication2.Services.Implementations
             return jobs;
         }
 
+        /// <summary>
+        /// Gets the currently relevant job for the authenticated user.
+        /// </summary>
+        /// <remarks>
+        /// PURPOSE:
+        /// Supplies the frontend with the user's current job state so the
+        /// active-job screen can render. Consumed by GET api/jobs/active
+        /// (JobsController.GetActiveJobForSitter) and, on the React side, by
+        /// the active-job / cry-detection screens.
+        ///
+        /// BUSINESS RULE — status priority (highest first):
+        ///   1. InProgress    — job under way.
+        ///   2. SitterArrived — sitter confirmed arrival, parent has not started
+        ///      the job yet (Phase 1 Fix A: this state was previously invisible
+        ///      here, so the sitter lost sight of the job at the exact moment of
+        ///      arrival).
+        ///   3. Assigned + today's date — accepted but not yet started.
+        ///
+        /// SECURITY:
+        /// currentUserId comes from the authenticated server session (claims),
+        /// never from the client request body. A sitter may only read their own
+        /// job (IDOR guard below); a parent only their own jobs.
+        ///
+        /// IMPORTANT — NOT a monitoring grant:
+        /// Returning a job here does NOT authorize Child Monitoring. Future
+        /// monitoring authorization (MonitoringAccess) requires ALL of:
+        ///   AssignedSitter == currentUser
+        ///   AND Job.Status == InProgress
+        ///   AND the child belongs to JobChildren(job).
+        /// Monitoring must never be authorized from SitterArrived.
+        /// </remarks>
         public ActiveJobResultDto GetActiveJob(string currentRole, int currentUserId, int? requestedBabysitterId)
         {
             var query = _db.Jobs.Where(j => !j.IsDeleted);
@@ -1519,11 +1550,46 @@ namespace WebApplication2.Services.Implementations
 
             var today = DateTime.Today;
             string inProgressStatus = JobStatus.InProgress.ToDisplayString();
+            // KNOWN DATA CONVENTION CONFLICT (resolved deliberately here):
+            // ToDisplayString() renders InProgress as "In Progress" (with a
+            // space) and current backend writers (JobService status
+            // transitions) store that spelling, but legacy rows already in the
+            // database carry the plain enum name "InProgress" (no space) —
+            // verified against live data during Phase 1 smoke testing. Both
+            // spellings are matched below so neither generation of data
+            // disappears from the active-job screen. SQL Server's default
+            // collation makes the comparison case-insensitive; only the space
+            // differs. Do NOT "simplify" this to one spelling without a data
+            // migration AND a review of every other status reader
+            // (AvailabilityService, BidService, JobInvitationService,
+            // MatchingService all compare Job.Status too).
+            string inProgressLegacyStatus = JobStatus.InProgress.ToString();
+            string sitterArrivedStatus = JobStatus.SitterArrived.ToDisplayString();
             string assignedStatus = JobStatus.Assigned.ToDisplayString();
 
+            // Which jobs count as "active" (Phase 1 Fix A):
+            // - InProgress: always visible, highest priority.
+            // - SitterArrived: visible WITHOUT a date window. The sitter has
+            //   physically arrived, so the job must stay visible even if it
+            //   runs past midnight; it disappears only by transitioning to
+            //   InProgress / Completed / Cancelled.
+            // - Assigned: only for today's date (existing behaviour preserved),
+            //   so stale accepted jobs from previous days do not pollute the
+            //   active-job screen.
+            //
+            // SECURITY NOTE: seeing a SitterArrived job here does NOT grant
+            // monitoring permission — monitoring remains restricted to
+            // InProgress by its own authorization layer (see method remarks).
             var job = query
-                .Where(j => j.Status == inProgressStatus || (j.Status == assignedStatus && DbFunctions.TruncateTime(j.JobDate) == today))
-                .OrderByDescending(j => j.Status == inProgressStatus ? 1 : 0)
+                .Where(j =>
+                    j.Status == inProgressStatus ||
+                    j.Status == inProgressLegacyStatus ||
+                    j.Status == sitterArrivedStatus ||
+                    (j.Status == assignedStatus && DbFunctions.TruncateTime(j.JobDate) == today))
+                // Priority: InProgress (true sorts above false in SQL) then
+                // SitterArrived, then most recent job id.
+                .OrderByDescending(j => j.Status == inProgressStatus || j.Status == inProgressLegacyStatus)
+                .ThenByDescending(j => j.Status == sitterArrivedStatus)
                 .ThenByDescending(j => j.Job_ID)
                 .FirstOrDefault();
 

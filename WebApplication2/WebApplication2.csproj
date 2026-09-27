@@ -187,6 +187,7 @@
     <Compile Include="Infrastructure\EnumExtensions.cs" />
     <Compile Include="Infrastructure\PasswordHasher.cs" />
     <Compile Include="Infrastructure\SessionAuthorizeAttribute.cs" />
+    <Compile Include="Infrastructure\SessionSettings.cs" />
     <Compile Include="Infrastructure\SimpleDependencyResolver.cs" />
         <Compile Include="Infrastructure\GeoHelper.cs" />
     <Compile Include="Infrastructure\ValidationHelper.cs" />

@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
@@ -141,10 +142,26 @@ namespace WebApplication2.Infrastructure
             }
             catch (Exception ex)
             {
+                // SECURITY (Phase 1 Fix B): never send exception details to the
+                // API client. Exception messages can leak SQL text, table/column
+                // names, connection strings or framework versions to an attacker.
+                // The full details (including stack trace) go to the server-side
+                // trace log only, where an operator can still read them.
+                //
+                // The HTTP status stays 500 (not 401) on purpose: a 401 would make
+                // the frontend clear the user's session and redirect to /login even
+                // when the failure was a transient database error, silently logging
+                // the user out of a still-valid session.
+                Trace.TraceError(
+                    "SessionAuthorize: session validation failed for {0} {1}: {2}",
+                    actionContext.Request.Method,
+                    actionContext.Request.RequestUri,
+                    ex);
+
                 actionContext.Response = CreateJsonResponse(
                     actionContext.Request,
                     HttpStatusCode.InternalServerError,
-                    new { message = "Session validation failed: " + ex.Message });
+                    new { message = "Session validation failed. Please try again or log in again." });
             }
         }
 
