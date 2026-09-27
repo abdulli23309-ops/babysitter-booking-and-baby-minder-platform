@@ -65,6 +65,11 @@ namespace WebApplication2.Infrastructure
                 return new CryDetectionController(new CryAlertService());
             }
 
+            if (serviceType == typeof(MonitoringController))
+            {
+                return new MonitoringController(new MonitoringService());
+            }
+
             if (serviceType == typeof(ImageController))
             {
                 return new ImageController(new ImageService());
@@ -118,6 +123,11 @@ namespace WebApplication2.Infrastructure
             if (serviceType == typeof(ICryAlertService))
             {
                 return new CryAlertService();
+            }
+
+            if (serviceType == typeof(IMonitoringService))
+            {
+                return new MonitoringService();
             }
 
             if (serviceType == typeof(IImageService))

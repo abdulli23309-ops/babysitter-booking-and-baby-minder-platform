@@ -156,6 +156,7 @@
     <Compile Include="Controllers\SitterInvitationsController.cs" />
     <Compile Include="Controllers\MatchingController.cs" />
     <Compile Include="Controllers\NotificationsController.cs" />
+    <Compile Include="Controllers\MonitoringController.cs" />
     <Compile Include="Controllers\ParentController.cs" />
     <Compile Include="Controllers\ReviewController.cs" />
     <Compile Include="DTOs\AvailabilityDto.cs" />
@@ -171,6 +172,7 @@
     <Compile Include="DTOs\JobDTOs.cs" />
     <Compile Include="DTOs\JobInvitationDtos.cs" />
     <Compile Include="DTOs\NotificationDto.cs" />
+    <Compile Include="DTOs\MonitoringDtos.cs" />
     <Compile Include="DTOs\ParentDTOs.cs" />
     <Compile Include="DTOs\ReviewDTO.cs" />
     <Compile Include="DTOs\SearchSittersDTO.cs" />
@@ -191,6 +193,7 @@
     <Compile Include="Infrastructure\SimpleDependencyResolver.cs" />
         <Compile Include="Infrastructure\GeoHelper.cs" />
     <Compile Include="Infrastructure\ValidationHelper.cs" />
+    <Compile Include="Infrastructure\MonitoringAccess.cs" />
     <Compile Include="Services\Interfaces\IAccountService.cs" />
     <Compile Include="Services\Implementations\AccountService.cs" />
     <Compile Include="Services\Interfaces\IAvailabilityService.cs" />
@@ -211,6 +214,8 @@
     <Compile Include="Services\Implementations\NotificationService.cs" />
     <Compile Include="Services\Interfaces\ICryAlertService.cs" />
     <Compile Include="Services\Implementations\CryAlertService.cs" />
+    <Compile Include="Services\Interfaces\IMonitoringService.cs" />
+    <Compile Include="Services\Implementations\MonitoringService.cs" />
     <Compile Include="Services\Interfaces\IImageService.cs" />
     <Compile Include="Services\Implementations\ImageService.cs" />
     <Compile Include="Services\Interfaces\IRecurringAvailabilityService.cs" />
