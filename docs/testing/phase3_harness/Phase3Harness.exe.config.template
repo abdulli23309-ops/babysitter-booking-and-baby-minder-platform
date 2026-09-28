@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    TEMPLATE ONLY - copy this to <HarnessName>.exe.config next to the compiled
+    harness and replace the placeholder connection string with your own.
+
+    This file is committed WITHOUT a real connection string on purpose. Point it
+    at the same database the backend Web.config uses.
+
+    Required customizations:
+      1. <data source=...> and <initial catalog=...>  -> your SQL Server instance
+      2. Name the file Phase3Harness.exe.config to match the executable.
+-->
+<configuration>
+  <configSections>
+    <section name="entityFramework" type="System.Data.Entity.Internal.ConfigFile.EntityFrameworkSection, EntityFramework, Version=6.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089" requirePermission="false" />
+  </configSections>
+  <connectionStrings>
+    <add name="BabySitterBooking_and_BabyMinderEntities" connectionString="metadata=res://*/Models.Model1.csdl|res://*/Models.Model1.ssdl|res://*/Models.Model1.msl;provider=System.Data.SqlClient;provider connection string='data source=&lt;YOUR-SERVER&gt;;initial catalog=&quot;BabySitterBooking and BabyMinder&quot;;integrated security=True;trustservercertificate=True;MultipleActiveResultSets=True;App=EntityFramework'" providerName="System.Data.EntityClient" />
+  </connectionStrings>
+  <entityFramework>
+    <defaultConnectionFactory type="System.Data.Entity.Infrastructure.SqlConnectionFactory, EntityFramework" />
+    <providers>
+      <provider invariantName="System.Data.SqlClient" type="System.Data.Entity.SqlServer.SqlProviderServices, EntityFramework.SqlServer" />
+    </providers>
+  </entityFramework>
+</configuration>
