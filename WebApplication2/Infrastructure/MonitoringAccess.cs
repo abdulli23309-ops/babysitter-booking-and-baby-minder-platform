@@ -21,7 +21,8 @@ namespace WebApplication2.Infrastructure
         NotAssignedSitter,  // 403 - Sitter is not Job.AssignedSitter_ID
         NotGuardian,        // 403 - Parent has no ChildGuardian row for this child
         SessionNotFound,    // 404 - MonitorSession does not exist (or is not Active on End)
-        SessionMismatch     // 403 - MonitorSession belongs to a different job/child
+        SessionMismatch,    // 403 - MonitorSession belongs to a different job/child
+        IncidentNotFound    // 404 - no ACTIVE cry incident (Open/Acknowledged) exists for this job+child
     }
 
     /// <summary>
@@ -62,6 +63,8 @@ namespace WebApplication2.Infrastructure
                     return "No active monitoring session was found for this job and child.";
                 case MonitoringDenial.SessionMismatch:
                     return "The monitoring session does not belong to this job and child.";
+                case MonitoringDenial.IncidentNotFound:
+                    return "No active cry incident was found for this job and child.";
                 default:
                     return "Access to the monitoring session was denied.";
             }

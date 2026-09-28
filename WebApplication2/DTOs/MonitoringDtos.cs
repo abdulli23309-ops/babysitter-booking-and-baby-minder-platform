@@ -80,4 +80,77 @@ namespace WebApplication2.DTOs
         public bool Ok { get; set; }
         public DateTime ServerTimeUtc { get; set; }
     }
+
+    // =====================================================================
+    // PHASE 5 + 6 - CRY INCIDENT (CryAlert) CONTRACTS
+    // ---------------------------------------------------------------------
+    // The incident IS the existing CryAlert row (extended in Phase 2). These
+    // DTOs intentionally mirror the database column names so the raw-SQL
+    // reader (SELECT ... FROM CryAlert) materializes them directly and the
+    // documented schema names stay visible to the frontend.
+    //
+    // Exposed fields are ONLY the lifecycle state the monitoring screens
+    // need: no RoomName, no credentials, no personal data.
+    // =====================================================================
+
+    /// <summary>
+    /// Request body shared by every Phase 5/6 cry action
+    /// (create / get / going-to-child / with-child).
+    /// Deliberately ONLY job + child: the caller identity comes from the bearer
+    /// token, and the server resolves the ACTIVE MonitorSession, the assigned
+    /// sitter, the guardians and every timestamp itself. A client can therefore
+    /// never point an incident at another session, choose a stage, backdate a
+    /// heartbeat of the timeline or fake an acknowledgement.
+    /// </summary>
+    public class CryIncidentRequest
+    {
+        public int JobId { get; set; }
+        public int ChildId { get; set; }
+    }
+
+    /// <summary>
+    /// One cry incident as returned to an authorized participant.
+    /// Status values: Open (detected, escalating) / Acknowledged (sitter
+    /// responded) / Resolved (sitter with child) / Cancelled (terminal, see
+    /// CancellationReason). EscalationStage: 0 = sitter alert pending,
+    /// 1 = sitter alerted (or responded), 2 = parents escalated (final stage).
+    /// NextEscalationDueAt is the authoritative server UTC deadline of the NEXT
+    /// escalation step (NULL = nothing further scheduled).
+    /// Reused=true means a duplicate cry report was de-duplicated into this
+    /// already-open incident instead of creating a second row.
+    /// </summary>
+    public class CryIncidentDto
+    {
+        public Guid Id { get; set; }
+        public int Job_ID { get; set; }
+        public int Child_ID { get; set; }
+        public int? MonitorSession_ID { get; set; }
+        public string Status { get; set; }
+        public int EscalationStage { get; set; }
+        public DateTime CreatedAtUtc { get; set; }
+        public DateTime? NextEscalationDueAt { get; set; }
+        public DateTime? AcknowledgedAt { get; set; }
+        public int? AcknowledgedByUserId { get; set; }
+        public string SitterResponse { get; set; }
+        public DateTime? RespondedAt { get; set; }
+        public DateTime? ResolvedAtUtc { get; set; }
+        public DateTime? CancelledAtUtc { get; set; }
+        public string CancellationReason { get; set; }
+        public bool Reused { get; set; }
+    }
+
+    /// <summary>
+    /// Result of one escalation sweep (ops endpoint / sweep-on-poll).
+    /// Counts only - it never reveals which users were notified.
+    /// ServerTimeUtc is the clock the sweep used (the same clock the database
+    /// compares NextEscalationDueAt against).
+    /// </summary>
+    public class SweepResultDto
+    {
+        public int Claimed { get; set; }
+        public int SitterAlerts { get; set; }
+        public int ParentEscalations { get; set; }
+        public int AutoCancelled { get; set; }
+        public DateTime ServerTimeUtc { get; set; }
+    }
 }

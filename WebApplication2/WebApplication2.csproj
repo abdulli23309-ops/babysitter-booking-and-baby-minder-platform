@@ -216,6 +216,8 @@
     <Compile Include="Services\Implementations\CryAlertService.cs" />
     <Compile Include="Services\Interfaces\IMonitoringService.cs" />
     <Compile Include="Services\Implementations\MonitoringService.cs" />
+    <Compile Include="Services\Interfaces\ICryIncidentService.cs" />
+    <Compile Include="Services\Implementations\CryIncidentService.cs" />
     <Compile Include="Services\Interfaces\IImageService.cs" />
     <Compile Include="Services\Implementations\ImageService.cs" />
     <Compile Include="Services\Interfaces\IRecurringAvailabilityService.cs" />

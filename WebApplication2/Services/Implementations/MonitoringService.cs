@@ -34,6 +34,16 @@ namespace WebApplication2.Services.Implementations
     /// judges "no beat within MonitoringHeartbeatTimeoutSeconds"), and a lost
     /// connection of ONE participant never ends the session while the other
     /// participant is still fine (parent and sitter are independent).
+    ///
+    /// Phase 5/6 hooks (cry escalation):
+    ///   * EndSession cancels the session's still-active cry incidents
+    ///     (reason MonitoringSessionEnded) — an incident must not keep escalating
+    ///     against a session that no longer exists.
+    ///   * GetSession also runs the sweep-on-poll escalation fallback for its own
+    ///     session, so the T+5 / T+15 timeline advances without SQL Agent.
+    /// See CryIncidentService for the incident lifecycle, the persisted schedule
+    /// (NextEscalationDueAt) and the atomic claim that prevents duplicate
+    /// escalations.
     /// </summary>
     public class MonitoringService : IMonitoringService, IDisposable
     {
@@ -130,7 +140,25 @@ namespace WebApplication2.Services.Implementations
             // session is never swept and never re-audited.
             int? activeSessionId = FindActiveSessionId(jobId, childId);
             if (activeSessionId.HasValue)
+            {
                 SweepConnections(jobId, childId, activeSessionId.Value);
+
+                // Phase 5/6 sweep-on-poll fallback: this authorized poll also drives
+                // the due cry escalations of THIS session, so the escalation timeline
+                // still advances when no SQL Agent schedule is deployed. It uses the
+                // same atomic claim as the ops endpoint (safe if both run at once)
+                // and is best-effort, so polling never breaks on a sweep failure.
+                try
+                {
+                    CryIncidentService.SweepForSession(_db, activeSessionId.Value);
+                }
+                catch (Exception ex)
+                {
+                    Trace.TraceError(
+                        "MonitoringService: cry escalation sweep failed for session {0}: {1}",
+                        activeSessionId.Value, ex);
+                }
+            }
 
             return GetSessionById(sessionId.Value);
         }
@@ -165,6 +193,25 @@ namespace WebApplication2.Services.Implementations
 
             WriteAudit(jobId, childId, "SessionEnded", currentUserId, currentRole,
                 "{\"sessionId\":" + sessionId.Value + "}");
+
+            // Phase 5/6: a session that no longer exists must not keep feeding a cry
+            // escalation. Cancelling (never deleting) keeps the incident, its
+            // notifications and its audit trail as history while clearing
+            // NextEscalationDueAt, so the sweeper can never fire for this session
+            // again. Best-effort: a failure here must not undo the session end — the
+            // escalation sweep independently re-checks the session state before it
+            // notifies anybody.
+            try
+            {
+                CryIncidentService.CancelIncidentsForSession(
+                    _db, sessionId.Value, CryIncidentService.CancelSessionEnded, currentUserId, currentRole);
+            }
+            catch (Exception ex)
+            {
+                Trace.TraceError(
+                    "MonitoringService: could not cancel cry incidents for ended session {0}: {1}",
+                    sessionId.Value, ex);
+            }
 
             return GetSessionById(sessionId.Value);
         }

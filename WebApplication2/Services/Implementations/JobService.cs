@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
 using System.Data.Entity;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using WebApplication2.DTOs;
@@ -880,6 +881,13 @@ namespace WebApplication2.Services.Implementations
                     });
                 }
 
+                // Phase 5/6: a cancelled job is AUTHORITATIVE over monitoring — end any
+                // Active session of this job and cancel its still-active cry incidents
+                // (reason JobCancelled). Best-effort with tracing: the monitoring hook
+                // must never mask the successful cancellation the caller asked for, and
+                // the escalation sweep re-checks the job status before notifying anyway.
+                TryCancelMonitoringForTerminalJob(job.Job_ID, CryIncidentService.CancelJobCancelled, currentUserId, currentRole);
+
                 return new JobStatusUpdateResultDto
                 {
                     Message = "Booking cancelled.",
@@ -1095,6 +1103,26 @@ namespace WebApplication2.Services.Implementations
             }
 
             _db.SaveChanges();
+
+            // Phase 5/6: a job that is no longer In Progress must stop monitoring too.
+            // "Completed" AND "Cancelled" are both terminal here: end the Active
+            // session(s) of this job and cancel its unresolved cry incidents (reason
+            // JobCompleted / JobCancelled), so no alert keeps escalating after the
+            // sitting ended or the booking was called off.
+            //
+            // This must cover EVERY path that can reach a terminal status, not just
+            // the SitterArrived -> Cancelled branch above: the generic transition
+            // below also allows In Progress -> Cancelled, and without this hook the
+            // sitter's session stayed Active and the cry incident kept escalating
+            // after the parent had cancelled the booking.
+            if (string.Equals(job.Status, JobStatus.Completed.ToDisplayString(), StringComparison.OrdinalIgnoreCase))
+            {
+                TryCancelMonitoringForTerminalJob(job.Job_ID, CryIncidentService.CancelJobCompleted, currentUserId, currentRole);
+            }
+            else if (string.Equals(job.Status, JobStatus.Cancelled.ToDisplayString(), StringComparison.OrdinalIgnoreCase))
+            {
+                TryCancelMonitoringForTerminalJob(job.Job_ID, CryIncidentService.CancelJobCancelled, currentUserId, currentRole);
+            }
 
             // Late-cascade check when Completed (Rule F, H, I)
             if (string.Equals(job.Status, JobStatus.Completed.ToDisplayString(), StringComparison.OrdinalIgnoreCase))
@@ -1838,6 +1866,8 @@ namespace WebApplication2.Services.Implementations
                 .ToList();
 
             int affected = 0;
+            // Phase 5/6: every day this termination cancels must also stop monitoring.
+            var terminatedJobIds = new List<int>();
             foreach (var j in seriesJobs)
             {
                 bool inScope =
@@ -1853,6 +1883,7 @@ namespace WebApplication2.Services.Implementations
                 j.CancelledAt = DateTime.UtcNow;
                 j.AssignedSitter_ID = null;
                 affected++;
+                terminatedJobIds.Add(j.Job_ID);
 
                 if (isParent && previousSitter.HasValue)
                 {
@@ -1873,7 +1904,38 @@ namespace WebApplication2.Services.Implementations
             }
 
             _db.SaveChanges();
+
+            // Phase 5/6: every day this termination just cancelled is terminal for
+            // monitoring too — end its Active session(s) and cancel unresolved cry
+            // incidents (same rule as a single job cancellation).
+            foreach (int terminatedJobId in terminatedJobIds)
+                TryCancelMonitoringForTerminalJob(terminatedJobId, CryIncidentService.CancelJobCancelled, currentUserId, currentRole);
+
             return ($"Series terminated. {affected} bookings cancelled.", affected);
+        }
+
+        /// <summary>
+        /// Phase 5/6 hook: the job is no longer In Progress (Cancelled/Completed),
+        /// so monitoring must stop as well. Ends the Active MonitorSession(s) of the
+        /// job and cancels its unresolved cry incidents with the given reason
+        /// (JobCancelled / JobCompleted).
+        ///
+        /// BEST-EFFORT BY DESIGN: failures are traced instead of failing the status
+        /// change the caller already performed. That is safe because the escalation
+        /// sweep independently re-checks the job status before it notifies anybody —
+        /// so even a hook that could not run can never produce a stale escalation.
+        /// </summary>
+        private void TryCancelMonitoringForTerminalJob(int jobId, string reason, int currentUserId, string currentRole)
+        {
+            try
+            {
+                CryIncidentService.CancelForJobNoLongerInProgress(_db, jobId, reason, currentUserId, currentRole);
+            }
+            catch (Exception ex)
+            {
+                Trace.TraceError(
+                    "JobService: could not stop monitoring for terminal job {0} ({1}): {2}", jobId, reason, ex);
+            }
         }
     }
 }
