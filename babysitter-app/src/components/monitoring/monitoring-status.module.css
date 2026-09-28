@@ -1,0 +1,91 @@
+/* Phase 8 - monitoring status bar.
+   Uses ONLY the existing design tokens (light + dark are both covered by
+   tokens.css), so the monitoring UI matches the rest of the app and needs no
+   new palette. Mobile-first: single column, no horizontal scrolling, and every
+   row wraps rather than truncating so a long status is always readable. */
+
+.bar {
+  background: var(--color-surface, #fff);
+  border: 1px solid var(--color-border, rgba(0, 0, 0, 0.08));
+  border-radius: 14px;
+  padding: 14px 16px;
+  margin: 0 0 16px;
+}
+
+.title {
+  margin: 0 0 10px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--color-text, #111);
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border-left: 4px solid transparent;
+  background: var(--color-bg-subtle, rgba(0, 0, 0, 0.03));
+  /* Long status text wraps instead of overflowing horizontally on a 360px phone. */
+  overflow-wrap: anywhere;
+}
+
+.label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-muted, #666);
+}
+
+.value {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--color-text, #111);
+}
+
+/* Tone is a SECONDARY cue only. Every state also carries a text label, so the
+   UI is never colour-alone (accessibility requirement). */
+.row[data-tone='ok'] {
+  border-left-color: var(--color-success, #16a34a);
+}
+
+.row[data-tone='warn'] {
+  border-left-color: var(--color-warning, #d97706);
+}
+
+.row[data-tone='alert'] {
+  border-left-color: var(--color-danger, #dc2626);
+  background: var(--color-danger-tint, #fef2f2);
+}
+
+.row[data-tone='muted'] {
+  border-left-color: var(--color-border, rgba(0, 0, 0, 0.15));
+}
+
+.row[data-tone='muted'] .value {
+  color: var(--color-text-muted, #666);
+  font-weight: 500;
+}
+
+@media (min-width: 480px) {
+  .row {
+    flex-direction: row;
+    align-items: baseline;
+    gap: 12px;
+  }
+
+  .label {
+    min-width: 108px;
+  }
+}

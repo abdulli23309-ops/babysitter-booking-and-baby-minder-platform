@@ -8,6 +8,8 @@ import CopyButton from '../../components/ui/CopyButton';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 
 import UserAvatar from '../../components/ui/UserAvatar';
+import SitterMonitoringPanel from '../../components/monitoring/SitterMonitoringPanel';
+import useMonitoring from '../../hooks/useMonitoring';
 import { API } from '../../services/api';
 import { useToast } from '../../components/ui/ToastContext';
 
@@ -67,6 +69,47 @@ export default function ActiveJobDetails() {
 
   const [job, setJob] = useState(passedJob ?? null);
   const [loading, setLoading] = useState(() => !passedJob && Boolean(numericJobId));
+
+  // Which child the sitter is monitoring. Monitoring state is per child
+  // (Phase 2 architecture), so a multi-child sitting needs an explicit choice.
+  // This is a display selection only — it grants nothing; the backend decides
+  // whether this sitter may monitor the chosen child.
+  const [monitorChildIndex, setMonitorChildIndex] = useState(0);
+  const [responding, setResponding] = useState(false);
+
+  // ==================================================================
+  // PHASE 8 - child monitoring for the assigned sitter
+  // ------------------------------------------------------------------
+  // Monitoring is scoped PER CHILD, so with several children the sitter picks
+  // which one to watch. The chosen child is the only thing this screen decides;
+  // whether they may monitor it at all is decided by the backend
+  // (MonitoringAccess: assigned sitter + job In Progress + child in JobChildren),
+  // which also auto-starts the session.
+  //
+  // These hooks MUST stay above every early return below, otherwise the hook
+  // order changes between renders (react-hooks/rules-of-hooks).
+  const children = job.Children ?? job.children ?? [];
+  const monitoredChild = children[monitorChildIndex] ?? null;
+
+  const monitoring = useMonitoring({
+    jobId: numericJobId,
+    childId: monitoredChild?.Child_ID ?? null,
+    role: 'sitter',
+    autoStart: Boolean(numericJobId && monitoredChild?.Child_ID),
+  });
+
+  // A sitter response is a server action; the refreshed state comes back from
+  // the server (the client never flips an incident status itself).
+  const respond = async (label, action) => {
+    setResponding(true);
+    try {
+      const ok = await action();
+      toast.success(ok ? label : 'That action is no longer available.');
+    } finally {
+      setResponding(false);
+    }
+  };
+
 
   // Hydrate from the API when no job was passed via navigation state.
   useEffect(() => {
@@ -280,6 +323,12 @@ export default function ActiveJobDetails() {
   const showPrimaryChip = childCount <= 1;
   const childAge = job.ChildAge ?? (job.Child_DOB ? calculateAge(job.Child_DOB) : '?');
 
+  // ==================================================================
+  // PHASE 8 - child monitoring for the assigned sitter
+  // ------------------------------------------------------------------
+  // NOTE: the `children`, `monitoring` and `respond` bindings are declared
+  // ABOVE the early returns in this component (see the top of the file) so the
+  // hook order never changes between renders.
   return (
     <div style={{
       minHeight: '100vh',
@@ -304,6 +353,73 @@ export default function ActiveJobDetails() {
           </h2>
           <div style={{ width: '42px' }} />
         </div>
+
+        {/* ==================================================================
+            PHASE 8 - child monitoring, reachable from the normal sitter flow.
+            Shows: the parent-approved pause banner, connection-loss warning, and
+            the cry alert with the three sitter responses. The sitter has NO
+            pause/guardian/DND controls here by design - a pause is a parent
+            action, and the sitter only ever sees its effect. */}
+        {children.length > 0 ? (
+          <div style={{ marginBottom: '16px' }}>
+            {children.length > 1 ? (
+              <label
+                htmlFor="monitor-child-select"
+                style={{
+                  display: 'block',
+                  marginBottom: '10px',
+                  fontSize: '13px',
+                  fontWeight: '600',
+                  color: 'var(--color-text)',
+                }}
+              >
+                Child to monitor
+                <select
+                  id="monitor-child-select"
+                  value={String(monitorChildIndex)}
+                  onChange={(e) => setMonitorChildIndex(Number(e.target.value))}
+                  style={{
+                    display: 'block',
+                    width: '100%',
+                    minHeight: '44px',
+                    marginTop: '6px',
+                    padding: '8px 10px',
+                    borderRadius: '10px',
+                    border: '1px solid var(--color-border-subtle)',
+                    background: 'var(--color-surface)',
+                    color: 'var(--color-text)',
+                  }}
+                >
+                  {children.map((c, i) => (
+                    <option key={c.Child_ID} value={String(i)}>
+                      {c.ChildName ?? `Child ${c.Child_ID}`}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
+
+            <SitterMonitoringPanel
+              session={monitoring.session}
+              incident={monitoring.incident}
+              offline={monitoring.offline}
+              busy={responding}
+              // A paused monitoring session has had its incident cancelled by
+              // the backend, so there is normally nothing to respond to; the
+              // guard is presentation only and the server refuses regardless.
+              canRespond={!monitoring.session?.IsPaused}
+              onGoingToChild={() => respond('Marked as going to the child', monitoring.goingToChild)}
+              onViewChild={() => toast.info('Opening the child camera view.')}
+              onWithChild={() => respond('Marked as with the child', monitoring.withChild)}
+            />
+
+            {monitoring.error ? (
+              <p role="alert" style={{ color: 'var(--color-danger)', fontSize: '13px', fontWeight: 600 }}>
+                {monitoring.error}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
 
         {/* ── Job Reference + Copy / Last Updated ── */}
         <div

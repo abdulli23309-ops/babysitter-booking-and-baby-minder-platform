@@ -208,6 +208,76 @@ export const API = {
   // axios passes a DELETE body through the `data` key of the config object.
   disableDnd: (jobId, childId) => apiDelete('/monitoring/dnd', { data: { jobId, childId } }),
   getDndStates: (jobId, childId) => apiGet(`/monitoring/dnd?jobId=${jobId}&childId=${childId}`),
+
+  // ==========================================================================
+  // PHASE 3/4/5/6 + PHASE 8 - monitoring session, heartbeat and cry incident
+  // --------------------------------------------------------------------------
+  // These endpoints were implemented and verified in Phases 3-6 but had NO
+  // frontend consumer until Phase 8, so they are wired here for the first time.
+  //
+  // E2E flow they participate in:
+  //   component -> these methods -> MonitoringController -> MonitoringAccess
+  //             -> MonitoringService / CryIncidentService -> DB state -> UI
+  //
+  // SECURITY: like every Phase 7 call, the body carries SCOPE ONLY
+  // ({ jobId, childId }). There is deliberately no field for the acting user,
+  // the session id, the escalation stage or a timestamp - the backend derives
+  // the caller from the bearer token, resolves the Active session itself, and
+  // owns every clock. React never decides who is allowed, when T+5/T+15 fire,
+  // or whether an incident is open.
+  // ==========================================================================
+
+  // ---- Monitoring session (Phase 3) ----
+  // Starts (or idempotently returns) the ACTIVE session for one child of a job.
+  // Backend rule: requires MonitoringAccess (guardian / assigned sitter + job
+  // In Progress + child in JobChildren). Failures: 400 bad ids, 403 not
+  // authorized / job not In Progress, 404 unknown job or child.
+  startMonitoringSession: (jobId, childId) =>
+    apiPost('/monitoring/session/start', { jobId, childId }),
+
+  // Reads the session AND (Phase 5/6 sweep-on-poll) advances any DUE cry
+  // escalation for it, so one call renders the whole monitoring view.
+  // Phase 7 also returns IsPaused / PauseSecondsRemaining here, which is how
+  // the SITTER sees the pause without any sitter-specific pause endpoint.
+  // Failures: 404 when the (job, child) never had a session; 403 otherwise.
+  getMonitoringSession: (jobId, childId) =>
+    apiGet(`/monitoring/session?jobId=${jobId}&childId=${childId}`),
+
+  // Ends the session (Phase 3). Phase 5/6 cancels its still-active cry
+  // incidents, and Phase 7 invalidates any pending/approved pause and DND.
+  endMonitoringSession: (jobId, childId) =>
+    apiPost('/monitoring/session/end', { jobId, childId }),
+
+  // ---- Heartbeat (Phase 4) ----
+  // Proves this participant is still communicating. WHICH timestamp is stamped
+  // comes from the authenticated role, never from the body. Response is only
+  // { ok, serverTimeUtc }. The client never derives Connected/Lost itself - it
+  // renders ParentConnection / SitterConnection returned by the session GET.
+  sendMonitoringHeartbeat: (jobId, childId) =>
+    apiPost('/monitoring/session/heartbeat', { jobId, childId }),
+
+  // ---- Cry incident (Phase 5/6) ----
+  // Creates the incident, or returns the already-open one with Reused=true
+  // (dedupe, so a repeatedly firing detector cannot create an alert storm).
+  // Callers poll getCryIncident instead; this exists for the detector path.
+  reportCry: (jobId, childId) => apiPost('/monitoring/cry', { jobId, childId }),
+
+  // Reads the ACTIVE incident (Open/Acknowledged) or the latest one as history,
+  // and drives the due-escalation sweep for the caller's own session.
+  // Shape: { Status, EscalationStage, SitterResponse, NextEscalationDueAt, ... }
+  // React TRANSLATES these into words; it must not reimplement the timing.
+  getCryIncident: (jobId, childId) =>
+    apiGet(`/monitoring/cry?jobId=${jobId}&childId=${childId}`),
+
+  // Sitter "I'm going to the child": acknowledges the incident and postpones the
+  // PARENT escalation to max(created+15s, response+10s). Idempotent. Sitter-only.
+  sitterGoingToChild: (jobId, childId) =>
+    apiPost('/monitoring/cry/going-to-child', { jobId, childId }),
+
+  // Sitter "with child": resolves the incident (terminal). A cancelled incident
+  // can never be resolved (400) - for example one a pause already cancelled.
+  sitterWithChild: (jobId, childId) =>
+    apiPost('/monitoring/cry/with-child', { jobId, childId }),
 };
 
 export default API;

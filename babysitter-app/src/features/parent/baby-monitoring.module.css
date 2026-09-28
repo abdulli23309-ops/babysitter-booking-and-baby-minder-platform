@@ -325,3 +325,67 @@
   transform: translateY(-2px);
 }
 
+/* =====================================================================
+   PHASE 8 - monitoring status / controls added to this screen.
+   Appended (existing rules above untouched) and built only from the existing
+   design tokens so light and dark themes both work. Mobile-first: full width
+   on phones, wraps instead of scrolling, 48px touch targets.
+   ===================================================================== */
+
+.monitorNote {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--color-bg-subtle, rgba(0, 0, 0, 0.03));
+  color: var(--color-text-muted, #666);
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+}
+
+.monitorError {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--color-danger-tint, #fef2f2);
+  border: 1px solid var(--color-danger-border-strong, #fecaca);
+  color: var(--color-text, #111);
+  font-size: 0.85rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.mediaNote {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--color-warning-tint, #fef3c7);
+  border: 1px solid var(--color-warning-border, #fde68a);
+  color: var(--color-text, #111);
+  font-size: 0.82rem;
+  overflow-wrap: anywhere;
+}
+
+.startMonitorBtn {
+  width: 100%;
+  min-height: 48px;
+  margin: 0 0 12px;
+  border-radius: 12px;
+  border: none;
+  background: var(--color-primary, #4f6ef7);
+  color: var(--color-text-inverse, #fff);
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.startMonitorBtn:focus-visible {
+  outline: 3px solid var(--color-primary, #4f6ef7);
+  outline-offset: 2px;
+}
+
+.startMonitorBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+

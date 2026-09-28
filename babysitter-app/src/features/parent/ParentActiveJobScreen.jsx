@@ -212,6 +212,23 @@ export default function ParentActiveJobScreen() {
 
   const resolvedAvatar = getAvatarUrl(job.SitterPicture, 'Sitters');
 
+  // Phase 8: monitoring is scoped per child, so the entry point needs the real
+  // Child_ID. It comes from the job's own child list - never from a URL or a
+  // guess. With several children the first is offered; the monitoring screen
+  // itself can switch child.
+  const monitorChildId = (job.Children ?? job.children ?? [])[0]?.Child_ID ?? null;
+
+  const openMonitoring = () => {
+    if (!monitorChildId) return;
+    navigate('/baby-monitoring', {
+      state: {
+        jobId: job.Job_ID ?? job.jobId,
+        childId: monitorChildId,
+        childName: (job.Children ?? job.children ?? [])[0]?.ChildName ?? childName,
+      },
+    });
+  };
+
   if (loading) {
     return (
       <div
@@ -367,6 +384,44 @@ export default function ParentActiveJobScreen() {
           <div className={styles.infoTextCol}>
             <span className={styles.infoLabel}>SESSION TOTAL</span>
             <span className={styles.infoValue}>PKR {Number(job.Payment ?? 0).toLocaleString()}</span>
+          </div>
+        </div>
+
+        {/* ==================================================================
+            PHASE 8 - E1 entry point into child monitoring.
+            This is the link that makes monitoring reachable through the normal
+            parent journey (active booking -> monitoring) instead of only from a
+            dashboard tile. The (job, child) scope travels as route STATE rather
+            than URL query parameters, because the monitoring endpoints are
+            already authenticated and the server resolves everything else itself.
+            No token, room id or other sensitive value is ever put in the URL. */}
+        <div className={styles.infoRow}>
+          <div className={styles.infoTextCol}>
+            <button
+              type="button"
+              onClick={openMonitoring}
+              disabled={!monitorChildId}
+              style={{
+                width: '100%',
+                minHeight: 48,
+                marginTop: 4,
+                borderRadius: 12,
+                border: '1px solid var(--color-primary)',
+                background: 'var(--color-primary)',
+                color: 'var(--color-text-inverse)',
+                fontSize: 15,
+                fontWeight: 700,
+                cursor: monitorChildId ? 'pointer' : 'not-allowed',
+                opacity: monitorChildId ? 1 : 0.6,
+              }}
+            >
+              Open child monitoring
+            </button>
+            <span className={styles.infoLabel} style={{ marginTop: 8 }}>
+              {monitorChildId
+                ? `Live status, cry alerts, pause and do-not-disturb for ${childName}.`
+                : 'Monitoring becomes available once this booking has a child attached.'}
+            </span>
           </div>
         </div>
       </div>

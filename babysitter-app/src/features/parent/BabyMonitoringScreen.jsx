@@ -1,9 +1,15 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { JitsiMeeting } from '@jitsi/react-sdk';
 import ParentBottomNav from '../../components/layout/ParentBottomNav';
 import BackButton from '../../components/ui/BackButton';
+import MonitoringStatusBar from '../../components/monitoring/MonitoringStatusBar';
+import Phase7FamilyPanel from './Phase7FamilyPanel';
+import useMonitoring from '../../hooks/useMonitoring';
+import { useAuth } from '../auth/AuthContext';
+import { API } from '../../services/api';
 import styles from './baby-monitoring.module.css';
+
 
 // ---------- SVG Icons ----------
 const Icons = {
@@ -137,10 +143,109 @@ const NurseryCameraFeed = () => (
 export default function BabyMonitoringScreen() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { userId, role } = useAuth();
+
+  // Monitoring scope. Phase 8 makes this screen a real consumer of the
+  // monitoring API, which is scoped PER CHILD, so the (job, child) pair has to
+  // be known. It arrives either as route state (from the active job screen /
+  // a notification) or, as a fallback, from the parent's most recent In Progress
+  // job. Nothing is guessed: without a scope the screen says so rather than
+  // inventing a child.
+  const stateJobId = location.state?.jobId ?? location.state?.Job_ID ?? null;
+  const stateChildId = location.state?.childId ?? location.state?.Child_ID ?? null;
+  const [scope, setScope] = useState({
+    jobId: stateJobId,
+    childId: stateChildId,
+    childName: location.state?.childName ?? null,
+  });
+  // Only actually "loading" when we still have to LOOK the scope up.
+  const [scopeLoading, setScopeLoading] = useState(!stateJobId && !stateChildId);
+
+  // Fallback: derive the scope from the parent's In Progress job so the screen
+  // is reachable from the dashboard even without deep-link state.
+  useEffect(() => {
+    if (stateJobId) return;
+    let cancelled = false;
+    // Deferred out of the effect body: this synchronizes with an external
+    // system (the API), it is not a derived render value.
+    Promise.resolve().then(async () => {
+      try {
+        const jobs = await API.getParentJobs(userId);
+        const list = Array.isArray(jobs) ? jobs : [];
+        const active = list.find((j) => j?.Status === 'In Progress') ?? list[0] ?? null;
+        if (cancelled || !active) return;
+        const children = Array.isArray(active.Children) ? active.Children : [];
+        const child = children[0] ?? null;
+        if (!child?.Child_ID) return;
+        setScope({
+          jobId: active.Job_ID ?? active.jobId,
+          childId: child.Child_ID,
+          childName: child.ChildName ?? null,
+        });
+      } catch {
+        // A failure here just means no scope could be derived; the screen
+        // renders its own explanatory empty state below.
+      } finally {
+        if (!cancelled) setScopeLoading(false);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [stateJobId, userId]);
+
+  // One hook owns session start, heartbeat, escalation polling and pause
+  // resolution for the whole screen.
+  const monitoring = useMonitoring({
+    jobId: scope.jobId,
+    childId: scope.childId,
+    role,
+  });
+  const { session, incident, offline, error, start, starting } = monitoring;
+
+  // Phase 7 pause + DND read for this scope. Both are parent-only surfaces and
+  // both are only ever DISPLAYED from server state; the panel issues the
+  // mutations and re-reads afterwards.
+  const [pause, setPause] = useState(null);
+  const [dndStates, setDndStates] = useState([]);
+
+  const refreshPauseAndDnd = useCallback(async () => {
+    if (!scope.jobId || !scope.childId) return;
+    try {
+      const [p, d] = await Promise.all([
+        API.getPause(scope.jobId, scope.childId).catch(() => null),
+        API.getDndStates(scope.jobId, scope.childId).catch(() => []),
+      ]);
+      setPause(p ?? null);
+      setDndStates(Array.isArray(d) ? d : []);
+    } catch {
+      /* keep the last known values; the server stays authoritative */
+    }
+  }, [scope.jobId, scope.childId]);
+
+  // Re-read whenever the server says the pause state may have moved (a fresh
+  // poll) so the countdown and the pending-approval row never go stale. Deferred
+  // out of the effect body because this synchronizes with an external system.
+  useEffect(() => {
+    let cancelled = false;
+    Promise.resolve().then(() => {
+      if (!cancelled) refreshPauseAndDnd();
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [refreshPauseAndDnd, session?.IsPaused, pause?.Status]);
+
+  // Media: the Jitsi path is unchanged and still only used when a real room
+  // name is supplied. MonitorSession.RoomName is a server-side placeholder in
+  // the current build (no media credentials are configured), so this screen must
+  // NOT invent a room, a JWT or a provider.
   const roomName = location.state?.roomName;
+  const mediaConfigured = Boolean(roomName);
 
   const [micOn, setMicOn] = useState(true);
   const [cameraOn, setCameraOn] = useState(true);
+
 
   return (
     <div className={styles.screenContainer}>
@@ -166,6 +271,67 @@ export default function BabyMonitoringScreen() {
         </div>
         <p className={styles.locationSubtitle}>Nursery · HD 1080p</p>
       </div>
+
+      {/* ---- Phase 8: real, server-driven monitoring state ----
+          Previously this screen rendered a static "LIVE" pill over a mock camera
+          feed with no backend state at all. Session, connection, pause, alert and
+          DND are now shown as SEPARATE facts (they can be true/false
+          independently), each derived from the server. */}
+      {scopeLoading ? (
+        <p role="status" className={styles.monitorNote}>
+          Loading your active monitoring session…
+        </p>
+      ) : !scope.jobId || !scope.childId ? (
+        <p role="status" className={styles.monitorNote}>
+          No active babysitting session to monitor right now. Start a booking to use
+          child monitoring.
+        </p>
+      ) : (
+        <>
+          <MonitoringStatusBar
+            session={session}
+            incident={incident}
+            pause={pause}
+            dndStates={dndStates}
+            offline={offline}
+            currentUserId={userId}
+          />
+
+          {error ? (
+            <p role="alert" className={styles.monitorError}>
+              {error}
+            </p>
+          ) : null}
+
+          {/* Starting a session is a server action. The backend is idempotent:
+              it returns the existing Active session rather than creating a
+              second one, and refuses anyone who is not an authorized guardian
+              or sitter. */}
+          {session?.Status !== 'Active' ? (
+            <button
+              type="button"
+              className={styles.startMonitorBtn}
+              disabled={starting}
+              onClick={start}
+            >
+              {starting ? 'Starting monitoring…' : 'Start monitoring this child'}
+            </button>
+          ) : null}
+
+          {scope.childName ? (
+            <p className={styles.monitorNote}>
+              Monitoring scope: job {scope.jobId}, child {scope.childName}.
+            </p>
+          ) : null}
+        </>
+      )}
+
+      {!mediaConfigured ? (
+        <p role="note" className={styles.mediaNote}>
+          Live video is not configured on this deployment. Monitoring status, cry
+          alerts and the pause controls above are fully active.
+        </p>
+      ) : null}
 
       {/* 16:9 Responsive Glassmorphic Camera Frame */}
       <div className={styles.cameraFrame}>
@@ -237,6 +403,14 @@ export default function BabyMonitoringScreen() {
           <span className={styles.controlLabel}>Exit</span>
         </div>
       </div>
+
+      {/* Phase 7 family surface, now reachable from the normal parent journey
+          instead of being a standalone component. It is parent-only and is
+          rendered only when a real (job, child) scope exists, because every
+          guardian/pause/DND endpoint is scoped per child. */}
+      {scope.jobId && scope.childId ? (
+        <Phase7FamilyPanel jobId={scope.jobId} childId={scope.childId} />
+      ) : null}
 
       {/* Bottom Navigation */}
       <ParentBottomNav />

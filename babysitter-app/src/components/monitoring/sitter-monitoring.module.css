@@ -1,0 +1,94 @@
+/* Phase 8 - sitter monitoring panel.
+   Only existing design tokens are used, so light and dark themes both work.
+   Urgent states use colour AND bold text (never colour alone) and wrap on
+   narrow phones instead of scrolling horizontally. Touch targets stay >=44px. */
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0 0 16px;
+}
+
+.warnBox,
+.alertBox {
+  border-radius: 14px;
+  padding: 14px 16px;
+  border: 1px solid transparent;
+  overflow-wrap: anywhere;
+}
+
+.warnBox {
+  background: var(--color-warning-tint, #fef3c7);
+  border-color: var(--color-warning-border, #fde68a);
+  color: var(--color-text, #111);
+}
+
+.alertBox {
+  background: var(--color-danger-tint, #fef2f2);
+  border-color: var(--color-danger-border-strong, #fecaca);
+  color: var(--color-text, #111);
+}
+
+.warnBox p,
+.alertBox p {
+  margin: 6px 0 0;
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.primaryAction,
+.secondaryAction {
+  min-height: 48px;
+  border-radius: 12px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  /* Visible focus for keyboard users (accessibility requirement). */
+  &:focus-visible {
+    outline: 3px solid var(--color-primary, #4f6ef7);
+    outline-offset: 2px;
+  }
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+}
+
+.primaryAction {
+  border: 1px solid var(--color-danger-strong, #dc2626);
+  background: var(--color-danger, #dc2626);
+  color: #fff;
+}
+
+.secondaryAction {
+  border: 1px solid var(--color-border, rgba(0, 0, 0, 0.15));
+  background: var(--color-surface, #fff);
+  color: var(--color-text, #111);
+}
+
+.mutedNote {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--color-text-muted, #666);
+}
+
+/* Wider screens: the three responses sit on one row. */
+@media (min-width: 480px) {
+  .actions {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .primaryAction,
+  .secondaryAction {
+    flex: 1 1 150px;
+  }
+}
