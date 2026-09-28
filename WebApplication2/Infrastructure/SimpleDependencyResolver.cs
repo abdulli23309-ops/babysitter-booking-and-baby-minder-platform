@@ -67,7 +67,8 @@ namespace WebApplication2.Infrastructure
 
             if (serviceType == typeof(MonitoringController))
             {
-                return new MonitoringController(new MonitoringService(), new CryIncidentService());
+                return new MonitoringController(
+                    new MonitoringService(), new CryIncidentService(), new GuardianConnectionService());
             }
 
             if (serviceType == typeof(ImageController))

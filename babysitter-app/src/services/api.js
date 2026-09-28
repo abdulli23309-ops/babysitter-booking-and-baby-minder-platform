@@ -157,6 +157,57 @@ export const API = {
   getParentProfile: (parentId) => apiGet(`/parent/${parentId}/profile`),
   updateParentProfile: (parentId, payload) =>
     apiPut(`/parent/${parentId}/profile`, payload),
+
+  // ==========================================================================
+  // PHASE 7 - Guardian connection, parent pause, parent DND
+  // --------------------------------------------------------------------------
+  // Every call below goes through the same apiGet/apiPost helpers, so the bearer
+  // token is attached exactly like every other endpoint.
+  //
+  // SECURITY: the frontend is NEVER the authorization boundary. It cannot choose
+  // who approves, whose DND is set, or how long a pause lasts - the backend DTOs
+  // deliberately have no such fields. These wrappers therefore send SCOPE ONLY
+  // ({ jobId, childId }) and let the server derive identity from the token.
+  // Disabling a button or hiding a section is presentation only.
+  // ==========================================================================
+
+  // ---- Family / guardians ----
+  // GET guardians of a child: [{ Parent_ID, FullName, Relation, IsPrimary,
+  //                              CanApprovePause, IsCurrentUser }]
+  getGuardians: (jobId, childId) =>
+    apiGet(`/monitoring/guardians?jobId=${jobId}&childId=${childId}`),
+
+  // POST a guardian invitation. `identifier` is a USERNAME or EMAIL, never a
+  // Parent_ID. `relation` ("Father" | "Mother" | "Guardian") decides whether the
+  // accepted guardian may approve a pause; the server assigns the capability.
+  createGuardianInvitation: (childId, identifier, relation) =>
+    apiPost('/monitoring/guardian-invitations', { childId, identifier, relation }),
+
+  // GET only the authenticated account's invitations (no parentId parameter is
+  // accepted by the server, so one parent cannot list another's).
+  getMyGuardianInvitations: () => apiGet('/monitoring/guardian-invitations'),
+  acceptGuardianInvitation: (id) => apiPost(`/monitoring/guardian-invitations/${id}/accept`),
+  rejectGuardianInvitation: (id) => apiPost(`/monitoring/guardian-invitations/${id}/reject`),
+  cancelGuardianInvitation: (id) => apiDelete(`/monitoring/guardian-invitations/${id}`),
+
+  // ---- Parent pause ----
+  // Requesting pauses nothing yet: the OTHER guardian must approve, and only
+  // then is the cry incident cancelled for exactly 150 seconds.
+  requestPause: (jobId, childId) => apiPost('/monitoring/pause', { jobId, childId }),
+  approvePause: (pauseId) => apiPost(`/monitoring/pause/${pauseId}/approve`),
+  denyPause: (pauseId) => apiPost(`/monitoring/pause/${pauseId}/deny`),
+  cancelPause: (pauseId) => apiDelete(`/monitoring/pause/${pauseId}`),
+  // Returns the current pause with IsActive / SecondsRemaining, or null.
+  getPause: (jobId, childId) => apiGet(`/monitoring/pause?jobId=${jobId}&childId=${childId}`),
+
+  // ---- Parent DND ----
+  // DND is PRESENTATION ONLY: the notification is still persisted and the cry
+  // still escalates. Only the ringing/sound is suppressed client-side, and only
+  // for the parent who enabled it. The other parent stays alertable.
+  enableDnd: (jobId, childId) => apiPost('/monitoring/dnd', { jobId, childId }),
+  // axios passes a DELETE body through the `data` key of the config object.
+  disableDnd: (jobId, childId) => apiDelete('/monitoring/dnd', { data: { jobId, childId } }),
+  getDndStates: (jobId, childId) => apiGet(`/monitoring/dnd?jobId=${jobId}&childId=${childId}`),
 };
 
 export default API;

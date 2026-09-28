@@ -1930,6 +1930,19 @@ namespace WebApplication2.Services.Implementations
             try
             {
                 CryIncidentService.CancelForJobNoLongerInProgress(_db, jobId, reason, currentUserId, currentRole);
+
+                // Phase 7: a terminal job must also invalidate its pause/DND state,
+                // so a Pending pause can never be approved and an Approved pause
+                // can never keep suppressing a cry for a sitting that is over.
+                // Uses the SAME session list the incident cancellation just ended.
+                var sessionIds = _db.Database.SqlQuery<int>(
+                    "SELECT MonitorSession_ID FROM MonitorSession WHERE Job_ID = @p0 AND IsDeleted = 0",
+                    jobId).ToList();
+                var guardians = new GuardianConnectionService(_db, ownsContext: false);
+                foreach (int sessionId in sessionIds)
+                {
+                    guardians.InvalidateForTerminalSession(sessionId, currentUserId, currentRole);
+                }
             }
             catch (Exception ex)
             {

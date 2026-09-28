@@ -250,6 +250,19 @@ namespace Phase56Harness
                 "ORDER BY p.Parent_ID")
                 .FirstOrDefault();
 
+            // PHASE 7 MIGRATION NOTE (2026-09-28): this fixture assumed
+            // ChildGuardian was EMPTY in the live database. Phase 7 now backfills
+            // ChildGuardian from Child.Parent_ID
+            // (docs/database/phase7_guardian_pause_dnd.sql), so the (27,34) and
+            // (29,34) rows this harness needs already exist and a blind INSERT
+            // would violate UQ_ChildGuardian_Child_Parent.
+            //
+            // FIX: the harness now establishes its OWN clean slate. No assertion
+            // and no expected value changed - only the fixture. The R5 residue
+            // check is unaffected because the DELETE and the INSERTs all run
+            // inside the rolled-back transaction.
+            db.Database.ExecuteSqlCommand("DELETE FROM ChildGuardian");
+
             db.Database.ExecuteSqlCommand(
                 "INSERT INTO ChildGuardian (Child_ID, Parent_ID, Relation, IsPrimary, CanApprovePause, IsDeleted) " +
                 "VALUES (27, 34, N'TestFixture', 1, 0, 0)");

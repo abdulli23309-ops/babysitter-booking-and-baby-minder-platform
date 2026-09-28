@@ -149,7 +149,18 @@ namespace Phase4Harness
 
         private static void RunFixtures(BabySitterBooking_and_BabyMinderEntities db)
         {
-            // ChildGuardian is EMPTY in the live DB (verified in Phase 3) - in-tx fixture.
+            // PHASE 7 MIGRATION NOTE (2026-09-28): this fixture assumed
+            // ChildGuardian was EMPTY in the live database. Phase 7 now backfills
+            // ChildGuardian from Child.Parent_ID
+            // (docs/database/phase7_guardian_pause_dnd.sql), so the (27,34) row
+            // this harness needs already exists and a blind INSERT would violate
+            // UQ_ChildGuardian_Child_Parent.
+            //
+            // FIX: the harness now establishes its OWN clean slate. No assertion
+            // and no expected value changed - only the fixture. The R3 residue
+            // check is unaffected because the DELETE and the INSERT both run
+            // inside the rolled-back transaction.
+            db.Database.ExecuteSqlCommand("DELETE FROM ChildGuardian");
             db.Database.ExecuteSqlCommand(
                 "INSERT INTO ChildGuardian (Child_ID, Parent_ID, Relation, IsPrimary, CanApprovePause, IsDeleted) VALUES (27, 34, N'TestFixture', 1, 0, 0)");
             // No live job is InProgress - flip statuses for positive tests (ROLLBACK restores).

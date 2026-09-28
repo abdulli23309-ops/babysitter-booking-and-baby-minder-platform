@@ -105,7 +105,21 @@ namespace Phase3Harness
 
         private static void RunFixtures(BabySitterBooking_and_BabyMinderEntities db)
         {
-            // ChildGuardian is EMPTY in the live DB (verified) - in-transaction fixtures.
+            // PHASE 7 MIGRATION NOTE (2026-09-28): this fixture used to assume
+            // ChildGuardian was EMPTY in the live database, which was true when
+            // Phase 3 ran. Phase 7 now backfills ChildGuardian from
+            // Child.Parent_ID (docs/database/phase7_guardian_pause_dnd.sql), so
+            // the (27,34) and (1,34) rows this harness needs already exist and a
+            // blind INSERT would violate UQ_ChildGuardian_Child_Parent.
+            //
+            // FIX: the harness now establishes its OWN clean slate instead of
+            // assuming anything about live data. This changes NO assertion and
+            // NO expected value - it only makes the fixture self-contained. The
+            // "R3 residue: ChildGuardian == 0" expectation stays literally true:
+            // the harness still leaves the table exactly as it found it, because
+            // the DELETE and both INSERTs run inside the rolled-back
+            // transaction.
+            db.Database.ExecuteSqlCommand("DELETE FROM ChildGuardian");
             db.Database.ExecuteSqlCommand(
                 "INSERT INTO ChildGuardian (Child_ID, Parent_ID, Relation, IsPrimary, CanApprovePause, IsDeleted) VALUES (27, 34, N'TestFixture', 1, 0, 0)");
             db.Database.ExecuteSqlCommand(
@@ -316,7 +330,7 @@ namespace Phase3Harness
             Expect("T16e every audit row carries actor", wrongActor == 0, wrongActor.ToString());
         }
 
-        private static void RunResidueChecks(string[,] before)
+        private static void RunResidueChecks(string[,] before, int baselineGuardians)
         {
             // FRESH context after rollback - proves the transaction left nothing.
             using (var db = new BabySitterBooking_and_BabyMinderEntities())
@@ -326,7 +340,22 @@ namespace Phase3Harness
                 int guardians = db.Database.SqlQuery<int>("SELECT COUNT(*) FROM ChildGuardian").Single();
                 Expect("R1 residue: MonitorSession == 0", sessions == 0, sessions.ToString());
                 Expect("R2 residue: MonitorEvent == 0", events == 0, events.ToString());
-                Expect("R3 residue: ChildGuardian == 0", guardians == 0, guardians.ToString());
+
+                // PHASE 7 MIGRATION NOTE (2026-09-28): this was hard-coded to 0,
+                // which was only true while ChildGuardian happened to be empty in
+                // the live database. Phase 7 now backfills ChildGuardian from
+                // Child.Parent_ID (docs/database/phase7_guardian_pause_dnd.sql),
+                // so 29 legitimate guardian rows exist permanently.
+                //
+                // The assertion's INTENT - and the wording in this file's own class
+                // comment - is "count identical to BASELINE", i.e. the harness left
+                // the table exactly as it found it. This now compares against the
+                // baseline captured before the run, which is the same pattern the
+                // Phase 4 and Phase 5/6 harnesses already use. The test is not
+                // weakened: it still fails if the rollback leaves ANY extra or
+                // missing guardian row.
+                Expect("R3 residue: ChildGuardian count == baseline (" + baselineGuardians + ")",
+                    guardians == baselineGuardians, guardians.ToString());
 
                 var after = SnapshotJobStatuses();
                 bool same = before.GetLength(0) == after.GetLength(0);
@@ -350,7 +379,15 @@ namespace Phase3Harness
         {
             Console.OutputEncoding = Encoding.UTF8;
             var baseline = SnapshotJobStatuses();
-            Console.WriteLine("[BASE] job statuses captured for jobs 167-171,23");
+            // PHASE 7: ChildGuardian is no longer empty (mandatory backfill from
+            // Child.Parent_ID), so the R3 residue check compares against this
+            // baseline instead of a hard-coded 0. See the note in RunResidueChecks.
+            int baselineGuardians = 0;
+            using (var probe = new BabySitterBooking_and_BabyMinderEntities())
+            {
+                baselineGuardians = probe.Database.SqlQuery<int>("SELECT COUNT(*) FROM ChildGuardian").Single();
+            }
+            Console.WriteLine("[BASE] job statuses captured for jobs 167-171,23; ChildGuardian baseline = " + baselineGuardians);
 
             using (var db = new BabySitterBooking_and_BabyMinderEntities())
             using (var tx = db.Database.BeginTransaction())
@@ -372,7 +409,7 @@ namespace Phase3Harness
                 }
             }
 
-            RunResidueChecks(baseline);
+            RunResidueChecks(baseline, baselineGuardians);
             Console.WriteLine();
             Console.WriteLine(string.Format("RESULT: {0} passed, {1} failed", _pass, _fail));
             return _fail == 0 ? 0 : 1;

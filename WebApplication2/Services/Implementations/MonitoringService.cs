@@ -213,6 +213,22 @@ namespace WebApplication2.Services.Implementations
                     sessionId.Value, ex);
             }
 
+            // Phase 7: once the session is over, a pending pause must never be
+            // approvable later and an approved pause must stop being active -
+            // otherwise stale Phase 7 state could "resurrect" monitoring for a
+            // sitting that no longer exists. Idempotent and best-effort.
+            try
+            {
+                new GuardianConnectionService(_db, ownsContext: false)
+                    .InvalidateForTerminalSession(sessionId.Value, currentUserId, currentRole);
+            }
+            catch (Exception ex)
+            {
+                Trace.TraceError(
+                    "MonitoringService: could not invalidate Phase 7 state for ended session {0}: {1}",
+                    sessionId.Value, ex);
+            }
+
             return GetSessionById(sessionId.Value);
         }
 
@@ -355,8 +371,70 @@ namespace WebApplication2.Services.Implementations
                 var timeout = GetHeartbeatTimeout();
                 dto.ParentConnection = DeriveConnection(dto.ParentHeartbeatUtc, nowUtc, timeout);
                 dto.SitterConnection = DeriveConnection(dto.SitterHeartbeatUtc, nowUtc, timeout);
+
+                // Phase 7: surface the APPROVED pause to BOTH participants through
+                // this existing endpoint, so the sitter UI can render
+                // "Monitoring temporarily paused by parent" without a sitter-specific
+                // pause endpoint. Read-only: it does not start, extend or end the
+                // pause, and it deliberately does NOT touch the Phase 4 connection
+                // derivation above - a pause is not a connection loss.
+                ApplyPauseState(dto, nowUtc);
             }
             return dto;
+        }
+
+        /// <summary>
+        /// Phase 7 pause summary on the session DTO.
+        ///
+        /// A pause is derived from the persisted MonitoringPause row, never from
+        /// any timer: an Approved pause whose PauseExpiresAtUtc has passed is
+        /// resolved to Expired right here (lazily, on read) and then reports
+        /// IsPaused=false, so an expired pause can never keep suppressing cry
+        /// detection even if nobody called the pause endpoint.
+        ///
+        /// Best-effort: a failure here must never break the session read, which
+        /// the client needs for heartbeat/connection state.
+        /// </summary>
+        private void ApplyPauseState(MonitorSessionDto dto, DateTime nowUtc)
+        {
+            try
+            {
+                int expired = _db.Database.ExecuteSqlCommand(
+                    "UPDATE MonitoringPause SET Status = 'Expired' " +
+                    "WHERE MonitorSession_ID = @p0 AND IsDeleted = 0 AND Status = 'Approved' " +
+                    "AND PauseExpiresAtUtc IS NOT NULL AND PauseExpiresAtUtc <= @p1",
+                    dto.MonitorSession_ID, nowUtc);
+                if (expired > 0)
+                {
+                    WriteAudit(dto.Job_ID, dto.Child_ID, "PauseExpired", 0, "Server",
+                        "{\"sessionId\":" + dto.MonitorSession_ID + ",\"expiredCount\":" + expired + "}");
+                }
+
+                var active = _db.Database.SqlQuery<ActivePauseRow>(
+                    "SELECT TOP (1) PauseExpiresAtUtc FROM MonitoringPause " +
+                    "WHERE MonitorSession_ID = @p0 AND IsDeleted = 0 AND Status = 'Approved' " +
+                    "AND PauseExpiresAtUtc IS NOT NULL AND PauseExpiresAtUtc > @p1",
+                    dto.MonitorSession_ID, nowUtc).FirstOrDefault();
+
+                if (active != null)
+                {
+                    dto.IsPaused = true;
+                    dto.PauseExpiresAtUtc = active.PauseExpiresAtUtc;
+                    dto.PauseSecondsRemaining =
+                        (int)Math.Max(0, Math.Round((active.PauseExpiresAtUtc - nowUtc).TotalSeconds));
+                }
+            }
+            catch (Exception ex)
+            {
+                Trace.TraceError(
+                    "MonitoringService: could not read Phase 7 pause state for session {0}: {1}",
+                    dto.MonitorSession_ID, ex);
+            }
+        }
+
+        private class ActivePauseRow
+        {
+            public DateTime PauseExpiresAtUtc { get; set; }
         }
 
         // ---------------------------------------------------------------------

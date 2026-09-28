@@ -70,6 +70,12 @@ namespace WebApplication2.Services.Implementations
         public const string CancelSessionEnded = "MonitoringSessionEnded";
         public const string CancelJobNotInProgress = "JobNotInProgress";
 
+        // Phase 7: an APPROVED parent pause stops cry escalation for its session.
+        // Reuses the exact Phase 5/6 cancellation path, so a paused incident can
+        // never resume and a cry after the pause naturally starts a fresh T+0 row
+        // (dedupe only covers Open/Acknowledged incidents).
+        public const string CancelParentPauseApproved = "ParentPauseApproved";
+
         // ---- timing (frozen Phase 5/6 spec; all server-side UTC) ----
         private const int SitterAlertDelaySeconds = 5;         // T+5   -> sitter alert
         private const int ParentEscalationDelaySeconds = 15;   // T+15  -> parent escalation
@@ -745,11 +751,6 @@ WHERE Id = @claimId;";
             public int MonitorSession_ID { get; set; }
         }
 
-        private class ParentIdRow
-        {
-            public int? Parent_ID { get; set; }
-        }
-
         private class SitterIdRow
         {
             public int? AssignedSitter_ID { get; set; }
@@ -828,25 +829,35 @@ WHERE Id = @claimId;";
         }
 
         /// <summary>
-        /// Authorized guardians of the child. ChildGuardian is the authoritative
-        /// (multi-guardian) source; Child.Parent_ID is only a fallback for a child
-        /// that has no guardian row yet, so a legacy family still receives the
-        /// parent escalation instead of being silently dropped.
+        /// Authorized guardians of the child for the PARENT ESCALATION fan-out.
+        ///
+        /// SECURITY (Phase 7, MANDATORY): ChildGuardian is the ONE and ONLY source
+        /// of authorized monitoring recipients. A row is counted when
+        ///   ChildGuardian.Child_ID = @childId AND IsDeleted = 0.
+        ///
+        /// The previous implementation fell back to Child.Parent_ID when no
+        /// ChildGuardian row existed. That was a genuine authorization defect: it
+        /// re-introduced the very legacy relationship that the frozen Phase 3
+        /// MonitoringAccess chain deliberately refuses to trust (Rule 4 resolves
+        /// guardians ONLY through ChildGuardian), so the ESCALATION path could
+        /// notify a parent who was not an authorized guardian while every other
+        /// monitoring entry point rejected the same person with NotGuardian. That
+        /// inconsistency is now removed.
+        ///
+        /// Consequence (intended, and covered by the Phase 7 harness): a parent who
+        /// appears only in Child.Parent_ID and has no active ChildGuardian row does
+        /// NOT receive the parent escalation. The correct fix is to connect them as
+        /// a guardian (docs/database/phase7_guardian_pause_dnd.sql backfills the
+        /// legacy owners), never to silently notify them from the owner column.
+        ///
+        /// CryAlert.ParentId (a legacy column from the original detection code) is
+        /// likewise NEVER used as a guardian set.
         /// </summary>
         private List<int> ReadGuardianParentIds(int childId)
         {
-            var ids = _db.Database.SqlQuery<int>(
+            return _db.Database.SqlQuery<int>(
                 "SELECT DISTINCT Parent_ID FROM ChildGuardian WHERE Child_ID = @p0 AND IsDeleted = 0",
                 childId).ToList();
-
-            if (ids.Count == 0)
-            {
-                var fallback = _db.Database.SqlQuery<ParentIdRow>(
-                    "SELECT Parent_ID FROM Child WHERE Child_ID = @p0 AND IsDeleted = 0", childId).FirstOrDefault();
-                if (fallback != null && fallback.Parent_ID.HasValue && fallback.Parent_ID.Value > 0)
-                    ids.Add(fallback.Parent_ID.Value);
-            }
-            return ids;
         }
 
         /// <summary>

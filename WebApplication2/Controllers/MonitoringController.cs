@@ -22,22 +22,34 @@ namespace WebApplication2.Controllers
     {
         private readonly IMonitoringService _monitoringService;
         private readonly ICryIncidentService _cryIncidentService;
+        private readonly IGuardianConnectionService _guardianConnectionService;
 
-        public MonitoringController() : this(new MonitoringService(), new CryIncidentService())
+        public MonitoringController()
+            : this(new MonitoringService(), new CryIncidentService(), new GuardianConnectionService())
         {
         }
 
         // Kept for compatibility with the Phase 3/4 verification harnesses, which
         // construct the controller with a single (shared-context) session service.
         public MonitoringController(IMonitoringService monitoringService)
-            : this(monitoringService, new CryIncidentService())
+            : this(monitoringService, new CryIncidentService(), new GuardianConnectionService())
         {
         }
 
         public MonitoringController(IMonitoringService monitoringService, ICryIncidentService cryIncidentService)
+            : this(monitoringService, cryIncidentService, new GuardianConnectionService())
+        {
+        }
+
+        public MonitoringController(
+            IMonitoringService monitoringService,
+            ICryIncidentService cryIncidentService,
+            IGuardianConnectionService guardianConnectionService)
         {
             _monitoringService = monitoringService ?? throw new ArgumentNullException(nameof(monitoringService));
             _cryIncidentService = cryIncidentService ?? throw new ArgumentNullException(nameof(cryIncidentService));
+            _guardianConnectionService = guardianConnectionService
+                ?? throw new ArgumentNullException(nameof(guardianConnectionService));
         }
 
         // POST api/monitoring/session/start   body: { "jobId": 171, "childId": 27 }
@@ -396,6 +408,258 @@ namespace WebApplication2.Controllers
             return diff == 0;
         }
 
+        // =================================================================
+        // PHASE 7 - GUARDIAN CONNECTION / PARENT PAUSE / PARENT DND
+        // ---------------------------------------------------------------------
+        // Every endpoint below is [SessionAuthorize] and takes the acting user
+        // ONLY from the bearer token via ClaimsPrincipalHelper. No Phase 7
+        // request DTO carries an acting user, an approver, a DND owner, a
+        // duration or an expiry, so a hostile client has no field it could
+        // forge - the rule is structural, not a check.
+        //
+        // The controller stays THIN: it validates the body shape, calls the
+        // service and maps exceptions to HTTP. All authorization lives in the
+        // service (MonitoringAccess + the guardian rules).
+        // =================================================================
+
+        // POST api/monitoring/guardian-invitations
+        // body: { "childId": 27, "identifier": "father.username", "relation": "Father" }
+        // INPUT: child + the invitee's username/email. NEVER a Parent_ID.
+        // IDENTITY: the inviter is the token's user.
+        // OUTPUT 200: the created Pending invitation (no token, no hash).
+        // FAILURES: 400 invalid body / no matching account / self-invite /
+        //           duplicate guardian / duplicate pending invitation,
+        //           403 not a guardian of that child, 404 unknown child.
+        [HttpPost]
+        [Route("guardian-invitations")]
+        [SessionAuthorize(Roles = "Parent")]
+        public IHttpActionResult CreateGuardianInvitation([FromBody] CreateGuardianInvitationRequest request)
+        {
+            if (request == null)
+                return BadRequest("Request body is required.");
+            if (request.ChildId <= 0)
+                return BadRequest("ChildId must be a positive integer.");
+
+            return FamilyAction(() => _guardianConnectionService.CreateInvitation(
+                request.ChildId, request.Identifier, request.Relation,
+                ClaimsPrincipalHelper.GetUserId(), ClaimsPrincipalHelper.GetRole()));
+        }
+
+        // GET api/monitoring/guardian-invitations
+        // Returns ONLY the authenticated account's invitations. There is no
+        // parentId/userId query parameter on purpose: one parent can never list
+        // another parent's invitations.
+        [HttpGet]
+        [Route("guardian-invitations")]
+        [SessionAuthorize(Roles = "Parent")]
+        public IHttpActionResult GetGuardianInvitations()
+        {
+            return FamilyAction(() => _guardianConnectionService.GetInvitationsForCurrentUser(
+                ClaimsPrincipalHelper.GetUserId(), ClaimsPrincipalHelper.GetRole()));
+        }
+
+        // POST api/monitoring/guardian-invitations/{id}/accept
+        // Atomic: the ChildGuardian row and the Accepted status are written in
+        // one transaction. Ownership is enforced server-side - the invitation
+        // must be addressed to the CALLER.
+        [HttpPost]
+        [Route("guardian-invitations/{id:int}/accept")]
+        [SessionAuthorize(Roles = "Parent")]
+        public IHttpActionResult AcceptGuardianInvitation(int id)
+        {
+            return FamilyAction(() => _guardianConnectionService.AcceptInvitation(
+                id, ClaimsPrincipalHelper.GetUserId(), ClaimsPrincipalHelper.GetRole()));
+        }
+
+        // POST api/monitoring/guardian-invitations/{id}/reject
+        [HttpPost]
+        [Route("guardian-invitations/{id:int}/reject")]
+        [SessionAuthorize(Roles = "Parent")]
+        public IHttpActionResult RejectGuardianInvitation(int id)
+        {
+            return FamilyAction(() => _guardianConnectionService.RejectInvitation(
+                id, ClaimsPrincipalHelper.GetUserId(), ClaimsPrincipalHelper.GetRole()));
+        }
+
+        // DELETE api/monitoring/guardian-invitations/{id}
+        // Only the account that SENT the invitation may withdraw it.
+        [HttpDelete]
+        [Route("guardian-invitations/{id:int}")]
+        [SessionAuthorize(Roles = "Parent")]
+        public IHttpActionResult CancelGuardianInvitation(int id)
+        {
+            return FamilyAction(() => _guardianConnectionService.CancelInvitation(
+                id, ClaimsPrincipalHelper.GetUserId(), ClaimsPrincipalHelper.GetRole()));
+        }
+
+        // GET api/monitoring/guardians?jobId=&childId=
+        // Connected guardians of a child, read from ChildGuardian only.
+        [HttpGet]
+        [Route("guardians")]
+        [SessionAuthorize(Roles = "Parent")]
+        public IHttpActionResult GetGuardians(int jobId, int childId)
+        {
+            if (jobId <= 0 || childId <= 0)
+                return BadRequest("jobId and childId must be positive integers.");
+
+            return FamilyAction(() => _guardianConnectionService.GetGuardians(
+                jobId, childId, ClaimsPrincipalHelper.GetUserId(), ClaimsPrincipalHelper.GetRole()));
+        }
+
+        // POST api/monitoring/pause   body: { "jobId": 171, "childId": 29 }
+        // Records a REQUEST only. No incident is cancelled and monitoring keeps
+        // running until a DIFFERENT guardian with CanApprovePause approves.
+        [HttpPost]
+        [Route("pause")]
+        [SessionAuthorize(Roles = "Parent")]
+        public IHttpActionResult RequestPause([FromBody] MonitoringPauseRequest request)
+        {
+            if (request == null) return BadRequest("Request body is required.");
+            if (request.JobId <= 0 || request.ChildId <= 0)
+                return BadRequest("JobId and ChildId must be positive integers.");
+
+            return FamilyAction(() => _guardianConnectionService.RequestPause(
+                request.JobId, request.ChildId,
+                ClaimsPrincipalHelper.GetUserId(), ClaimsPrincipalHelper.GetRole()));
+        }
+
+        // POST api/monitoring/pause/{id}/approve
+        // The window is ALWAYS exactly 150 seconds, computed by the server. The
+        // approver must be a different guardian holding CanApprovePause.
+        // Side effect: the active cry incident is cancelled (ParentPauseApproved).
+        [HttpPost]
+        [Route("pause/{id:int}/approve")]
+        [SessionAuthorize(Roles = "Parent")]
+        public IHttpActionResult ApprovePause(int id)
+        {
+            return FamilyAction(() => _guardianConnectionService.ApprovePause(
+                id, ClaimsPrincipalHelper.GetUserId(), ClaimsPrincipalHelper.GetRole()));
+        }
+
+        // POST api/monitoring/pause/{id}/deny  (never touches CryAlert)
+        [HttpPost]
+        [Route("pause/{id:int}/deny")]
+        [SessionAuthorize(Roles = "Parent")]
+        public IHttpActionResult DenyPause(int id)
+        {
+            return FamilyAction(() => _guardianConnectionService.DenyPause(
+                id, ClaimsPrincipalHelper.GetUserId(), ClaimsPrincipalHelper.GetRole()));
+        }
+
+        // DELETE api/monitoring/pause/{id}  (own PENDING request only)
+        [HttpDelete]
+        [Route("pause/{id:int}")]
+        [SessionAuthorize(Roles = "Parent")]
+        public IHttpActionResult CancelPause(int id)
+        {
+            return FamilyAction(() => _guardianConnectionService.CancelPause(
+                id, ClaimsPrincipalHelper.GetUserId(), ClaimsPrincipalHelper.GetRole()));
+        }
+
+        // GET api/monitoring/pause?jobId=&childId=
+        // Resolves Approved -> Expired lazily when the window has passed.
+        [HttpGet]
+        [Route("pause")]
+        [SessionAuthorize(Roles = "Parent")]
+        public IHttpActionResult GetPause(int jobId, int childId)
+        {
+            if (jobId <= 0 || childId <= 0)
+                return BadRequest("jobId and childId must be positive integers.");
+
+            return FamilyAction(() => _guardianConnectionService.GetPause(
+                jobId, childId, ClaimsPrincipalHelper.GetUserId(), ClaimsPrincipalHelper.GetRole()));
+        }
+
+        // POST api/monitoring/dnd   body: { "jobId": 171, "childId": 29 }
+        // Enables the CALLER's own DND for a server-chosen bounded window. The
+        // owner is the token's user: there is no UserId field to forge. Refused
+        // when another guardian already has DND on this session (enforced by a
+        // transaction, not by the UI). NEVER suppresses a Notification and
+        // NEVER touches the cry incident.
+        [HttpPost]
+        [Route("dnd")]
+        [SessionAuthorize(Roles = "Parent")]
+        public IHttpActionResult EnableDnd([FromBody] MonitoringDndRequest request)
+        {
+            if (request == null) return BadRequest("Request body is required.");
+            if (request.JobId <= 0 || request.ChildId <= 0)
+                return BadRequest("JobId and ChildId must be positive integers.");
+
+            return FamilyAction(() => _guardianConnectionService.EnableDnd(
+                request.JobId, request.ChildId,
+                ClaimsPrincipalHelper.GetUserId(), ClaimsPrincipalHelper.GetRole()));
+        }
+
+        // DELETE api/monitoring/dnd  - the caller's own DND only.
+        [HttpDelete]
+        [Route("dnd")]
+        [SessionAuthorize(Roles = "Parent")]
+        public IHttpActionResult DisableDnd([FromBody] MonitoringDndRequest request)
+        {
+            if (request == null) return BadRequest("Request body is required.");
+            if (request.JobId <= 0 || request.ChildId <= 0)
+                return BadRequest("JobId and ChildId must be positive integers.");
+
+            return FamilyAction(() => _guardianConnectionService.DisableDnd(
+                request.JobId, request.ChildId,
+                ClaimsPrincipalHelper.GetUserId(), ClaimsPrincipalHelper.GetRole()));
+        }
+
+        // GET api/monitoring/dnd?jobId=&childId=  (expired DND reads as inactive)
+        [HttpGet]
+        [Route("dnd")]
+        [SessionAuthorize(Roles = "Parent")]
+        public IHttpActionResult GetDndStates(int jobId, int childId)
+        {
+            if (jobId <= 0 || childId <= 0)
+                return BadRequest("jobId and childId must be positive integers.");
+
+            return FamilyAction(() => _guardianConnectionService.GetDndStates(
+                jobId, childId, ClaimsPrincipalHelper.GetUserId(), ClaimsPrincipalHelper.GetRole()));
+        }
+
+        /// <summary>
+        /// Phase 7 execution wrapper: one place that maps the guardian/pause/DND
+        /// service contract to HTTP status. 403 for access denials, 404 for a
+        /// missing target, 400 for a business-rule or validation refusal, and a
+        /// generic 500 that never leaks exception details (Phase 1 Fix B).
+        /// </summary>
+        private IHttpActionResult FamilyAction<T>(Func<T> action)
+        {
+            try
+            {
+                return Ok(action());
+            }
+            catch (MonitoringAccessException ex)
+            {
+                return MonitoringError(ex);
+            }
+            catch (KeyNotFoundException)
+            {
+                return NotFound();
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Content(HttpStatusCode.Forbidden, ex.Message);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+            catch (InvalidOperationException ex)
+            {
+                // Business-rule refusal: self-invite, duplicate relationship,
+                // self-approval, another parent already DND, ...
+                return Content(HttpStatusCode.BadRequest, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Trace.TraceError("MonitoringController: phase 7 family/pause/dnd action failed: {0}", ex);
+                return Content(HttpStatusCode.InternalServerError,
+                    "A server error occurred while processing the request.");
+            }
+        }
+
         /// <summary>
         /// Maps a structured monitoring denial to its HTTP status:
         /// *NotFound denials are true 404s; everything else is 403 Forbidden.
@@ -425,6 +689,8 @@ namespace WebApplication2.Controllers
                     monitoring.Dispose();
                 if (_cryIncidentService is IDisposable incidents)
                     incidents.Dispose();
+                if (_guardianConnectionService is IDisposable guardians)
+                    guardians.Dispose();
             }
             base.Dispose(disposing);
         }
