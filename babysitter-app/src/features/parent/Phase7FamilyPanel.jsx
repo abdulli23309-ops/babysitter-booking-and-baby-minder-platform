@@ -25,6 +25,7 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import API from '../../services/api.js';
+import { useAuth } from '../auth/AuthContext.jsx';
 
 const formatCountdown = (seconds) => {
   const s = Math.max(0, Math.floor(seconds ?? 0));
@@ -35,6 +36,7 @@ const formatCountdown = (seconds) => {
 const RELATIONS = ['Father', 'Mother', 'Guardian'];
 
 export default function Phase7FamilyPanel({ jobId, childId }) {
+  const { userId } = useAuth();
   const [guardians, setGuardians] = useState([]);
   const [invitations, setInvitations] = useState([]);
   const [pause, setPause] = useState(null);
@@ -131,6 +133,14 @@ export default function Phase7FamilyPanel({ jobId, childId }) {
   const myDndActive = dnd.find((x) => x.IsCurrentUser && x.IsActive);
   const otherGuardianDnd = dnd.find((x) => !x.IsCurrentUser && x.IsActive);
   const awaitingOther = pause?.Status === 'Requested';
+  // Phase 9 fix: the requester must not be offered Approve/Decline on their
+  // OWN request. The server already refuses self-approval (403), so those
+  // buttons could only ever fail - showing them was misleading. Approve/Decline
+  // belong to the other guardian; only the requester may Withdraw.
+  const iRequestedPause =
+    awaitingOther &&
+    pause?.RequestedByParent_ID != null &&
+    Number(pause.RequestedByParent_ID) === Number(userId);
 
   if (!hasScope) return null;
 
@@ -235,31 +245,37 @@ export default function Phase7FamilyPanel({ jobId, childId }) {
           <p>
             Waiting for the other guardian to decide
             {pause?.RequestedByName ? ` (requested by ${pause.RequestedByName})` : ''}.
-            {/* The server refuses self-approval; these buttons are a convenience only. */}
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => run('Pause approved', () =>
-                API.approvePause(pause.MonitoringPause_ID), loadMonitoring)}
-            >
-              Approve
-            </button>
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => run('Pause declined', () =>
-                API.denyPause(pause.MonitoringPause_ID), loadMonitoring)}
-            >
-              Decline
-            </button>
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => run('Request withdrawn', () =>
-                API.cancelPause(pause.MonitoringPause_ID), loadMonitoring)}
-            >
-              Withdraw
-            </button>
+            {/* Phase 9: the requester only ever sees Withdraw. Approve/Decline
+                are for the other guardian; the server refuses self-approval. */}
+            {iRequestedPause ? (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => run('Request withdrawn', () =>
+                  API.cancelPause(pause.MonitoringPause_ID), loadMonitoring)}
+              >
+                Withdraw
+              </button>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => run('Pause approved', () =>
+                    API.approvePause(pause.MonitoringPause_ID), loadMonitoring)}
+                >
+                  Approve
+                </button>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => run('Pause declined', () =>
+                    API.denyPause(pause.MonitoringPause_ID), loadMonitoring)}
+                >
+                  Decline
+                </button>
+              </>
+            )}
           </p>
         ) : (
           <button

@@ -172,7 +172,18 @@ export default function BabyMonitoringScreen() {
       try {
         const jobs = await API.getParentJobs(userId);
         const list = Array.isArray(jobs) ? jobs : [];
-        const active = list.find((j) => j?.Status === 'In Progress') ?? list[0] ?? null;
+        // Phase 9 fix: the backend actually stores "InProgress" (no space),
+        // while this comparison used to require "In Progress". It therefore
+        // never matched and silently fell through to `list[0]` - typically a
+        // COMPLETED job - so the monitoring screen opened against a finished
+        // job and reported "Monitoring not started".
+        // Same normalisation convention as MyJobsScreen: trim, lowercase and
+        // strip spaces/underscores/hyphens so both spellings compare equal.
+        const isInProgress = (status) =>
+          String(status ?? '').trim().toLowerCase().replace(/[\s_-]+/g, '') === 'inprogress';
+        // Only a genuinely in-progress job may define the scope. Picking an
+        // arbitrary job would show monitoring for work that is not running.
+        const active = list.find((j) => isInProgress(j?.Status)) ?? null;
         if (cancelled || !active) return;
         const children = Array.isArray(active.Children) ? active.Children : [];
         const child = children[0] ?? null;

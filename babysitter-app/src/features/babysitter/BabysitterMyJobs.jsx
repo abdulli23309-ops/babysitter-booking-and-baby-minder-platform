@@ -25,6 +25,29 @@ const sortByJobDateDesc = (list) =>
     return (b.Job_ID ?? 0) - (a.Job_ID ?? 0);
   });
 
+/**
+ * Phase 9 fix — job status must be compared case/whitespace-insensitively.
+ *
+ * The API returns the live status as "InProgress" (no space) for a running
+ * session, but this screen bucketed and routed on the literal "In Progress".
+ * An in-progress job therefore matched NEITHER the Active bucket ("In Progress")
+ * NOR History (completed/cancelled only), so the sitter's Active Jobs tab read
+ * 0 and their running session was unreachable from My Jobs.
+ *
+ * Uses the same convention as MyJobsScreen: trim, lowercase and strip
+ * spaces/underscores/hyphens, so "In Progress", "InProgress" and "in-progress"
+ * all compare equal.
+ */
+const normalizeJobStatus = (status) =>
+  String(status ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_-]+/g, '');
+
+const ACTIVE_JOB_STATUSES = new Set(['inprogress', 'sitterarrived']);
+const UPCOMING_JOB_STATUSES = new Set(['assigned', 'confirmed']);
+const HISTORY_JOB_STATUSES = new Set(['completed', 'cancelled', 'canceled']);
+
 // Multi-child support: render the real child list from job.Children, falling
 // back to the legacy single-child ChildName/ChildAge columns when absent.
 const formatChildrenCard = (job) => {
@@ -125,15 +148,14 @@ export default function BabysitterMyJobs() {
     return map;
   }, [jobs]);
 
-  const activeJobs = sortByJobDateDesc(jobs.filter((j) => j.Status === 'In Progress' || j.Status === 'SitterArrived'));
+  const activeJobs = sortByJobDateDesc(
+    jobs.filter((j) => ACTIVE_JOB_STATUSES.has(normalizeJobStatus(j.Status)))
+  );
   const upcomingJobs = groupJobsBySeries(sortByJobDateDesc(
-    jobs.filter((j) => j.Status === 'Assigned' || j.Status === 'Confirmed')
+    jobs.filter((j) => UPCOMING_JOB_STATUSES.has(normalizeJobStatus(j.Status)))
   ));
   const historyJobs = groupJobsBySeries(sortByJobDateDesc(
-    jobs.filter((j) => {
-      const st = String(j.Status || '').toLowerCase();
-      return st === 'completed' || st === 'cancelled' || st === 'canceled';
-    })
+    jobs.filter((j) => HISTORY_JOB_STATUSES.has(normalizeJobStatus(j.Status)))
   ));
 
   // Pending requests: invitations that are still "invited" (not yet accepted/rejected).
@@ -171,14 +193,15 @@ export default function BabysitterMyJobs() {
 
   const handleJobClick = (job) => {
     const targetJobId = job.Job_ID ?? job.jobId;
-    if (job.Status === 'SitterArrived') {
+    const st = normalizeJobStatus(job.Status);
+    if (st === 'sitterarrived') {
       navigate(
         targetJobId != null ? `/upcoming-job-details/${targetJobId}` : '/upcoming-job-details',
         { state: { job } }
       );
-    } else if (job.Status === 'In Progress') {
+    } else if (st === 'inprogress') {
       navigate('/active-job-details', { state: { job } });
-    } else if (job.Status === 'Assigned' || job.Status === 'Confirmed') {
+    } else if (UPCOMING_JOB_STATUSES.has(st)) {
       // 'Confirmed' previously fell through to the completed screen (bug).
       navigate(
         targetJobId != null ? `/upcoming-job-details/${targetJobId}` : '/upcoming-job-details',
@@ -360,16 +383,16 @@ export default function BabysitterMyJobs() {
                     </div>
                   </div>
 
-                  {job.Status === 'In Progress' ? (
+                  {ACTIVE_JOB_STATUSES.has(normalizeJobStatus(job.Status)) ? (
                     <span className={styles.badgeActive}>
                       <span className={styles.pulsingDot} />
                       Active
                     </span>
-                  ) : job.Status === 'Assigned' ? (
+                  ) : UPCOMING_JOB_STATUSES.has(normalizeJobStatus(job.Status)) ? (
                     <span className={styles.badgeUpcoming}>
                       Upcoming
                     </span>
-                  ) : job.Status === 'Completed' ? (
+                  ) : HISTORY_JOB_STATUSES.has(normalizeJobStatus(job.Status)) ? (
                     <span className={styles.badgeCompleted}>
                       Completed
                     </span>
