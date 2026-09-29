@@ -60,10 +60,15 @@ namespace WebApplication2.Infrastructure
                 return new NotificationsController(new NotificationService());
             }
 
-            if (serviceType == typeof(CryDetectionController))
-            {
-                return new CryDetectionController(new CryAlertService());
-            }
+            // PHASE 11 REMOVAL: the legacy CryDetectionController (api/cry-detection)
+            // and its CryAlertService are gone. That path inserted cry alerts
+            // through the STALE EDMX CryAlert mapping, leaving
+            // NextEscalationDueAt = NULL so the sweeper could never escalate or
+            // notify them - a silent false-success pipeline. The single live cry
+            // pipeline is now MonitoringController -> CryIncidentService, which
+            // writes the same CryAlert TABLE with parameterized raw SQL and owns
+            // incident creation, T+5, T+15, acknowledgement, resolution and
+            // dedupe. Do not reintroduce a second cry pipeline here.
 
             if (serviceType == typeof(MonitoringController))
             {
@@ -121,10 +126,9 @@ namespace WebApplication2.Infrastructure
                 return new NotificationService();
             }
 
-            if (serviceType == typeof(ICryAlertService))
-            {
-                return new CryAlertService();
-            }
+            // PHASE 11 REMOVAL: ICryAlertService / CryAlertService registration
+            // removed with the legacy api/cry-detection pipeline. Cry incident
+            // behaviour now lives solely in ICryIncidentService / CryIncidentService.
 
             if (serviceType == typeof(IMonitoringService))
             {

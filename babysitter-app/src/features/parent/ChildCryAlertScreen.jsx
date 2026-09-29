@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { JitsiMeeting } from '@jitsi/react-sdk';
+import { useNavigate } from 'react-router-dom';
 import ParentBottomNav from '../../components/layout/ParentBottomNav';
 import BackButton from '../../components/ui/BackButton';
 import EmptyState from '../../components/ui/EmptyState';
@@ -64,78 +64,54 @@ const LiveCameraPreview = () => (
 
 export default function ChildCryAlertScreen() {
   const [latestAlert, setLatestAlert] = useState(null);
-  const [inCall, setInCall] = useState(false);
-  const parentId = Number(localStorage.getItem('userId'));
+  const navigate = useNavigate();
 
-  // Poll for cry alerts every 5 seconds
+  // NOTE: userId is no longer needed here - the server derives the caller from
+  // the bearer token, which is exactly the point (no client-supplied parent).
+
+  // ---- PHASE 11: real incident source, no legacy endpoint, no public room ----
+  // Replaces a poll of `/cry-detection/latest`, which read the stale EDMX
+  // CryAlert mapping and returned a RoomName that this screen then joined on
+  // the PUBLIC `meet.jit.si` host. That was both a false success (the legacy
+  // rows were never escalated) and a room-name-only access path.
+  //
+  // The incident now comes from the same server-authoritative endpoint the rest
+  // of monitoring uses, discovered through the guardian-aware scope list. This
+  // screen states the incident; the live feed is owned by /baby-monitoring,
+  // which asks the server for a media session and fails closed.
   useEffect(() => {
-    if (!parentId) return;
-    let ignore = false;
+    let mounted = true;
+    let scope = null;
 
-    const checkAlerts = async () => {
+    const check = async () => {
       try {
-        const data = await API.getLatestCryAlert(parentId);
-        if (data && !ignore) {
-          setLatestAlert(data);
+        if (!scope) {
+          const scopes = await API.getAccessibleMonitoringScopes();
+          if (!scopes?.length) return;
+          scope = scopes[0];
         }
-      } catch (error) {
-        console.error('Error fetching cry alert', error);
+        const incident = await API.getCryIncident(scope.JobId, scope.ChildId);
+        if (mounted) setLatestAlert(incident || null);
+      } catch {
+        // Never invent an alert, and never clear a real one on a poll failure.
       }
     };
 
-    checkAlerts();
-    const interval = setInterval(checkAlerts, 5000);
+    check();
+    const interval = setInterval(() => {
+      if (!document.hidden) check();
+    }, 5000);
     return () => {
-      ignore = true;
+      mounted = false;
       clearInterval(interval);
     };
-  }, [parentId]);
+  }, []);
 
+  // "View Child" no longer starts an embedded call from a room name. It opens
+  // the monitoring screen, which is where the server-issued media session lives.
   const handleJoinCall = () => {
-    if (latestAlert?.roomName) {
-      setInCall(true);
-    }
+    navigate('/baby-monitoring');
   };
-
-  // If in a Jitsi call, show the contained meeting interface within 480px app-shell
-  if (inCall && latestAlert?.roomName) {
-    return (
-      <div className={styles.meetingContainer}>
-        <JitsiMeeting
-          roomName={latestAlert.roomName}
-          domain="meet.jit.si"
-          configOverwrite={{
-            startWithAudioMuted: true,
-            startWithVideoMuted: false,
-            disableDeepLinking: true,
-          }}
-          interfaceConfigOverwrite={{
-            SHOW_JITSI_WATERMARK: false,
-            SHOW_WATERMARK_FOR_GUESTS: false,
-            TOOLBAR_BUTTONS: [
-              'microphone', 'camera', 'chat', 'tileview', 'fullscreen',
-              'raisehand', 'settings', 'hangup'
-            ],
-          }}
-          getIFrameRef={(iframe) => {
-            if (iframe) {
-              iframe.style.height = '100%';
-              iframe.style.width = '100%';
-              iframe.style.border = 'none';
-            }
-          }}
-        />
-        <button
-          type="button"
-          onClick={() => setInCall(false)}
-          className={styles.leaveMeetingFloatingBtn}
-        >
-          <Icons.leaveCall />
-          Leave Call
-        </button>
-      </div>
-    );
-  }
 
   // Main Cry alert UI
   return (

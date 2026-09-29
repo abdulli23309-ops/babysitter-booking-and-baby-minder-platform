@@ -43,7 +43,7 @@ export default function ParentNotifications() {
 
   const [notifications, setNotifications] = useState([]);
 
-  const [latestCryRoom, setLatestCryRoom] = useState(null);
+  const [activeCry, setActiveCry] = useState(null);
 
   useEffect(() => {
     let ignore = false;
@@ -90,30 +90,62 @@ export default function ParentNotifications() {
     };
   }, [userId]);
 
-  // Poll for latest cry alert
+  // ---- PHASE 11: cry banner driven by the REAL monitoring incident ----
+  // This used to poll the legacy `/cry-detection/latest` and, whenever that
+  // endpoint returned a RoomName, rendered
+  //   "CRITICAL NURSERY CRY ALERT ... launch live secure video monitoring feed"
+  // and navigated to /baby-monitoring with that room in router state.
+  //
+  // That was the false-success path Phase 10 flagged as the P1 defect: the legacy
+  // endpoint inserts through the STALE EDMX CryAlert mapping with
+  // NextEscalationDueAt = NULL, so the sweeper could never escalate it and no
+  // parent was ever actually contacted - yet the banner appeared anyway and
+  // promised a "secure video feed" that did not exist.
+  //
+  // It is now driven by the same server-authoritative incident the rest of
+  // monitoring uses, and the button simply opens the monitoring screen. That
+  // screen resolves the scope AND the media session itself from the server, so
+  // no room name is ever carried through the router.
   useEffect(() => {
     let mounted = true;
-    const checkCryAlert = async () => {
+
+    const checkCryIncident = async () => {
       try {
-        const data = await API.getLatestCryAlert(userId);
-        if (data && mounted && (data.roomName || data.RoomName)) {
-          setLatestCryRoom(data.roomName ?? data.RoomName);
+        const scopes = await API.getAccessibleMonitoringScopes();
+        if (!mounted) return;
+        if (!scopes?.length) {
+          setActiveCry(null);
+          return;
         }
+
+        // A parent can be guardian on more than one job, so check every scope
+        // the server says this user may monitor and surface the newest open one.
+        // Sequential on purpose: this polls a handful of scopes every 5s, and
+        // burst-parallel polling would be needlessly rude to the API.
+        let newest = null;
+        for (const s of scopes) {
+          const incident = await API.getCryIncident(s.JobId, s.ChildId);
+          const st = incident?.Status;
+          if (st === 'Open' || st === 'Acknowledged') {
+            if (!newest || incident.Timestamp > newest.Timestamp) newest = incident;
+          }
+        }
+        if (mounted) setActiveCry(newest);
       } catch {
-        // silent polling catch
+        // A failed poll must not clear a real alert, and must never invent one.
       }
     };
 
-    checkCryAlert();
+    checkCryIncident();
     const interval = setInterval(() => {
       if (document.hidden) return;
-      checkCryAlert();
+      checkCryIncident();
     }, 5000);
     return () => {
       mounted = false;
       clearInterval(interval);
     };
-  }, [userId]);
+  }, []);
 
   const handleClearNotifications = () => {
     setNotifications([]);
@@ -163,26 +195,36 @@ export default function ParentNotifications() {
         </button>
       </div>
 
-      {/* Urgent Cry Alert Banner */}
-      {latestCryRoom && (
+      {/* Urgent Cry Alert Banner.
+          PHASE 11: the wording no longer promises a "live secure video feed".
+          The banner is rendered from the REAL incident record, while the video
+          itself may genuinely be unavailable (no provider configured), so the
+          copy states the escalation stage the SERVER recorded and the button
+          simply opens the monitoring screen - which then reports the true media
+          state rather than being handed a room name through the router. */}
+      {activeCry && (
         <section className={styles.cryAlertCard}>
           <div className={styles.cryAlertHeader}>
             <span className={styles.alertPulseDot} />
             <span>CRITICAL NURSERY CRY ALERT</span>
           </div>
           <p className={styles.cryAlertText}>
-            Acoustic infant distress sound detected by AI Cry Minder. Tap below to launch live secure video monitoring feed immediately.
+            A cry incident was recorded for your child. Escalation stage:{' '}
+            <strong>{activeCry.EscalationStage || 'Sitter alerted'}</strong>.
+            Open baby monitoring to see the current status and, if live video is
+            configured, the camera feed.
           </p>
           <Button
             variant="danger"
             size="md"
             fullWidth
-            onClick={() => navigate('/baby-monitoring', { state: { roomName: latestCryRoom } })}
+            onClick={() => navigate('/baby-monitoring')}
           >
-            Launch Live Camera Feed
+            Open Baby Monitoring
           </Button>
         </section>
       )}
+      {/* Urgent Cry Alert Banner */}
 
       {/* TASK B: Notifications List */}
       <section className={styles.notifList} aria-label="Notifications list">

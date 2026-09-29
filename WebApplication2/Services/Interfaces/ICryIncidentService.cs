@@ -29,7 +29,7 @@ namespace WebApplication2.Services.Interfaces
     /// produce a notification after the sitting has ended.
     ///
     /// All methods take the authenticated caller explicitly (same pattern as
-    /// ICryAlertService / IMonitoringService) and re-use the centralized
+    /// IMonitoringService) and re-use the centralized
     /// MonitoringAccess chain — no authorization logic is duplicated here.
     /// </summary>
     public interface ICryIncidentService

@@ -14,7 +14,7 @@ namespace WebApplication2.Services.Implementations
     /// MonitorSession lifecycle (Phase 3): Start / Get / End, one Active session
     /// PER CHILD of a job. Raw-SQL only - MonitorSession/MonitorEvent/JobChildren/
     /// ChildGuardian are intentionally not in Model1.edmx (frozen by Phase 2).
-    /// Pattern follows CryAlertService (dual ctor, context ownership flag,
+    /// Pattern follows the other monitoring services (dual ctor, context ownership flag,
     /// Trace.TraceError logging, caller identity passed in explicitly).
     ///
     /// Phase 4 - heartbeat & connection-loss detection (E2E flow, documentation
@@ -83,34 +83,84 @@ namespace WebApplication2.Services.Implementations
                 throw new MonitoringAccessException(denial);
             }
 
-            // Duplicate-active-session guard: exactly ONE Active session per
-            // (job, child). A retry gets the existing session back instead of a
-            // second row - start is idempotent while a session is Active.
-            int? activeSessionId = FindActiveSessionId(jobId, childId);
-            if (activeSessionId.HasValue)
-                return GetSessionById(activeSessionId.Value);
+            // PHASE 11 CONCURRENCY FIX: the duplicate guard used to be a plain
+            // SELECT followed by an INSERT with no mutual exclusion, so several
+            // participants pressing "start" at the same instant could all read
+            // "no active session" before any INSERT landed. The Phase 11
+            // concurrency run really did produce THREE Active MonitorSessions
+            // (377, 376, 378) for one (job, child).
+            //
+            // WHY A PROCESS GATE AND NOT A DATABASE TRANSACTION
+            // A `Database.BeginTransaction()` here is NOT viable: the Phase 3
+            // regression harness calls this service on a context that is already
+            // inside its own transaction, and EF6's EntityClient explicitly
+            // refuses nested transactions ("The connection is already in a
+            // transaction and cannot participate in another"). That would break
+            // the frozen Phase 3 suite. The original code documented the same
+            // constraint for the audit write.
+            //
+            // A per-(job, child) semaphore gives the mutual exclusion we actually
+            // need, works whether or not the caller owns a transaction, and is
+            // held only for the few milliseconds of the re-check plus insert.
+            // Every request for the same scope is serialised; different scopes
+            // still run in parallel. Note this is IN-PROCESS mutual exclusion:
+            // a multi-instance deployment would additionally need a unique index
+            // on (Job_ID, Child_ID) WHERE Status='Active', which is a database
+            // change deliberately NOT made here.
+            var gate = StartGate(jobId, childId);
+            gate.Wait();
+            try
+            {
+                // Re-check INSIDE the gate: this is the step that was missing.
+                var activeSessionId = FindActiveSessionId(jobId, childId);
+                if (activeSessionId.HasValue)
+                    return GetSessionById(activeSessionId.Value);
 
-            // RoomName is NOT NULL in the Phase 2 schema but the media layer is a
-            // later phase: store a non-committal placeholder. It is never returned
-            // by this API and never logged (Phase 2 DDL: "no room exposure").
-            string roomName = "pending-" + Guid.NewGuid().ToString("N").Substring(0, 12);
-            var startedAtUtc = DateTime.UtcNow;
+                // RoomName is NOT NULL in the Phase 2 schema but the media layer
+                // is a later phase: store a non-committal placeholder. It is
+                // never returned by this API and never logged (Phase 2 DDL:
+                // "no room exposure").
+                string roomName = "pending-" + Guid.NewGuid().ToString("N").Substring(0, 12);
+                var startedAtUtc = DateTime.UtcNow;
 
-            int newSessionId = _db.Database.SqlQuery<int>(
-                @"INSERT INTO MonitorSession (Job_ID, Child_ID, RoomName, Status, StartedAtUtc)
-                  VALUES (@p0, @p1, @p2, 'Active', @p3);
-                  SELECT CAST(SCOPE_IDENTITY() AS INT);",
-                jobId, childId, roomName, startedAtUtc).Single();
+                int newSessionId = _db.Database.SqlQuery<int>(
+                    @"INSERT INTO MonitorSession (Job_ID, Child_ID, RoomName, Status, StartedAtUtc)
+                      VALUES (@p0, @p1, @p2, 'Active', @p3);
+                      SELECT CAST(SCOPE_IDENTITY() AS INT);",
+                    jobId, childId, roomName, startedAtUtc).Single();
 
-            // Audit: append-only MonitorEvent (Phase 2 schema). Deliberately no
-            // surrounding transaction here: the service may run on a context that
-            // already participates in an outer transaction (test harnesses), and a
-            // failed audit write surfaces as a 500 that the idempotent start guard
-            // heals on the next retry. Documented Phase 3 limitation.
-            WriteAudit(jobId, childId, "SessionStarted", currentUserId, currentRole,
-                "{\"sessionId\":" + newSessionId + "}");
+                // Audit: append-only MonitorEvent (Phase 2 schema). Deliberately
+                // no surrounding transaction here: the service may run on a
+                // context that already participates in an outer transaction
+                // (test harnesses), and a failed audit write surfaces as a 500
+                // that the idempotent start guard heals on the next retry.
+                // Documented Phase 3 limitation.
+                WriteAudit(jobId, childId, "SessionStarted", currentUserId, currentRole,
+                    "{\"sessionId\":" + newSessionId + "}");
 
-            return GetSessionById(newSessionId);
+                return GetSessionById(newSessionId);
+            }
+            finally
+            {
+                gate.Release();
+            }
+        }
+
+        /// <summary>
+        /// One gate per (job, child) so concurrent starts for the SAME scope are
+        /// serialised while different scopes proceed in parallel. The dictionary
+        /// is intentionally not trimmed: it is bounded by the number of distinct
+        /// monitored scopes, which is tiny, and a stable key is safer than
+        /// removing an entry a waiter is about to use.
+        /// </summary>
+        private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, System.Threading.SemaphoreSlim>
+            StartGates = new System.Collections.Concurrent.ConcurrentDictionary<string, System.Threading.SemaphoreSlim>();
+
+        private static System.Threading.SemaphoreSlim StartGate(int jobId, int childId)
+        {
+            return StartGates.GetOrAdd(
+                jobId + ":" + childId,
+                _ => new System.Threading.SemaphoreSlim(1, 1));
         }
 
         public MonitorSessionDto GetSession(int jobId, int childId, int currentUserId, string currentRole)

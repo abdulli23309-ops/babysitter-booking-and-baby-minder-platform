@@ -149,7 +149,7 @@
     <Compile Include="Controllers\BabySitterController.cs" />
     <Compile Include="Controllers\BidsController.cs" />
     <Compile Include="Controllers\ChildrenController.cs" />
-    <Compile Include="Controllers\CryDetectionController.cs" />
+    <!-- PHASE 11: legacy api/cry-detection controller removed. Cry incidents are served by MonitoringController + CryIncidentService. -->
     <Compile Include="Controllers\ImageController.cs" />
     <Compile Include="Controllers\JobsController.cs" />
     <Compile Include="Controllers\JobInvitationsController.cs" />
@@ -166,7 +166,10 @@
     <Compile Include="DTOs\UpdateChildDTO.cs" />
     <Compile Include="DTOs\CreateChildDto.cs" />
     <Compile Include="DTOs\CreateJobDto.cs" />
-    <Compile Include="DTOs\CryAlertDto.cs" />
+    <!-- PHASE 11: legacy CryAlertDto removed; monitoring uses MonitoringDtos. -->
+    <!-- Phase 11: media session + guardian-aware discovery DTOs -->
+    <Compile Include="DTOs\MediaDtos.cs" />
+    <Compile Include="DTOs\AccessibleScopeDtos.cs" />
     <Compile Include="DTOs\FilterSittersDTO.cs" />
     <Compile Include="DTOs\ImageDtos.cs" />
     <Compile Include="DTOs\JobDTOs.cs" />
@@ -212,12 +215,15 @@
     <Compile Include="Services\Implementations\ReviewService.cs" />
     <Compile Include="Services\Interfaces\INotificationService.cs" />
     <Compile Include="Services\Implementations\NotificationService.cs" />
-    <Compile Include="Services\Interfaces\ICryAlertService.cs" />
-    <Compile Include="Services\Implementations\CryAlertService.cs" />
+    <!-- PHASE 11: legacy ICryAlertService removed (see CryIncidentService). -->
+    <!-- PHASE 11: legacy CryAlertService removed (see CryIncidentService). -->
     <Compile Include="Services\Interfaces\IMonitoringService.cs" />
     <Compile Include="Services\Implementations\MonitoringService.cs" />
     <Compile Include="Services\Interfaces\ICryIncidentService.cs" />
     <Compile Include="Services\Implementations\CryIncidentService.cs" />
+    <!-- Phase 11: server-issued media sessions and guardian-aware discovery -->
+    <Compile Include="Services\Implementations\MediaSessionService.cs" />
+    <Compile Include="Services\Implementations\AccessibleScopeService.cs" />
     <Compile Include="Services\Interfaces\IGuardianConnectionService.cs" />
     <Compile Include="Services\Implementations\GuardianConnectionService.cs" />
     <Compile Include="Services\Interfaces\IImageService.cs" />
@@ -308,7 +314,7 @@
     <Folder Include="Images\Sitters\" />
     <Folder Include="Views\BabySitter\" />
     <Folder Include="Views\Children\" />
-    <Folder Include="Views\CryDetection\" />
+    <!-- PHASE 11: empty Views\CryDetection folder removed with the legacy cry controller. -->
     <Folder Include="Views\Default\" />
     <Folder Include="Views\Image\" />
     <Folder Include="Views\Jobs\" />

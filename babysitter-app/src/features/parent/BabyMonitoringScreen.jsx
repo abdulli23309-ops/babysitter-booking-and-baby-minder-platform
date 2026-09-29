@@ -6,6 +6,7 @@ import BackButton from '../../components/ui/BackButton';
 import MonitoringStatusBar from '../../components/monitoring/MonitoringStatusBar';
 import Phase7FamilyPanel from './Phase7FamilyPanel';
 import useMonitoring from '../../hooks/useMonitoring';
+import useMonitoringMedia from '../../hooks/useMonitoringMedia';
 import { useAuth } from '../auth/AuthContext';
 import { API } from '../../services/api';
 import styles from './baby-monitoring.module.css';
@@ -60,85 +61,25 @@ const Icons = {
     </svg>
   ),
 };
+// --------------------------------------------------------------------------
+// PHASE 11 REMOVAL: NurseryCameraFeed (the static drawn "nursery camera")
+// --------------------------------------------------------------------------
+// This mock SVG used to render whenever no room was available, underneath a
+// "LIVE" badge. It was not merely decorative - it was actively misleading:
+//   * the "LIVE" pill and "HD 1080p" subtitle claimed a stream that did not
+//     exist,
+//   * it drew hard-coded sensor badges (22 C, 45% humidity) that nothing ever
+//     measured,
+//   * it showed a "Secure Connection" badge while the underlying media was the
+//     PUBLIC, unencrypted meet.jit.si room, and
+//   * it left the parent believing live video was available, which is exactly
+//     the false success state the Phase 10 audit recorded as E5 / PARTIAL.
+//
+// The monitoring screen now renders the real server-issued player when the
+// server confirms a media session, and an explicit "live video unavailable"
+// message when it does not. Nothing is faked in between.
+// --------------------------------------------------------------------------
 
-// ---------- Nursery Camera Scene ----------
-const NurseryCameraFeed = () => (
-  <div style={{ position: 'relative', width: '100%', height: '100%', background: '#e8e0d8', overflow: 'hidden' }}>
-    <svg width="100%" height="100%" viewBox="0 0 360 230" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice">
-      <rect width="360" height="230" fill="#f0ece6" />
-      <rect x="0" y="175" width="360" height="55" fill="#ddd5c8" />
-      <rect x="0" y="0" width="360" height="175" fill="#f5f1ec" />
-
-      {/* Wall art frame 1 */}
-      <rect x="100" y="18" width="65" height="82" rx="4" fill="#c8a87a" />
-      <rect x="105" y="23" width="55" height="72" rx="3" fill="#e8d9c4" />
-      <ellipse cx="132" cy="52" rx="12" ry="16" fill="#c8956a" opacity="0.7"/>
-      <rect x="128" y="62" width="4" height="20" rx="2" fill="#c8956a" opacity="0.7"/>
-      <rect x="136" y="62" width="4" height="20" rx="2" fill="#c8956a" opacity="0.7"/>
-      <ellipse cx="132" cy="42" rx="7" ry="9" fill="#c8956a" opacity="0.7"/>
-      <rect x="130" y="33" width="3" height="8" rx="1" fill="#c8956a" opacity="0.7"/>
-
-      {/* Wall art frame 2 */}
-      <rect x="185" y="18" width="65" height="82" rx="4" fill="#c8a87a" />
-      <rect x="190" y="23" width="55" height="72" rx="3" fill="#e8d9c4" />
-      <circle cx="217" cy="55" r="18" fill="none" stroke="#c8956a" strokeWidth="2" opacity="0.6"/>
-      <circle cx="217" cy="55" r="10" fill="none" stroke="#c8956a" strokeWidth="1.5" opacity="0.6"/>
-      <circle cx="217" cy="55" r="4" fill="#c8956a" opacity="0.5"/>
-      {[0,60,120,180,240,300].map((a, i) => (
-        <ellipse key={i} cx={217 + 18*Math.cos(a*Math.PI/180)} cy={55 + 18*Math.sin(a*Math.PI/180)} rx="4" ry="6"
-          transform={`rotate(${a}, ${217 + 18*Math.cos(a*Math.PI/180)}, ${55 + 18*Math.sin(a*Math.PI/180)})`}
-          fill="#c8956a" opacity="0.4"/>
-      ))}
-
-      {/* Dresser right */}
-      <rect x="295" y="80" width="65" height="110" rx="6" fill="#c4a472" />
-      <rect x="300" y="86" width="55" height="48" rx="4" fill="#d4b482" />
-      <rect x="300" y="140" width="55" height="44" rx="4" fill="#d4b482" />
-      <circle cx="327" cy="112" r="4" fill="#a08050" />
-      <circle cx="327" cy="163" r="4" fill="#a08050" />
-      <rect x="300" y="68" width="20" height="14" rx="3" fill="#d4c4a8" />
-      <rect x="326" y="62" width="12" height="20" rx="3" fill="#e8d4b8" />
-      <rect x="342" y="66" width="14" height="16" rx="3" fill="#c8b890" />
-
-      {/* Plant left */}
-      <rect x="18" y="158" width="20" height="20" rx="4" fill="#8B6914" />
-      <ellipse cx="28" cy="155" rx="28" ry="22" fill="#3a7a3a" />
-      <ellipse cx="15" cy="148" rx="18" ry="14" fill="#4a8a4a" />
-      <ellipse cx="42" cy="148" rx="16" ry="12" fill="#2a6a2a" />
-      <ellipse cx="28" cy="138" rx="12" ry="16" fill="#3a7a3a" />
-
-      {/* Crib */}
-      <rect x="68" y="108" width="220" height="75" rx="8" fill="#d4b896" />
-      <rect x="73" y="148" width="210" height="28" rx="4" fill="#e8ddd0" />
-      <rect x="68" y="140" width="220" height="10" rx="4" fill="#c4a880" />
-      <rect x="62" y="100" width="14" height="90" rx="6" fill="#c4a880" />
-      <rect x="280" y="100" width="14" height="90" rx="6" fill="#c4a880" />
-      {Array.from({length: 14}, (_, i) => (
-        <rect key={i} x={80 + i * 15} y={112} width="5" height="62" rx="2.5" fill="#c8ac86" />
-      ))}
-      <rect x="68" y="185" width="10" height="20" rx="4" fill="#b89870" />
-      <rect x="278" y="185" width="10" height="20" rx="4" fill="#b89870" />
-      <ellipse cx="178" cy="204" rx="100" ry="6" fill="#00000015"/>
-    </svg>
-
-    {/* Overlaid sensor badges */}
-    <div className={styles.sensorOverlay}>
-      <div className={styles.sensorBadge}>
-        <Icons.thermometer />
-        <span>22°C</span>
-      </div>
-      <div className={styles.sensorBadge}>
-        <Icons.drop />
-        <span>45%</span>
-      </div>
-    </div>
-
-    <div className={styles.secureBadge}>
-      <Icons.shield />
-      <span>Secure Connection</span>
-    </div>
-  </div>
-);
 
 export default function BabyMonitoringScreen() {
   const navigate = useNavigate();
@@ -247,12 +188,28 @@ export default function BabyMonitoringScreen() {
     };
   }, [refreshPauseAndDnd, session?.IsPaused, pause?.Status]);
 
-  // Media: the Jitsi path is unchanged and still only used when a real room
-  // name is supplied. MonitorSession.RoomName is a server-side placeholder in
-  // the current build (no media credentials are configured), so this screen must
-  // NOT invent a room, a JWT or a provider.
-  const roomName = location.state?.roomName;
-  const mediaConfigured = Boolean(roomName);
+  // ---- PHASE 11: media is SERVER-ISSUED, never client-derived ----
+  // This used to read `location.state?.roomName`, i.e. a room name handed to the
+  // browser through React Router navigation (originally derived from a legacy
+  // cry alert). A room name is a routing detail, not a capability: anyone who
+  // learned it could join, and nothing on the server had checked. The room and
+  // the provider JWT are now minted by the server AFTER MonitoringAccess
+  // approves this caller, and `canPublish` is the server's answer, not ours.
+  //
+  // While no media provider is configured the server replies Configured=false
+  // and the screen below shows an honest "live video unavailable" panel. It
+  // deliberately renders NO video and no placeholder "camera", because a mock
+  // feed under a LIVE badge is a false success state.
+  // The session status is the refresh key: the media endpoint only answers for an
+  // ACTIVE monitoring session, so Child Mode starting (or ending) is exactly when
+  // the media answer changes. Without this the first 404 would stick forever and
+  // the parent would be told the stream never became available.
+  const media = useMonitoringMedia(
+    scope.jobId,
+    scope.childId,
+    !scopeLoading,
+    session?.Status ?? 'none',
+  );
 
   const [micOn, setMicOn] = useState(true);
   const [cameraOn, setCameraOn] = useState(true);
@@ -276,11 +233,30 @@ export default function BabyMonitoringScreen() {
 
       {/* Live Badge & Subtitle */}
       <div className={styles.statusHeader}>
-        <div className={styles.livePill}>
-          <span className={styles.liveBeacon} aria-hidden="true" />
-          <span className={styles.liveTag}>LIVE</span>
-        </div>
-        <p className={styles.locationSubtitle}>Nursery · HD 1080p</p>
+        {/* PHASE 11: the "LIVE" pill is shown ONLY when the server has issued a
+            real media session. A static LIVE badge over an unavailable
+            camera is a false success state, so it is now conditional. */}
+        {media.status === 'ready' ? (
+          <div className={styles.livePill}>
+            <span className={styles.liveBeacon} aria-hidden="true" />
+            <span className={styles.liveTag}>LIVE</span>
+          </div>
+        ) : null}
+        {/*
+          PHASE 11: this subtitle used to read "Nursery - HD 1080p"
+          unconditionally. That is a media CLAIM - it asserted a resolution and a
+          live stream that may not exist. It now states the child, and states the
+          media state the server actually reported, so "live video" and
+          "receive only" are only ever shown when they are true.
+        */}
+        <p className={styles.locationSubtitle}>
+          {scope.childName || 'Child'}
+          {media.status === 'ready' ? ' - live video' : ''}
+          {media.status === 'ready' && !media.canPublish ? ' - receive only' : ''}
+          {media.status === 'unavailable' ? ' - live video not configured' : ''}
+          {media.status === 'no-session' ? ' - awaiting Child Mode' : ''}
+          {media.status === 'denied' ? ' - not authorised to view' : ''}
+        </p>
       </div>
 
       {/* ---- Phase 8: real, server-driven monitoring state ----
@@ -337,28 +313,46 @@ export default function BabyMonitoringScreen() {
         </>
       )}
 
-      {!mediaConfigured ? (
-        <p role="note" className={styles.mediaNote}>
-          Live video is not configured on this deployment. Monitoring status, cry
-          alerts and the pause controls above are fully active.
-        </p>
-      ) : null}
-
-      {/* 16:9 Responsive Glassmorphic Camera Frame */}
-      <div className={styles.cameraFrame}>
-        {roomName ? (
+      {/* ---- PHASE 11: honest media surface ----
+          Three genuinely different states, each stated in words rather than
+          implied by a colour:
+            ready        - the server issued a real session; render the player
+            unavailable  - the server says no provider is configured
+            denied       - MonitoringAccess refused this caller
+          The mock <NurseryCameraFeed /> is deliberately NOT rendered as a
+          fallback. A drawn nursery under a "LIVE" badge tells the parent a feed
+          exists when none does, which is the false success state the Phase 10
+          audit flagged. */}
+      {media.status === 'ready' && media.media ? (
+        <div className={styles.cameraFrame}>
+          {/*
+            PHASE 11 SECURITY FIX: `domain` used to be the hard-coded public
+            "meet.jit.si", which let anyone who guessed a room name join an
+            unencrypted, uncontrolled public host - exactly the "room-name-only
+            access" the audit forbids. The tenant host now comes from the server
+            (Web.config MonitoringMediaDomain) and the request is authenticated
+            with a short-lived server-signed JWT. `canPublish` is the server's
+            answer, so a sitter is never offered a publish control.
+          */}
           <JitsiMeeting
-            roomName={roomName}
-            domain="meet.jit.si"
+            roomName={media.media.RoomName}
+            domain={media.media.Domain}
+            jwt={media.media.Token}
             configOverwrite={{
-              startWithAudioMuted: !micOn,
-              startWithVideoMuted: !cameraOn,
+              startWithAudioMuted: !media.canPublish,
+              startWithVideoMuted: !media.canPublish,
+              // A receive-only viewer must not be offered a publish button.
+              ...(media.canPublish
+                ? {}
+                : { startAudioMuted: true, startVideoMuted: true }),
               disableDeepLinking: true,
             }}
             interfaceConfigOverwrite={{
               SHOW_JITSI_WATERMARK: false,
               SHOW_WATERMARK_FOR_GUESTS: false,
-              TOOLBAR_BUTTONS: ['microphone', 'camera', 'fullscreen', 'hangup'],
+              TOOLBAR_BUTTONS: media.canPublish
+                ? ['microphone', 'camera', 'fullscreen', 'hangup']
+                : ['fullscreen', 'hangup'],   // sitter: no mic, no camera
             }}
             getIFrameRef={(iframe) => {
               if (iframe) {
@@ -368,10 +362,22 @@ export default function BabyMonitoringScreen() {
               }
             }}
           />
-        ) : (
-          <NurseryCameraFeed />
-        )}
-      </div>
+        </div>
+      ) : (
+        <div className={styles.cameraFrame}>
+          <p role="status" className={styles.mediaNote}>
+            {media.status === 'loading' && 'Connecting to the live baby monitor...'}
+            {media.status === 'unavailable' &&
+              (media.reason ||
+                'Live video is not configured on this deployment. Monitoring status, cry alerts and the pause controls above are fully active.')}
+            {media.status === 'denied' && media.reason}
+            {media.status === 'no-session' && media.reason}
+            {media.status === 'error' && media.reason}
+            {media.status === 'idle' &&
+              'Start Child Mode on the monitoring phone to see live video here.'}
+          </p>
+        </div>
+      )}
 
       {/* Hardware / Session Controls */}
       <div className={styles.controlsRow}>

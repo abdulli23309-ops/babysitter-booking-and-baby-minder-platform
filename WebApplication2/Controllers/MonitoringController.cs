@@ -15,7 +15,7 @@ namespace WebApplication2.Controllers
 {
     // CORS (Phase 1 Fix C): intentionally NO per-controller [EnableCors] here -
     // a per-controller attribute would replace the single global config-driven
-    // policy in WebApiConfig.Register (same rule as CryDetectionController).
+    // policy in WebApiConfig.Register.
     [RoutePrefix("api/monitoring")]
     [SessionAuthorize]
     public class MonitoringController : ApiController
@@ -616,6 +616,86 @@ namespace WebApplication2.Controllers
 
             return FamilyAction(() => _guardianConnectionService.GetDndStates(
                 jobId, childId, ClaimsPrincipalHelper.GetUserId(), ClaimsPrincipalHelper.GetRole()));
+        }
+
+        // =====================================================================
+        // PHASE 11 - MEDIA (live baby video) and guardian-aware DISCOVERY
+        // =====================================================================
+        // Both are thin wrappers. Neither makes an authorization decision of its
+        // own: they delegate to MonitoringAccess inside the service, so
+        // "who may watch this baby" stays answerable in exactly one place.
+
+        // GET api/monitoring/media?jobId=&childId=
+        //
+        // PURPOSE       Issue (or refuse) a server-signed media session for one
+        //               monitoring scope, so the browser never holds a provider
+        //               secret and never decides that a room exists.
+        // AUTH          [SessionAuthorize]; MonitoringAccess decides the caller.
+        //               The participant role is derived server-side, so a sitter
+        //               is always receive-only.
+        // REQUEST       jobId, childId (scope only - no actor, no role, no token).
+        // RESPONSE      MonitoringMediaDto. Configured=false + Reason is a valid,
+        //               expected 200 while no provider credentials exist; the UI
+        //               then shows an honest "live video unavailable" state.
+        // FAILURE       400 bad ids, 403/404 when MonitoringAccess denies,
+        //               404 when there is no ACTIVE monitoring session.
+        // STATE IMPACT  None - creates no session and writes nothing.
+        [HttpGet]
+        [Route("media")]
+        [SessionAuthorize]
+        public IHttpActionResult GetMonitoringMedia(int jobId, int childId)
+        {
+            if (jobId <= 0 || childId <= 0)
+                return BadRequest("jobId and childId must be positive integers.");
+
+            var media = new MediaSessionService();
+            try
+            {
+                return Ok(media.GetMediaSession(jobId, childId,
+                    ClaimsPrincipalHelper.GetUserId(), ClaimsPrincipalHelper.GetRole()));
+            }
+            catch (MonitoringAccessException ex) { return MonitoringError(ex); }
+            catch (KeyNotFoundException) { return NotFound(); }
+            catch (ArgumentException ex) { return BadRequest(ex.Message); }
+            catch (Exception ex)
+            {
+                Trace.TraceError("MonitoringController: media request failed: {0}", ex);
+                return Content(HttpStatusCode.InternalServerError,
+                    "A server error occurred while preparing the live video session.");
+            }
+            finally { media.Dispose(); }
+        }
+
+        // GET api/monitoring/accessible-scopes
+        //
+        // PURPOSE       Tell the UI which (job, child) pairs THIS user may monitor
+        //               right now. This fixes the co-parent gap: a guardian of
+        //               another parent's child is authorized by MonitoringAccess,
+        //               but the old screen could only discover jobs it owned.
+        // AUTH          [SessionAuthorize]. DISCOVERY ONLY - it grants nothing.
+        // REQUEST       none (the caller comes from the bearer token).
+        // RESPONSE      AccessibleMonitoringScopeDto[].
+        // FAILURE       400 when the authenticated id is missing.
+        // STATE IMPACT  None - read-only.
+        [HttpGet]
+        [Route("accessible-scopes")]
+        [SessionAuthorize]
+        public IHttpActionResult GetAccessibleScopes()
+        {
+            var service = new AccessibleScopeService();
+            try
+            {
+                return Ok(service.GetAccessibleScopes(
+                    ClaimsPrincipalHelper.GetUserId(), ClaimsPrincipalHelper.GetRole()));
+            }
+            catch (ArgumentException ex) { return BadRequest(ex.Message); }
+            catch (Exception ex)
+            {
+                Trace.TraceError("MonitoringController: accessible scopes failed: {0}", ex);
+                return Content(HttpStatusCode.InternalServerError,
+                    "A server error occurred while loading your monitoring sessions.");
+            }
+            finally { service.Dispose(); }
         }
 
         /// <summary>

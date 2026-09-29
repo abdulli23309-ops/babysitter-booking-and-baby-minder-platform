@@ -137,48 +137,88 @@ namespace WebApplication2.Services.Implementations
             if (!sessionId.HasValue)
                 throw new MonitoringAccessException(MonitoringDenial.SessionNotFound);
 
-            var existing = ReadIncident(
-                "WHERE JobId = @p0 AND Child_ID = @p1 AND MonitorSession_ID = @p2 AND IsDeleted = 0 " +
-                "AND Status IN ('Open','Acknowledged') ORDER BY CreatedAt DESC",
-                jobId, childId, sessionId.Value);
-            if (existing != null)
-                return ToDto(existing, reused: true);
+            // ---- ATOMIC DEDUPE (Phase 11 concurrency fix) -------------------
+            // The check below used to be a plain SELECT followed by an INSERT.
+            // Four SIMULTANEOUS "cry detected" reports (a detector firing on a
+            // loop, or several participants reporting at once) could all read
+            // "no open incident" before any of them inserted, producing FOUR
+            // incidents and therefore four independent T+5/T+15 escalation
+            // chains. The Phase 11 concurrency run reproduced exactly that.
+            //
+            // WHY A PROCESS GATE AND NOT Database.BeginTransaction()
+            // The Phase 5/6 and Phase 7 harnesses call these services on a context
+            // that is already inside a transaction, and EF6's EntityClient refuses
+            // nested transactions, so opening one here breaks the frozen suites.
+            // A per-scope semaphore gives the same mutual exclusion without
+            // needing a transaction, and is held only across the re-check and the
+            // insert. This is IN-PROCESS exclusion; a multi-instance deployment
+            // would additionally want a filtered unique index on
+            // (MonitorSession_ID) WHERE Status IN ('Open','Acknowledged').
+            var gate = IncidentGate(jobId, childId, sessionId.Value);
+            gate.Wait();
+            try
+            {
+                var existing = ReadIncident(
+                    "WHERE JobId = @p0 AND Child_ID = @p1 AND MonitorSession_ID = @p2 AND IsDeleted = 0 " +
+                    "AND Status IN ('Open','Acknowledged') ORDER BY CreatedAt DESC",
+                    jobId, childId, sessionId.Value);
+                if (existing != null)
+                    return ToDto(existing, reused: true);
 
-            var nowUtc = DateTime.UtcNow;                                  // server authority = T+0
-            var dueAtUtc = nowUtc.AddSeconds(SitterAlertDelaySeconds);     // T+5
+                var nowUtc = DateTime.UtcNow;                                  // server authority = T+0
+                var dueAtUtc = nowUtc.AddSeconds(SitterAlertDelaySeconds);     // T+5
 
-            // ParentId / BabysitterId are the pre-existing informational columns.
-            // The AUTHORITATIVE guardian list is resolved at escalation time from
-            // ChildGuardian (see EscalateToParents). Both values are read from the
-            // database — never from the request body — so a caller cannot point an
-            // incident at somebody else's family.
-            var keys = _db.Database.SqlQuery<JobChildKeyRow>(
-                "SELECT c.Parent_ID, j.AssignedSitter_ID FROM Child c CROSS JOIN Job j " +
-                "WHERE c.Child_ID = @p0 AND j.Job_ID = @p1",
-                childId, jobId).FirstOrDefault();
+                // ParentId / BabysitterId are the pre-existing informational columns.
+                // The AUTHORITATIVE guardian list is resolved at escalation time from
+                // ChildGuardian (see EscalateToParents). Both values are read from the
+                // database — never from the request body — so a caller cannot point an
+                // incident at somebody else's family.
+                var keys = _db.Database.SqlQuery<JobChildKeyRow>(
+                    "SELECT c.Parent_ID, j.AssignedSitter_ID FROM Child c CROSS JOIN Job j " +
+                    "WHERE c.Child_ID = @p0 AND j.Job_ID = @p1",
+                    childId, jobId).FirstOrDefault();
 
-            var incidentId = Guid.NewGuid();
-            _db.Database.ExecuteSqlCommand(
-                "INSERT INTO CryAlert (Id, Timestamp, Level, RoomName, JobId, ParentId, BabysitterId, CreatedAt, " +
-                "                      IsDeleted, Child_ID, MonitorSession_ID, Status, EscalationStage, NextEscalationDueAt) " +
-                "VALUES (@p0, @p1, @p2, @p3, @p4, @p5, @p6, @p7, 0, @p8, @p9, @p10, 0, @p11)",
-                incidentId,
-                nowUtc,                                     // Timestamp: legacy detection column (UTC)
-                "Cry",                                      // Level: detector label, no personal data
-                RoomNamePlaceholder(),                      // RoomName: NOT NULL legacy column, never exposed
-                jobId,
-                (object)(keys == null ? (int?)null : keys.Parent_ID) ?? DBNull.Value,
-                (object)(keys == null ? (int?)null : keys.AssignedSitter_ID) ?? DBNull.Value,
-                nowUtc,                                     // CreatedAt doubles as the incident start (T+0)
-                childId,
-                sessionId.Value,
-                StatusOpen,
-                dueAtUtc);
+                var incidentId = Guid.NewGuid();
+                _db.Database.ExecuteSqlCommand(
+                    "INSERT INTO CryAlert (Id, Timestamp, Level, RoomName, JobId, ParentId, BabysitterId, CreatedAt, " +
+                    "                      IsDeleted, Child_ID, MonitorSession_ID, Status, EscalationStage, NextEscalationDueAt) " +
+                    "VALUES (@p0, @p1, @p2, @p3, @p4, @p5, @p6, @p7, 0, @p8, @p9, @p10, 0, @p11)",
+                    incidentId,
+                    nowUtc,                                     // Timestamp: legacy detection column (UTC)
+                    "Cry",                                      // Level: detector label, no personal data
+                    RoomNamePlaceholder(),                      // RoomName: NOT NULL legacy column, never exposed
+                    jobId,
+                    (object)(keys == null ? (int?)null : keys.Parent_ID) ?? DBNull.Value,
+                    (object)(keys == null ? (int?)null : keys.AssignedSitter_ID) ?? DBNull.Value,
+                    nowUtc,                                     // CreatedAt doubles as the incident start (T+0)
+                    childId,
+                    sessionId.Value,
+                    StatusOpen,
+                    dueAtUtc);
 
-            WriteAudit(incidentId, jobId, childId, "CryIncidentCreated", currentUserId, RoleName(currentRole),
-                "{\"sessionId\":" + sessionId.Value + ",\"stage\":0,\"dueInSeconds\":" + SitterAlertDelaySeconds + "}");
+                WriteAudit(incidentId, jobId, childId, "CryIncidentCreated", currentUserId, RoleName(currentRole),
+                    "{\"sessionId\":" + sessionId.Value + ",\"stage\":0,\"dueInSeconds\":" + SitterAlertDelaySeconds + "}");
 
-            return ToDto(ReadIncidentById(incidentId), reused: false);
+                return ToDto(ReadIncidentById(incidentId), reused: false);
+            }
+            finally
+            {
+                gate.Release();
+            }
+        }
+
+        /// <summary>
+        /// One gate per monitoring session. Incidents are deduplicated per
+        /// (job, child, session), so the session id is the natural key. Bounded by
+        /// the number of monitoring sessions and never trimmed, which is safer
+        /// than evicting an entry another thread is about to wait on.
+        /// </summary>
+        private static readonly System.Collections.Concurrent.ConcurrentDictionary<int, System.Threading.SemaphoreSlim>
+            IncidentGates = new System.Collections.Concurrent.ConcurrentDictionary<int, System.Threading.SemaphoreSlim>();
+
+        private static System.Threading.SemaphoreSlim IncidentGate(int jobId, int childId, int sessionId)
+        {
+            return IncidentGates.GetOrAdd(sessionId, _ => new System.Threading.SemaphoreSlim(1, 1));
         }
 
         /// <summary>

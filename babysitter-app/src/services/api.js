@@ -111,15 +111,13 @@ export const API = {
   acceptBid: (bidId) => apiPost(`/bids/accept/${bidId}`, {}),
   rejectBid: (bidId) => apiPost(`/bids/reject/${bidId}`, {}),
 
-  // ---- Cry detection (404 means "no alert yet" — treated as null, other errors rethrow) ----
-  getLatestCryAlert: async (parentId) => {
-    try {
-      return await apiGet(`/cry-detection/latest?parentId=${parentId}`);
-    } catch (err) {
-      if (err?.response?.status === 404 || err?.status === 404) return null;
-      throw err;
-    }
-  },
+  // PHASE 11 REMOVAL: getLatestCryAlert is gone.
+  // It called the legacy `GET /api/cry-detection/latest`, which read the STALE
+  // EDMX CryAlert mapping and returned a RoomName the browser then treated as a
+  // joinable media room. The endpoint and its service were deleted; cry state
+  // is now read with getCryIncident(jobId, childId) below, which returns the
+  // ACTIVE incident from the single live pipeline.
+
 
   // Submit a review for a completed job (replaces raw fetch in BabySitterDetails2.jsx)
   submitReview: (jobId, rating, comment) =>
@@ -261,6 +259,38 @@ export const API = {
   // (dedupe, so a repeatedly firing detector cannot create an alert storm).
   // Callers poll getCryIncident instead; this exists for the detector path.
   reportCry: (jobId, childId) => apiPost('/monitoring/cry', { jobId, childId }),
+
+  // ---- PHASE 11: server-issued media + guardian-aware discovery ----
+
+  // ENDPOINT  GET /api/monitoring/media?jobId=&childId=
+  // PURPOSE   Ask the server for a media session for this monitoring scope. The
+  //           server runs MonitoringAccess first, then mints the room and the
+  //           short-lived provider JWT. This is the ONLY sanctioned way to get a
+  //           room - never derive one on the client.
+  // REQUEST   jobId, childId only. No actor, no role, no token from the client.
+  // RESPONSE  { Configured, Reason, Domain, RoomName, Token, Role, CanPublish,
+  //             MonitorSessionId }
+  //           Configured=false is a NORMAL 200 while no media provider is
+  //           configured on the deployment. The UI must then show an honest
+  //           "live video unavailable" message and render no video at all.
+  // FAILURE   403/404 => not authorised to watch this child (show that plainly);
+  //           404 may also mean no ACTIVE monitoring session exists.
+  // STATE     None. Read-only; creates no session and writes nothing.
+  getMonitoringMedia: (jobId, childId) =>
+    apiGet(`/monitoring/media?jobId=${jobId}&childId=${childId}`),
+
+  // ENDPOINT  GET /api/monitoring/accessible-scopes
+  // PURPOSE   Discover which (job, child) pairs THIS user may monitor now.
+  //           Fixes the co-parent gap: a guardian of the other parent's child is
+  //           authorized by MonitoringAccess, but "jobs I own" never surfaced it.
+  // REQUEST   none - the caller is taken from the bearer token.
+  // RESPONSE  AccessibleMonitoringScopeDto[] = { JobId, ChildId, ChildName,
+  //           JobStatus, Via, HasActiveSession }
+  //           This is DISCOVERY, not a grant: every real monitoring action still
+  //           re-runs MonitoringAccess on the server.
+  // FAILURE   400 when the authenticated id is missing.
+  // STATE     None. Read-only.
+  getAccessibleMonitoringScopes: () => apiGet('/monitoring/accessible-scopes'),
 
   // Reads the ACTIVE incident (Open/Acknowledged) or the latest one as history,
   // and drives the due-escalation sweep for the caller's own session.

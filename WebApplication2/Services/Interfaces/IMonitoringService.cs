@@ -7,7 +7,7 @@ namespace WebApplication2.Services.Interfaces
     /// All three methods run the centralized MonitoringAccess authorization chain
     /// before touching session state and write MonitorEvent audit entries.
     /// The authenticated caller is passed in explicitly (same pattern as
-    /// ICryAlertService) so the service never depends on ambient principal state.
+    /// IMonitoringService) so the service never depends on ambient principal state.
     /// </summary>
     public interface IMonitoringService
     {

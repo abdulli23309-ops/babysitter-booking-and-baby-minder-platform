@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { JitsiMeeting } from '@jitsi/react-sdk';
+
 import BackButton from '../../components/ui/BackButton';
 import Button from '../../components/ui/Button';
 import EmptyState from '../../components/ui/EmptyState';
-import { apiGet, apiPost } from '../../services/apiClient';
+import { apiGet } from '../../services/apiClient';
+import { API } from '../../services/api';
 import styles from './cry-detector.module.css';
 
 /* ================================================================
@@ -104,8 +105,8 @@ export default function CryDetector() {
   const [timer, setTimer] = useState({ elapsed: 0, required: INITIAL_SECONDS, active: false, fastMode: false });
 
   const [activeJob, setActiveJob] = useState(null);
-  const [jitsiRoom, setJitsiRoom] = useState(null);
-  const [inCall, setInCall] = useState(false);
+
+
   const [micPermissionDenied, setMicPermissionDenied] = useState(false);
 
   const analyserRef     = useRef(null);
@@ -148,6 +149,51 @@ export default function CryDetector() {
     fetchActiveJob();
   }, [addLog]);
 
+  // ---- PHASE 11: resolve the MONITORING SCOPE, not the legacy child column ----
+  // A cry incident is per (job, child), and MonitoringAccess treats the job's
+  // children as authoritative through the JobChildren table.
+  //
+  // /api/jobs/active reports `childId` from the LEGACY `Job.Child_ID` column
+  // (JobService maps Child_ID = job.Child_ID), which can be null on jobs created
+  // before that column was populated and can disagree with JobChildren. Using it
+  // here would risk reporting a cry against a child the caller is not authorized
+  // to monitor - or against no child at all.
+  //
+  // So the scope is resolved from GET /api/monitoring/accessible-scopes, which
+  // returns (job, child) pairs the SERVER says this sitter may monitor right now
+  // (AssignedSitter, InProgress, joined through JobChildren). That is the same
+  // authority the cry endpoint enforces, so what we report is exactly what we
+  // are allowed to report. We never guess, and never fall back to children[0].
+  const [monitorScope, setMonitorScope] = useState(null);
+
+  useEffect(() => {
+    if (!activeJob?.jobId) return undefined;
+    let cancelled = false;
+
+    const resolveScope = async () => {
+      try {
+        const scopes = await API.getAccessibleMonitoringScopes();
+        if (cancelled) return;
+        // Match on the job we are actually monitoring. If a sitter is assigned
+        // to more than one InProgress job, only that job's children are valid.
+        const match = (scopes || []).find(
+          (s) => Number(s.JobId) === Number(activeJob.jobId),
+        );
+        setMonitorScope(match || null);
+        if (!match) {
+          addLog('No monitorable child found for this job');
+        }
+      } catch {
+        if (!cancelled) setMonitorScope(null);
+      }
+    };
+
+    resolveScope();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeJob?.jobId, addLog]);
+
   const stopListening = useCallback(() => {
     clearTimeout(tickTimerRef.current);
     if (scriptNodeRef.current) scriptNodeRef.current.disconnect();
@@ -169,36 +215,53 @@ export default function CryDetector() {
 
   const sendAlert = useCallback(async () => {
     setAlertCount((prev) => prev + 1);
-    addLog('CRITICAL: Infant cry verified — alerting parent');
+    addLog('CRITICAL: Infant cry verified - reporting to monitoring');
 
-    if (!activeJob) {
-      setStatusText('⚠️ Cry detected! (No active job linked to forward emergency call)');
-      addLog('No active parent link to call');
+    // The scope must be one the SERVER says this sitter may monitor. If we
+    // could not resolve it (no active job, job not InProgress, or no child
+    // linked through JobChildren) we stop here and say so plainly. Guessing a
+    // child id would either report against the wrong baby or be rejected, and
+    // reporting a cry we cannot attribute is worse than reporting nothing.
+    if (!monitorScope?.JobId || !monitorScope?.ChildId) {
+      setStatusText('Cry detected, but no active monitoring session is available to report it.');
+      addLog('No monitorable scope available - cry not reported');
       return;
     }
 
     try {
-      const data = await apiPost('/cry-detection', {
-        timestamp: new Date().toISOString(),
-        level: 'HIGH',
-        jobId: activeJob.jobId,
-        parentId: activeJob.parentId,
-        babysitterId: Number(localStorage.getItem('userId')),
-      });
+      // ---- PHASE 11: the ONE cry pipeline ----
+      // This used to POST /cry-detection and, on any 200, declare
+      //   "Parent connected. Video call stream open."
+      // That was false on both counts: the legacy endpoint inserts through the
+      // STALE EDMX CryAlert mapping with NextEscalationDueAt = NULL, so the
+      // sweeper could never escalate it and NOBODY was ever notified; and it
+      // then opened the PUBLIC meet.jit.si room from a locally generated
+      // roomName. It also sent client-supplied parentId/babysitterId, which the
+      // security audit flags as a client-controlled identity.
+      //
+      // Now the detector only submits a CLAIM. The server is authoritative for
+      // incident creation, T+5 sitter alert, T+15 parent escalation,
+      // acknowledgement, resolution and dedupe. No identity is supplied by the
+      // client - it comes from the bearer token.
+      //
+      // The response's Reused flag tells us the incident was already open, which
+      // is what stops a continuously-firing YAMNet model creating an alert storm.
+      const data = await API.reportCry(monitorScope.JobId, monitorScope.ChildId);
 
-      if (data?.roomName) {
-        setJitsiRoom(data.roomName);
-        setInCall(true);
-        setStatusText('🚨 Parent connected. Video call stream open.');
-        addLog(`Emergency channel opened: ${data.roomName}`);
-        stopListening();
+      stopListening();
+
+      if (data?.Reused) {
+        setStatusText('Cry still ongoing - the existing incident was updated.');
+        addLog('Existing cry incident reused (deduplicated)');
       } else {
-        setStatusText('❌ Could not dispatch alert to parent.');
+        setStatusText('Cry reported. The sitter has been alerted.');
+        addLog('Cry incident created; escalation is now server-controlled');
       }
     } catch {
-      setStatusText('❌ Network error dispatching cry alert.');
+      setStatusText('Could not reach the server to report the cry.');
+      addLog('Network error dispatching cry alert');
     }
-  }, [activeJob, addLog, stopListening]);
+  }, [monitorScope, addLog, stopListening]);
 
   // TensorFlow & YAMNet loaders (unchanged)
   function loadTFJS() {
@@ -443,58 +506,22 @@ export default function CryDetector() {
     return () => clearTimeout(tickTimerRef.current);
   }, []);
 
-  // Jitsi call view
-  if (inCall && jitsiRoom) {
-    return (
-      <div className={styles.cryContainer}>
-        <div className={styles.topBar}>
-          <h1 className={styles.pageTitle}>Emergency Video Call</h1>
-        </div>
-
-        <div className={styles.jitsiWrapper}>
-          <div className={styles.liveBadge}>
-            <span className={styles.liveDot} />
-            <span>LIVE VIDEO CONNECTION</span>
-          </div>
-          <JitsiMeeting
-            roomName={jitsiRoom}
-            domain="meet.jit.si"
-            configOverwrite={{
-              startWithAudioMuted: false,
-              startWithVideoMuted: false,
-              disableDeepLinking: true,
-            }}
-            interfaceConfigOverwrite={{
-              SHOW_JITSI_WATERMARK: false,
-              SHOW_WATERMARK_FOR_GUESTS: false,
-              TOOLBAR_BUTTONS: [
-                'microphone', 'camera', 'chat', 'tileview', 'fullscreen', 'hangup'
-              ],
-            }}
-            getIFrameRef={(iframeRef) => {
-              iframeRef.style.width = '100%';
-              iframeRef.style.height = '100%';
-              iframeRef.style.border = 'none';
-            }}
-          />
-        </div>
-
-        <Button
-          variant="danger"
-          size="lg"
-          fullWidth
-          onClick={() => {
-            setInCall(false);
-            setJitsiRoom(null);
-            setStatusText('✅ Call completed. Ready to resume monitoring.');
-            addLog('Emergency call disconnected');
-          }}
-        >
-          Disconnect Call & Return to Monitoring
-        </Button>
-      </div>
-    );
-  }
+  // ---- PHASE 11: the emergency "video call" view is REMOVED ----
+  // This screen used to swap itself for a Jitsi meeting on a room name the
+  // DEVICE invented, hosted on the public meet.jit.si, labelled "LIVE VIDEO
+  // CONNECTION". That was wrong three times over:
+  //   * the room was not authorised by anything - any name that reached the
+  //     browser was a way in,
+  //   * meet.jit.si is an uncontrolled public host, so the badge overstated
+  //     the security of the call, and
+  //   * it fired on a cry DETECTION, which inverted the whole design: cry
+  //     detection is an ADDITIONAL capability, not the thing that starts the
+  //     camera. The feed must be continuous while monitoring is active.
+  //
+  // Live video now lives in one place - /baby-monitoring - which requests a
+  // server-issued, MonitoringAccess-gated media session. This screen keeps its
+  // actual job: running YAMNet locally and reporting a cry claim to the server.
+  // The jitsiRoom / inCall state is gone with the view.
 
   // Permission Denied View
   if (micPermissionDenied) {
