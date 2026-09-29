@@ -197,6 +197,7 @@
         <Compile Include="Infrastructure\GeoHelper.cs" />
     <Compile Include="Infrastructure\ValidationHelper.cs" />
     <Compile Include="Infrastructure\MonitoringAccess.cs" />
+    <Compile Include="Infrastructure\MonitoringScopeGate.cs" />
     <Compile Include="Services\Interfaces\IAccountService.cs" />
     <Compile Include="Services\Implementations\AccountService.cs" />
     <Compile Include="Services\Interfaces\IAvailabilityService.cs" />

@@ -167,8 +167,13 @@ namespace WebApplication2.Services.Implementations
         /// </summary>
         private static string BuildRoomName(int monitorSessionId)
         {
-            string salt = Guid.NewGuid().ToString("N").Substring(0, 8);
-            return "lc-monitor-" + monitorSessionId + "-" + salt;
+            // Every authorized participant for this MonitorSession must receive
+            // the same room identifier. A random suffix per request created a
+            // different room for the parent and sitter, preventing them from
+            // ever meeting. This identifier is deterministic, but is NOT an
+            // authorization secret: MonitoringAccess and the signed provider
+            // token are still required on every request.
+            return "lc-monitor-" + monitorSessionId;
         }
 
         /// <summary>

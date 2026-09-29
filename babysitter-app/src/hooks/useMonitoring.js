@@ -205,11 +205,21 @@ export default function useMonitoring({ jobId, childId, role, autoStart = false 
         await API.sendMonitoringHeartbeat(jobId, childId);
         if (aliveRef.current) setOffline(false);
       } catch {
-        // A failed beat does NOT mean "disconnected": the server decides that
-        // by comparing its own clock against the last stamp IT recorded.
-        // Declaring the connection lost here would be exactly the
-        // "frontend is not authoritative" mistake this project forbids.
-        if (aliveRef.current) setOffline(true);
+        // PHASE 12 CORRECTION.
+        //
+        // This block used to call setOffline(true), which contradicted the
+        // comment directly above it: a failed beat does NOT mean the child
+        // monitor is disconnected. The SERVER decides that, by comparing its own
+        // clock against the last stamp IT recorded (Phase 4). A heartbeat can
+        // legitimately fail - a transient 500, a proxy hiccup, a lost network for
+        // one request - and turning that into a client-declared "Connection
+        // problem" is exactly the "frontend is authoritative" mistake this
+        // project forbids.
+        //
+        // The session poll (below) still sets `offline` for a genuine network
+        // failure, and even then the wording is "cannot reach the server" rather
+        // than a claim about the child's camera. So: swallow the error here and
+        // let the next successful poll or beat clear the flag.
       }
     };
     const t = setInterval(beat, HEARTBEAT_MS);

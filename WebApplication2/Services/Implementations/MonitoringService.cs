@@ -99,16 +99,15 @@ namespace WebApplication2.Services.Implementations
             // the frozen Phase 3 suite. The original code documented the same
             // constraint for the audit write.
             //
-            // A per-(job, child) semaphore gives the mutual exclusion we actually
-            // need, works whether or not the caller owns a transaction, and is
-            // held only for the few milliseconds of the re-check plus insert.
-            // Every request for the same scope is serialised; different scopes
-            // still run in parallel. Note this is IN-PROCESS mutual exclusion:
+            // MonitoringScopeGate gives the mutual exclusion we need without
+            // depending on whether the caller owns a transaction. Start, end,
+            // cry creation, pause approval and escalation delivery all use this
+            // same gate for a scope; other children still run in parallel.
+            // Note this is IN-PROCESS mutual exclusion:
             // a multi-instance deployment would additionally need a unique index
             // on (Job_ID, Child_ID) WHERE Status='Active', which is a database
             // change deliberately NOT made here.
-            var gate = StartGate(jobId, childId);
-            gate.Wait();
+            var gateLease = MonitoringScopeGate.Enter(jobId, childId);
             try
             {
                 // Re-check INSIDE the gate: this is the step that was missing.
@@ -142,25 +141,8 @@ namespace WebApplication2.Services.Implementations
             }
             finally
             {
-                gate.Release();
+                gateLease.Dispose();
             }
-        }
-
-        /// <summary>
-        /// One gate per (job, child) so concurrent starts for the SAME scope are
-        /// serialised while different scopes proceed in parallel. The dictionary
-        /// is intentionally not trimmed: it is bounded by the number of distinct
-        /// monitored scopes, which is tiny, and a stable key is safer than
-        /// removing an entry a waiter is about to use.
-        /// </summary>
-        private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, System.Threading.SemaphoreSlim>
-            StartGates = new System.Collections.Concurrent.ConcurrentDictionary<string, System.Threading.SemaphoreSlim>();
-
-        private static System.Threading.SemaphoreSlim StartGate(int jobId, int childId)
-        {
-            return StartGates.GetOrAdd(
-                jobId + ":" + childId,
-                _ => new System.Threading.SemaphoreSlim(1, 1));
         }
 
         public MonitorSessionDto GetSession(int jobId, int childId, int currentUserId, string currentRole)
@@ -229,6 +211,8 @@ namespace WebApplication2.Services.Implementations
             if (!sessionId.HasValue)
                 throw new MonitoringAccessException(MonitoringDenial.SessionNotFound);
 
+            using (MonitoringScopeGate.Enter(jobId, childId))
+            {
             // Guarded UPDATE: only an Active row can transition to Ended, so a
             // concurrent double-end affects exactly one request (rows == 1) and
             // the loser receives SessionNotFound. The row is kept (never deleted)
@@ -279,6 +263,10 @@ namespace WebApplication2.Services.Implementations
                     sessionId.Value, ex);
             }
 
+            }
+
+            // Read outside the scope gate because GetSessionById runs the due
+            // escalation sweep, whose delivery also acquires this gate.
             return GetSessionById(sessionId.Value);
         }
 

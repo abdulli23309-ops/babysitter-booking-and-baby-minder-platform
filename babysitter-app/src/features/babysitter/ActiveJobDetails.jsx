@@ -409,7 +409,25 @@ export default function ActiveJobDetails() {
               // guard is presentation only and the server refuses regardless.
               canRespond={!monitoring.session?.IsPaused}
               onGoingToChild={() => respond('Marked as going to the child', monitoring.goingToChild)}
-              onViewChild={() => toast.info('Opening the child camera view.')}
+              onViewChild={() => {
+                // PHASE 12 CORRECTION - this was a dead action.
+                // "View Child" only fired toast.info('Opening the child camera
+                // view.') and changed nothing on screen, so the sitter was told a
+                // camera view was opening when it never did. It is now a real
+                // navigation to the monitoring screen.
+                //
+                // Carry the selected job/child so a sitter with more than one
+                // active scope lands on the child whose alert they opened. Route
+                // state is only a locator: media and every monitoring action are
+                // still authorized again by MonitoringAccess on the server.
+                navigate('/baby-monitoring', {
+                  state: {
+                    jobId: numericJobId,
+                    childId: monitoredChild?.Child_ID,
+                    childName: monitoredChild?.ChildName ?? null,
+                  },
+                });
+              }}
               onWithChild={() => respond('Marked as with the child', monitoring.withChild)}
             />
 

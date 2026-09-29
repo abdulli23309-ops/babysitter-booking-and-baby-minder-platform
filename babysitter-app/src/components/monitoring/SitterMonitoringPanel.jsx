@@ -46,6 +46,11 @@ export default function SitterMonitoringPanel({
 }) {
   const sessionActive = session?.Status === 'Active';
   const urgent = isActiveIncident(incident);
+  // `!offline` is deliberate and easy to misread. `offline` means WE cannot reach
+  // the server, so ParentConnection/SitterConnection are stale or unknown and
+  // asserting "connection lost" from them would be a client-side guess. The
+  // banner is therefore shown only when we CAN reach the server AND the server
+  // itself says a participant has gone quiet (Phase 4 stale-heartbeat rule).
   const connectionLost = sessionActive && !offline
     && (session.ParentConnection === 'Lost' || session.SitterConnection === 'Lost');
 

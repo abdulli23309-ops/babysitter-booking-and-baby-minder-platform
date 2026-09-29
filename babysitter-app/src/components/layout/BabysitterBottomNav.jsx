@@ -41,7 +41,7 @@ const Icons = {
 
 const tabs = [
   { icon: 'dashboard', label: 'Dashboard', route: '/babysitter-dashboard', matches: ['/babysitter-dashboard', '/menu'] },
-  { icon: 'jobs', label: 'Jobs', route: '/job-request', matches: ['/job-request', '/babysitter-my-jobs', '/active-job-details', '/upcoming-job-details', '/completed-job-details', '/job-details'] },
+  { icon: 'jobs', label: 'Jobs', route: '/job-request', matches: ['/job-request', '/babysitter-my-jobs', '/active-job-details', '/upcoming-job-details', '/completed-job-details', '/job-details', '/baby-monitoring'] },
   { icon: 'schedule', label: 'Schedule', route: '/set-availability', matches: ['/set-availability'] },
   { icon: 'earnings', label: 'Earnings', route: '/earnings', matches: ['/earnings'] },
   { icon: 'profile', label: 'Profile', route: '/my-profile', matches: ['/my-profile', '/update-profile', '/ratings'] },

@@ -16,6 +16,11 @@ function New-HarnessConfig($work, $exe, $templatePath) {
     # Prefer the documented template artifact; only substitute the escaped server.
     $cfg = Get-Content $templatePath -Raw
     $cfg = $cfg.Replace('&lt;YOUR-SERVER&gt;', $server).Replace('<YOUR-SERVER>', $server)
+    # The ops-sweep assertions drive the controller in-process and need this key.
+    $cfg = $cfg.Replace('<connectionStrings>', "  <appSettings>
+    <add key="MonitoringOpsSweepKey" value="harness-ops-key" />
+  </appSettings>
+  <connectionStrings>")
   } else {
     $cfg = "<?xml version=`"1.0`" encoding=`"utf-8`"?>`n<configuration>`n  <connectionStrings>`n    $connEntry`n  </connectionStrings>`n  $provider`n</configuration>"
   }

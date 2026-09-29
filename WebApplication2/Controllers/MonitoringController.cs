@@ -325,6 +325,19 @@ namespace WebApplication2.Controllers
             {
                 return MonitoringError(ex);
             }
+            catch (CryIncidentService.CryDetectionPausedException ex)
+            {
+                // Phase 12: a cry claim arrived while an approved parent pause is
+                // active. This is a STATE conflict, not an authorization failure,
+                // so 409 (not 403) is returned and the message explains what is
+                // actually happening instead of surfacing a generic error.
+                return Content(HttpStatusCode.Conflict, new
+                {
+                    error = "paused",
+                    message = ex.Message,
+                    pauseExpiresAtUtc = ex.PauseExpiresAtUtc
+                });
+            }
             catch (ArgumentException ex)
             {
                 return BadRequest(ex.Message);

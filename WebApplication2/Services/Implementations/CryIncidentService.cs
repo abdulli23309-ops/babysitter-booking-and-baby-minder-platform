@@ -76,6 +76,64 @@ namespace WebApplication2.Services.Implementations
         // (dedupe only covers Open/Acknowledged incidents).
         public const string CancelParentPauseApproved = "ParentPauseApproved";
 
+        /// <summary>
+        /// Thrown when a cry claim arrives while an APPROVED, unexpired parent
+        /// pause is active for the session.
+        ///
+        /// WHY THIS EXISTS (Phase 12 independent audit)
+        /// The frozen business rule is "during a pause, cry detection is
+        /// suspended". Approving a pause correctly CANCELS the incident that was
+        /// already open, so nothing escalates for THAT incident. But the detector
+        /// on Phone 2 keeps running, so the very next "cry detected" claim opened
+        /// a brand-new incident which then escalated normally: a live audit
+        /// observed the parent being alerted 4 times and the incident reaching
+        /// EscalationStage 2 while the pause was still Approved with ~120s left.
+        /// A pause that still lets the phone ring is not a pause.
+        ///
+        /// This is a distinct exception rather than a MonitoringDenial because it
+        /// is a STATE conflict, not an authorization failure: the caller may
+        /// perfectly well be an authorized sitter, the request simply arrives at
+        /// a moment when detection is suspended. The controller maps it to 409 so
+        /// the UI can say "cry detection is paused" rather than showing an error.
+        /// </summary>
+        public class CryDetectionPausedException : Exception
+        {
+            public DateTime? PauseExpiresAtUtc { get; }
+
+            public CryDetectionPausedException(DateTime? pauseExpiresAtUtc)
+                : base("Cry detection is suspended while a parent pause is active.")
+            {
+                PauseExpiresAtUtc = pauseExpiresAtUtc;
+            }
+        }
+
+        /// <summary>
+        /// Returns the expiry of the session's currently active pause, or null
+        /// when detection is running normally.
+        ///
+        /// The status filter is deliberately 'Approved' only. A 'Requested' pause
+        /// has not taken effect yet (the other guardian still has to approve it),
+        /// and a 'Cancelled'/'Expired' pause must never suppress detection.
+        /// Expiry is compared against the SERVER clock so the rule survives an
+        /// app-pool recycle and needs no background timer.
+        /// </summary>
+        private DateTime? ActivePauseExpiry(int sessionId, DateTime nowUtc)
+        {
+            var row = _db.Database.SqlQuery<ActivePauseWindowRow>(
+                "SELECT TOP (1) PauseExpiresAtUtc FROM MonitoringPause " +
+                "WHERE MonitorSession_ID = @p0 AND IsDeleted = 0 AND Status = 'Approved' " +
+                "AND PauseExpiresAtUtc IS NOT NULL AND PauseExpiresAtUtc > @p1 " +
+                "ORDER BY MonitoringPause_ID DESC", sessionId, nowUtc)
+                .FirstOrDefault();
+            return row?.PauseExpiresAtUtc;
+        }
+
+        /// <summary>Projection for the active-pause lookup.</summary>
+        private class ActivePauseWindowRow
+        {
+            public DateTime? PauseExpiresAtUtc { get; set; }
+        }
+
         // ---- timing (frozen Phase 5/6 spec; all server-side UTC) ----
         private const int SitterAlertDelaySeconds = 5;         // T+5   -> sitter alert
         private const int ParentEscalationDelaySeconds = 15;   // T+15  -> parent escalation
@@ -149,15 +207,30 @@ namespace WebApplication2.Services.Implementations
             // The Phase 5/6 and Phase 7 harnesses call these services on a context
             // that is already inside a transaction, and EF6's EntityClient refuses
             // nested transactions, so opening one here breaks the frozen suites.
-            // A per-scope semaphore gives the same mutual exclusion without
-            // needing a transaction, and is held only across the re-check and the
-            // insert. This is IN-PROCESS exclusion; a multi-instance deployment
+            // MonitoringScopeGate gives the same mutual exclusion without
+            // needing a transaction. The shared gate also orders pause approval
+            // and escalation delivery against this re-check and insert. This is
+            // IN-PROCESS exclusion; a multi-instance deployment
             // would additionally want a filtered unique index on
             // (MonitorSession_ID) WHERE Status IN ('Open','Acknowledged').
-            var gate = IncidentGate(jobId, childId, sessionId.Value);
-            gate.Wait();
+            var gateLease = MonitoringScopeGate.Enter(jobId, childId);
             try
             {
+                // Session end shares this gate. Re-check the lifecycle anchor
+                // after acquiring it so a report that waited behind EndSession
+                // cannot create an incident for a closed session.
+                var currentSessionId = FindActiveSessionId(jobId, childId);
+                if (!currentSessionId.HasValue || currentSessionId.Value != sessionId.Value)
+                    throw new MonitoringAccessException(MonitoringDenial.SessionNotFound);
+
+                // PHASE 12: refuse to open an incident while a parent pause is
+                // active. Checked INSIDE the gate so it is evaluated against the
+                // same session row the insert would use, and read from the
+                // persisted pause + server clock (no timer, lazy expiry).
+                var pauseUntil = ActivePauseExpiry(sessionId.Value, DateTime.UtcNow);
+                if (pauseUntil.HasValue)
+                    throw new CryDetectionPausedException(pauseUntil.Value);
+
                 var existing = ReadIncident(
                     "WHERE JobId = @p0 AND Child_ID = @p1 AND MonitorSession_ID = @p2 AND IsDeleted = 0 " +
                     "AND Status IN ('Open','Acknowledged') ORDER BY CreatedAt DESC",
@@ -203,22 +276,8 @@ namespace WebApplication2.Services.Implementations
             }
             finally
             {
-                gate.Release();
+                gateLease.Dispose();
             }
-        }
-
-        /// <summary>
-        /// One gate per monitoring session. Incidents are deduplicated per
-        /// (job, child, session), so the session id is the natural key. Bounded by
-        /// the number of monitoring sessions and never trimmed, which is safer
-        /// than evicting an entry another thread is about to wait on.
-        /// </summary>
-        private static readonly System.Collections.Concurrent.ConcurrentDictionary<int, System.Threading.SemaphoreSlim>
-            IncidentGates = new System.Collections.Concurrent.ConcurrentDictionary<int, System.Threading.SemaphoreSlim>();
-
-        private static System.Threading.SemaphoreSlim IncidentGate(int jobId, int childId, int sessionId)
-        {
-            return IncidentGates.GetOrAdd(sessionId, _ => new System.Threading.SemaphoreSlim(1, 1));
         }
 
         /// <summary>
@@ -485,6 +544,20 @@ WHERE IsDeleted = 0
   AND NextEscalationDueAt IS NOT NULL
   AND NextEscalationDueAt <= GETUTCDATE()
   AND (@p0 = -1 OR MonitorSession_ID = @p0)
+  -- Phase 12 defence in depth: an incident must NEVER escalate while an
+  -- approved, unexpired parent pause is active for its session. Approving a
+  -- pause already cancels the open incident, so this normally matches nothing;
+  -- it exists for the window where an incident was created a moment before the
+  -- pause was approved. Without it, that incident rang the parent's phone during
+  -- a pause - reproduced live before this clause existed. The comparison is
+  -- against GETUTCDATE() (server clock) and needs no timer.
+  AND NOT EXISTS (
+      SELECT 1 FROM dbo.MonitoringPause mp
+      WHERE mp.MonitorSession_ID = dbo.CryAlert.MonitorSession_ID
+        AND mp.IsDeleted = 0
+        AND mp.Status = 'Approved'
+        AND mp.PauseExpiresAtUtc IS NOT NULL
+        AND mp.PauseExpiresAtUtc > GETUTCDATE())
 ORDER BY NextEscalationDueAt;
 
 UPDATE dbo.CryAlert
@@ -517,9 +590,9 @@ WHERE Id = @claimId;";
         ///
         /// STEP 2 — notify exactly one stage:
         ///   stage 1 → the ASSIGNED sitter ("Baby may need attention")
-        ///   stage 2 → every authorized guardian from ChildGuardian, falling back
-        ///             to Child.Parent_ID when that child has no guardian row yet,
-        ///             so a legacy family is never silently dropped.
+        ///   stage 2 → every active guardian from ChildGuardian. If no active
+        ///             guardian row exists, nobody is notified; Child.Parent_ID
+        ///             is legacy profile data and is never monitoring authority.
         /// Both are PERSISTENT Notification rows (the frontend polls).
         ///
         /// STEP 3 — audit: EscalationClaimed plus SitterAlerted / ParentEscalated.
@@ -530,8 +603,30 @@ WHERE Id = @claimId;";
         /// </summary>
         private void ProcessClaimed(ClaimedIncidentRow claimed, SweepResultDto result)
         {
-            if (claimed.JobId == null || claimed.Child_ID == null)
+            if (claimed.JobId == null || claimed.Child_ID == null || claimed.MonitorSession_ID == null)
                 return;
+
+            // Session/pause state changes share this scope gate with incident
+            // creation and pause approval. The row claim stays a short atomic
+            // SQL statement; delivery is serialized with approval so a claimed
+            // pre-pause alert cannot ring during the pause window.
+            using (MonitoringScopeGate.Enter(claimed.JobId.Value, claimed.Child_ID.Value))
+            {
+                int stillActive = _db.Database.SqlQuery<int>(
+                    "SELECT COUNT(*) FROM CryAlert WHERE Id = @p0 AND IsDeleted = 0 " +
+                    "AND Status IN ('Open','Acknowledged')", claimed.Id).Single();
+                if (stillActive == 0)
+                    return; // another scope transition (for example pause approval) cancelled it
+
+                if (ActivePauseExpiry(claimed.MonitorSession_ID.Value, DateTime.UtcNow).HasValue)
+                    return; // fail closed if a persisted pause is active after the claim
+
+                ProcessClaimedInScope(claimed, result);
+            }
+        }
+
+        private void ProcessClaimedInScope(ClaimedIncidentRow claimed, SweepResultDto result)
+        {
 
             int jobId = claimed.JobId.Value;
             int childId = claimed.Child_ID.Value;

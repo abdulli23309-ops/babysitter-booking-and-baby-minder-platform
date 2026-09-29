@@ -89,7 +89,20 @@ function App() {
                   </ProtectedRoute>
                 }
               />
-              <Route path="/baby-monitoring" element={<ProtectedRoute allowedRoles={['parent']}><BabyMonitoringScreen /></ProtectedRoute>} />
+              {/* PHASE 12: the sitter role is now allowed here.
+                  This route used to be parent-only, so the sitter's "View Child"
+                  button could never actually show a feed - it redirected to the
+                  sitter dashboard. The monitoring screen is already safe for a
+                  sitter because EVERY action is authorized server-side:
+                  MonitoringAccess permits an assigned sitter, and
+                  MediaSessionService returns role "viewer" with CanPublish=false
+                  so a sitter is receive-only. Allowing the route therefore does
+                  not weaken authorization, it only stops the UI from blocking a
+                  capability the backend already enforces correctly.
+
+                  NOTE: role strings are LOWERCASE in this app ('parent' /
+                  'babysitter'), which is what AuthContext stores. */}
+              <Route path="/baby-monitoring" element={<ProtectedRoute allowedRoles={['parent', 'babysitter']}><BabyMonitoringScreen /></ProtectedRoute>} />
               <Route path="/cry-alert" element={<ProtectedRoute allowedRoles={['parent']}><ChildCryAlertScreen /></ProtectedRoute>} />
 
               {/* ---- Babysitter-protected routes ---- */}

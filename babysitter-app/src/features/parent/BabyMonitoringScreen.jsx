@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { JitsiMeeting } from '@jitsi/react-sdk';
+import MonitoringMediaPanel from '../../components/monitoring/MonitoringMediaPanel';
 import ParentBottomNav from '../../components/layout/ParentBottomNav';
+import BabysitterBottomNav from '../../components/layout/BabysitterBottomNav';
 import BackButton from '../../components/ui/BackButton';
 import MonitoringStatusBar from '../../components/monitoring/MonitoringStatusBar';
 import Phase7FamilyPanel from './Phase7FamilyPanel';
@@ -94,49 +95,71 @@ export default function BabyMonitoringScreen() {
   // inventing a child.
   const stateJobId = location.state?.jobId ?? location.state?.Job_ID ?? null;
   const stateChildId = location.state?.childId ?? location.state?.Child_ID ?? null;
-  const [scope, setScope] = useState({
-    jobId: stateJobId,
-    childId: stateChildId,
-    childName: location.state?.childName ?? null,
-  });
-  // Only actually "loading" when we still have to LOOK the scope up.
-  const [scopeLoading, setScopeLoading] = useState(!stateJobId && !stateChildId);
+  // Deep-link values are locators only; the server's authorized scope is the
+  // source for the child name and the scope used by every subsequent request.
+  // PHASE 12: the initial scope is a null-SAFE OBJECT, not `null`.
+  // Consumers read `scope.jobId` directly - including the dependency array of
+  // the pause/DND refresh - and that runs on the first render, before any
+  // request has resolved. An initial `null` therefore threw a TypeError and
+  // blanked the entire screen. "Not resolved yet" is expressed by
+  // jobId/childId being falsy, which is what the render already checks.
+  const [scope, setScope] = useState({ jobId: null, childId: null, childName: null });
+  const [scopeLoading, setScopeLoading] = useState(true);
 
-  // Fallback: derive the scope from the parent's In Progress job so the screen
-  // is reachable from the dashboard even without deep-link state.
+  // PHASE 12 - CO-PARENT REACHABILITY.
+  // This used to derive the scope from `getParentJobs(userId)`, i.e. "jobs I
+  // OWN". An authorized co-parent is a ChildGuardian of the other parent's
+  // child but does not own the job, so the lookup returned nothing and the
+  // screen showed "No active babysitting session to monitor right now" even
+  // though the server would have authorized every single action for them. That
+  // was the Phase 10 gap D4/G5 reaching the UI.
+  //
+  // The scope now comes from GET /monitoring/accessible-scopes, which is the
+  // server's own answer to "what may this user monitor right now?". It already
+  // applies MonitoringAccess, the ChildGuardian relationship, JobChildren
+  // membership and the InProgress filter, so it works identically for the owner
+  // parent, the co-parent and a sitter.
+  //
+  // This is DISCOVERY, not authorization: it cannot expose anything the caller
+  // could not already reach, and every action below (start, heartbeat, cry,
+  // pause, media) is still re-authorized server-side.
   useEffect(() => {
-    if (stateJobId) return;
     let cancelled = false;
     // Deferred out of the effect body: this synchronizes with an external
     // system (the API), it is not a derived render value.
+    //
+    // PHASE 12 CORRECTION: the two reset calls were made SYNCHRONOUSLY here.
+    // React treats a setState in the effect body as a cascading render, and
+    // clearing `scope` to null before the request even started blanked the
+    // whole screen for a frame. They now run inside the deferred block, next to
+    // the request they describe - the same pattern useMonitoring already uses.
     Promise.resolve().then(async () => {
+      setScopeLoading(true);
+      // Reset to the SAME null-safe shape the initial state uses. Setting plain
+      // `null` here would make every `scope.jobId` read below throw on the next
+      // render (including the pause/DND dependency array) and blank the screen.
+      setScope({ jobId: null, childId: null, childName: null });
       try {
-        const jobs = await API.getParentJobs(userId);
-        const list = Array.isArray(jobs) ? jobs : [];
-        // Phase 9 fix: the backend actually stores "InProgress" (no space),
-        // while this comparison used to require "In Progress". It therefore
-        // never matched and silently fell through to `list[0]` - typically a
-        // COMPLETED job - so the monitoring screen opened against a finished
-        // job and reported "Monitoring not started".
-        // Same normalisation convention as MyJobsScreen: trim, lowercase and
-        // strip spaces/underscores/hyphens so both spellings compare equal.
-        const isInProgress = (status) =>
-          String(status ?? '').trim().toLowerCase().replace(/[\s_-]+/g, '') === 'inprogress';
-        // Only a genuinely in-progress job may define the scope. Picking an
-        // arbitrary job would show monitoring for work that is not running.
-        const active = list.find((j) => isInProgress(j?.Status)) ?? null;
-        if (cancelled || !active) return;
-        const children = Array.isArray(active.Children) ? active.Children : [];
-        const child = children[0] ?? null;
-        if (!child?.Child_ID) return;
+        const scopes = await API.getAccessibleMonitoringScopes();
+        if (cancelled) return;
+        const list = Array.isArray(scopes) ? scopes : [];
+        // Deep links narrow authorized results but never grant access. Direct
+        // navigation uses the server's preferred active scope.
+        const pick = stateJobId && stateChildId
+          ? list.find((s) => Number(s.JobId) === Number(stateJobId)
+            && Number(s.ChildId) === Number(stateChildId)) ?? null
+          : list.find((s) => s.HasActiveSession) ?? list[0] ?? null;
+        if (!pick?.JobId || !pick?.ChildId) return;
         setScope({
-          jobId: active.Job_ID ?? active.jobId,
-          childId: child.Child_ID,
-          childName: child.ChildName ?? null,
+          jobId: pick.JobId,
+          childId: pick.ChildId,
+          childName: pick.ChildName ?? null,
         });
       } catch {
         // A failure here just means no scope could be derived; the screen
-        // renders its own explanatory empty state below.
+        // renders its own explanatory empty state below. Falling back to the
+        // owned-jobs lookup would be misleading for a co-parent, so we simply
+        // show the empty state rather than guessing.
       } finally {
         if (!cancelled) setScopeLoading(false);
       }
@@ -144,7 +167,7 @@ export default function BabyMonitoringScreen() {
     return () => {
       cancelled = true;
     };
-  }, [stateJobId, userId]);
+  }, [stateJobId, stateChildId, userId]);
 
   // One hook owns session start, heartbeat, escalation polling and pause
   // resolution for the whole screen.
@@ -211,9 +234,9 @@ export default function BabyMonitoringScreen() {
     session?.Status ?? 'none',
   );
 
-  const [micOn, setMicOn] = useState(true);
-  const [cameraOn, setCameraOn] = useState(true);
-
+  // PHASE 12: the local `micOn` / `cameraOn` state was deleted along with the
+  // fake toggles that used it. Real microphone and camera control belongs to the
+  // provider toolbar, which only mounts once a media session is genuinely live.
 
   return (
     <div className={styles.screenContainer}>
@@ -225,38 +248,26 @@ export default function BabyMonitoringScreen() {
           type="button"
           className={styles.iconBtn}
           aria-label="Settings"
-          onClick={() => navigate('/parent-dashboard')}
+          onClick={() => navigate(role === 'parent' ? '/parent-dashboard' : '/babysitter-dashboard')}
         >
           <Icons.settings />
         </button>
       </header>
 
-      {/* Live Badge & Subtitle */}
-      <div className={styles.statusHeader}>
-        {/* PHASE 11: the "LIVE" pill is shown ONLY when the server has issued a
-            real media session. A static LIVE badge over an unavailable
-            camera is a false success state, so it is now conditional. */}
-        {media.status === 'ready' ? (
-          <div className={styles.livePill}>
-            <span className={styles.liveBeacon} aria-hidden="true" />
-            <span className={styles.liveTag}>LIVE</span>
-          </div>
-        ) : null}
-        {/*
-          PHASE 11: this subtitle used to read "Nursery - HD 1080p"
-          unconditionally. That is a media CLAIM - it asserted a resolution and a
-          live stream that may not exist. It now states the child, and states the
-          media state the server actually reported, so "live video" and
-          "receive only" are only ever shown when they are true.
-        */}
-        <p className={styles.locationSubtitle}>
-          {scope.childName || 'Child'}
-          {media.status === 'ready' ? ' - live video' : ''}
-          {media.status === 'ready' && !media.canPublish ? ' - receive only' : ''}
-          {media.status === 'unavailable' ? ' - live video not configured' : ''}
-          {media.status === 'no-session' ? ' - awaiting Child Mode' : ''}
-          {media.status === 'denied' ? ' - not authorised to view' : ''}
-        </p>
+      {/* ---- PHASE 12: child identity header ----
+          This used to be a "LIVE" pill plus a "Nursery - HD 1080p" subtitle.
+          Both were removed: the pill duplicated the media panel, and the
+          subtitle asserted a resolution for a stream that usually did not exist.
+          What remains identifies the CHILD, which is the fact a parent actually
+          needs to confirm at a glance that they are looking at the right baby. */}
+      <div className={styles.childHeader}>
+        <span className={styles.childAvatar} aria-hidden="true">
+          {(scope.childName || '').trim().charAt(0).toUpperCase()}
+        </span>
+        <span className={styles.childHeaderText}>
+          <span className={styles.childHeaderLabel}>Monitoring</span>
+          <span className={styles.childHeaderName}>{scope.childName || 'Child'}</span>
+        </span>
       </div>
 
       {/* ---- Phase 8: real, server-driven monitoring state ----
@@ -313,107 +324,35 @@ export default function BabyMonitoringScreen() {
         </>
       )}
 
-      {/* ---- PHASE 11: honest media surface ----
-          Three genuinely different states, each stated in words rather than
-          implied by a colour:
-            ready        - the server issued a real session; render the player
-            unavailable  - the server says no provider is configured
-            denied       - MonitoringAccess refused this caller
-          The mock <NurseryCameraFeed /> is deliberately NOT rendered as a
-          fallback. A drawn nursery under a "LIVE" badge tells the parent a feed
-          exists when none does, which is the false success state the Phase 10
-          audit flagged. */}
-      {media.status === 'ready' && media.media ? (
-        <div className={styles.cameraFrame}>
-          {/*
-            PHASE 11 SECURITY FIX: `domain` used to be the hard-coded public
-            "meet.jit.si", which let anyone who guessed a room name join an
-            unencrypted, uncontrolled public host - exactly the "room-name-only
-            access" the audit forbids. The tenant host now comes from the server
-            (Web.config MonitoringMediaDomain) and the request is authenticated
-            with a short-lived server-signed JWT. `canPublish` is the server's
-            answer, so a sitter is never offered a publish control.
-          */}
-          <JitsiMeeting
-            roomName={media.media.RoomName}
-            domain={media.media.Domain}
-            jwt={media.media.Token}
-            configOverwrite={{
-              startWithAudioMuted: !media.canPublish,
-              startWithVideoMuted: !media.canPublish,
-              // A receive-only viewer must not be offered a publish button.
-              ...(media.canPublish
-                ? {}
-                : { startAudioMuted: true, startVideoMuted: true }),
-              disableDeepLinking: true,
-            }}
-            interfaceConfigOverwrite={{
-              SHOW_JITSI_WATERMARK: false,
-              SHOW_WATERMARK_FOR_GUESTS: false,
-              TOOLBAR_BUTTONS: media.canPublish
-                ? ['microphone', 'camera', 'fullscreen', 'hangup']
-                : ['fullscreen', 'hangup'],   // sitter: no mic, no camera
-            }}
-            getIFrameRef={(iframe) => {
-              if (iframe) {
-                iframe.style.height = '100%';
-                iframe.style.width = '100%';
-                iframe.style.border = 'none';
-              }
-            }}
-          />
-        </div>
-      ) : (
-        <div className={styles.cameraFrame}>
-          <p role="status" className={styles.mediaNote}>
-            {media.status === 'loading' && 'Connecting to the live baby monitor...'}
-            {media.status === 'unavailable' &&
-              (media.reason ||
-                'Live video is not configured on this deployment. Monitoring status, cry alerts and the pause controls above are fully active.')}
-            {media.status === 'denied' && media.reason}
-            {media.status === 'no-session' && media.reason}
-            {media.status === 'error' && media.reason}
-            {media.status === 'idle' &&
-              'Start Child Mode on the monitoring phone to see live video here.'}
-          </p>
-        </div>
-      )}
+      {/* ---- PHASE 12: media surface ----
+          All seven media states render through one component, so the word
+          "Live" can only ever appear when the server issued a real signed
+          session. This block previously faked a camera frame and a "Secure
+          Connection" badge; neither is possible now. */}
+      <MonitoringMediaPanel
+        status={media.status}
+        media={media.media}
+        canPublish={media.canPublish}
+        reason={media.reason}
+        childName={scope.childName}
+      />
 
-      {/* Hardware / Session Controls */}
+      {/* ---- PHASE 12: session controls ----
+          The local "Camera On / Mic Active" toggles were REMOVED. They were
+          plain component state that controlled nothing - the real controls are
+          the provider's own toolbar, which only exists once a session is live -
+          yet they were rendered unconditionally, so a parent with no video at
+          all was shown "CAMERA ON / MIC ACTIVE". That is the same class of false
+          success as the removed "HD 1080p" subtitle, so it goes too.
+
+          What remains is a real action: leaving the screen. */}
       <div className={styles.controlsRow}>
-        {/* Camera toggle */}
-        <div className={styles.controlItem}>
-          <button
-            type="button"
-            onClick={() => setCameraOn(!cameraOn)}
-            className={`${styles.controlBtn} ${cameraOn ? styles.controlBtnDefault : styles.controlBtnDanger}`}
-            aria-label={cameraOn ? 'Turn Camera Off' : 'Turn Camera On'}
-          >
-            <Icons.videocam />
-          </button>
-          <span className={styles.controlLabel}>{cameraOn ? 'Camera On' : 'Camera Off'}</span>
-        </div>
-
-        {/* Mic toggle */}
-        <div className={styles.controlItem}>
-          <button
-            type="button"
-            onClick={() => setMicOn(!micOn)}
-            className={`${styles.controlBtn} ${micOn ? styles.controlBtnPrimary : styles.controlBtnDefault}`}
-            aria-label={micOn ? 'Mute Microphone' : 'Unmute Microphone'}
-          >
-            <Icons.mic />
-          </button>
-          <span className={styles.controlLabel}>{micOn ? 'Mic Active' : 'Mic Muted'}</span>
-        </div>
-
-        {/* End / Return */}
         <div className={styles.controlItem}>
           <button
             type="button"
             onClick={() => navigate(-1)}
             className={`${styles.controlBtn} ${styles.controlBtnDanger}`}
-            aria-label="Exit Monitor"
+            aria-label="Exit monitoring"
           >
             <Icons.callEnd />
           </button>
@@ -424,13 +363,19 @@ export default function BabyMonitoringScreen() {
       {/* Phase 7 family surface, now reachable from the normal parent journey
           instead of being a standalone component. It is parent-only and is
           rendered only when a real (job, child) scope exists, because every
-          guardian/pause/DND endpoint is scoped per child. */}
-      {scope.jobId && scope.childId ? (
+          guardian/pause/DND endpoint is scoped per child.
+
+          PHASE 12: now also gated on role. Since the monitoring route was opened
+          to sitters, a sitter would otherwise reach this panel and provoke 403s
+          from the guardian/pause/DND endpoints, which are guardian-only by
+          design. A sitter's access to monitoring is the video and the cry
+          response, not family administration. */}
+      {role === 'parent' && scope.jobId && scope.childId ? (
         <Phase7FamilyPanel jobId={scope.jobId} childId={scope.childId} />
       ) : null}
 
       {/* Bottom Navigation */}
-      <ParentBottomNav />
+      {role === 'parent' ? <ParentBottomNav /> : <BabysitterBottomNav />}
     </div>
   );
 }

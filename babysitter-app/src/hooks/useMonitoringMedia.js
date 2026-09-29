@@ -124,7 +124,11 @@ export default function useMonitoringMedia(jobId, childId, enabled = true, refre
         });
       }
     }
-  }, [scopeKey, jobId, childId, refreshKey]);
+  // `scopeKey` already folds `refreshKey` in, so depending on scopeKey is
+  // sufficient; listing refreshKey again would be redundant (and ESLint is
+  // right to say so). Changing the session status changes scopeKey, which
+  // re-runs this effect and therefore re-requests the media state.
+  }, [scopeKey, jobId, childId]);
 
   useEffect(() => {
     // `load` is async, but React's set-state-in-effect rule is a static check:

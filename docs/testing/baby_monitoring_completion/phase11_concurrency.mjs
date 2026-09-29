@@ -19,9 +19,14 @@
 // here. The atomic claim in CryIncidentService targets that case, but this
 // script does NOT verify it.
 
-const BASE = 'https://localhost:44368/api';
+const BASE = `${process.env.LITTLECARE_TEST_API_BASE_URL || 'https://localhost:44368'}/api`;
 const JOB = 9001;
 const CHILD = 1;
+const testPassword = process.env.LITTLECARE_TEST_PASSWORD;
+if (!testPassword) {
+  console.error('Set LITTLECARE_TEST_PASSWORD to the development fixture account password before running this harness.');
+  process.exit(2);
+}
 
 let pass = 0, fail = 0;
 const check = (name, cond, detail = '') => {
@@ -49,10 +54,10 @@ async function login(path, body) {
 const scope = { jobId: JOB, childId: CHILD };
 
 console.log('=== PHASE 11 CONCURRENCY ===');
-const tOwner = await login('/parent/login', { username: 'usmantariq', password: '1234', role: 'Parent' });
-const tCo = await login('/parent/login', { username: 'hina', password: '1234', role: 'Parent' });
-const tBad = await login('/parent/login', { username: 'user5', password: '1234', role: 'Parent' });
-const tSit = await login('/babysitter/login', { username: 'sitter4', password: '1234', role: 'Sitter' });
+const tOwner = await login('/parent/login', { username: 'usmantariq', password: testPassword, role: 'Parent' });
+const tCo = await login('/parent/login', { username: 'hina', password: testPassword, role: 'Parent' });
+const tBad = await login('/parent/login', { username: 'user5', password: testPassword, role: 'Parent' });
+const tSit = await login('/babysitter/login', { username: 'sitter4', password: testPassword, role: 'Sitter' });
 console.log('logged in: owner, co-parent, unauthorised, sitter');
 
 console.log('\n--- A) 6 CONCURRENT session/start (owner x3, co-parent, sitter, unauthorised) ---');

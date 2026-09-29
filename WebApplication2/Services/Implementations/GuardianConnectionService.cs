@@ -518,6 +518,23 @@ namespace WebApplication2.Services.Implementations
         {
             RequireParentRole(currentUserId, currentRole);
 
+            var scope = ReadPauseRowForCaller(pauseId);
+            if (scope == null)
+                throw new KeyNotFoundException("Pause request not found.");
+
+            // Cry creation and escalation delivery use the same per-scope gate.
+            // Re-read and re-check the request only after entering it so the
+            // approval plus incident cancellation is ordered against those paths.
+            using (MonitoringScopeGate.Enter(scope.Job_ID, scope.Child_ID))
+            {
+                return ApprovePauseInScope(pauseId, currentUserId, currentRole);
+            }
+        }
+
+        private MonitoringPauseDto ApprovePauseInScope(int pauseId, int currentUserId, string currentRole)
+        {
+            RequireParentRole(currentUserId, currentRole);
+
             var nowUtc = DateTime.UtcNow;
             var row = ReadPauseRowForCaller(pauseId);
             if (row == null)

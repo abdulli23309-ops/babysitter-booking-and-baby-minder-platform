@@ -1,5 +1,44 @@
 $ProgressPreference='SilentlyContinue'
-. 'e:\Fyp Fazooliyaaat\e2e_lib.ps1'
+$script:apiBase = if ($env:LITTLECARE_TEST_API_BASE_URL) { $env:LITTLECARE_TEST_API_BASE_URL.TrimEnd('/') } else { 'https://localhost:44368' }
+$script:testPassword = $env:LITTLECARE_TEST_PASSWORD
+if ([string]::IsNullOrWhiteSpace($script:testPassword)) {
+  throw 'Set LITTLECARE_TEST_PASSWORD to the development fixture account password before running this harness.'
+}
+
+# This harness owns its HTTP helper. A missing response is status 0 and must
+# never be accepted as a passing authorization or discovery result.
+function Api($method, $path, $token, $body) {
+  $headers = @{}
+  if ($token) { $headers.Authorization = "Bearer $token" }
+  $request = @{
+    Method = $method
+    Uri = "$($script:apiBase)$path"
+    Headers = $headers
+    TimeoutSec = 15
+    UseBasicParsing = $true
+  }
+  if ($null -ne $body) {
+    $request.ContentType = 'application/json'
+    $request.Body = ConvertTo-Json -InputObject $body -Depth 8 -Compress
+  }
+  try {
+    $response = Invoke-WebRequest @request
+    $status = [int]$response.StatusCode
+    $content = $response.Content
+  } catch {
+    $response = $_.Exception.Response
+    if (-not $response) { return @{ Status = 0; Body = $null; Error = $_.Exception.GetType().Name } }
+    $status = [int]$response.StatusCode
+    $reader = New-Object System.IO.StreamReader($response.GetResponseStream())
+    try { $content = $reader.ReadToEnd() } finally { $reader.Dispose() }
+  }
+  $parsed = $null
+  if ($content) {
+    try { $parsed = ConvertFrom-Json -InputObject $content } catch { $parsed = $content }
+  }
+  return @{ Status = $status; Body = $parsed }
+}
+
 $JOB = 9001; $CHILD = 1
 $script:pass = 0; $script:fail = 0
 function Check($id, $desc, $cond, $detail) {
@@ -8,14 +47,22 @@ function Check($id, $desc, $cond, $detail) {
 }
 
 # Identities come from the server on login; the client never supplies an actor.
-$pA  = Api POST '/api/parent/login'    $null @{ Username='usmantariq'; Password='1234'; Role='Parent' }
-$pB  = Api POST '/api/parent/login'    $null @{ Username='hina';      Password='1234'; Role='Parent' }
-$pX  = Api POST '/api/parent/login'    $null @{ Username='user5';     Password='1234'; Role='Parent' }
-$st  = Api POST '/api/babysitter/login' $null @{ Username='sitter4';   Password='1234'; Role='Sitter' }
+$pA  = Api POST '/api/parent/login'    $null @{ Username='usmantariq'; Password=$script:testPassword; Role='Parent' }
+$pB  = Api POST '/api/parent/login'    $null @{ Username='hina';      Password=$script:testPassword; Role='Parent' }
+$pX  = Api POST '/api/parent/login'    $null @{ Username='user5';     Password=$script:testPassword; Role='Parent' }
+$st  = Api POST '/api/babysitter/login' $null @{ Username='sitter4';   Password=$script:testPassword; Role='Sitter' }
 $tA=$pA.Body.token; $tB=$pB.Body.token; $tX=$pX.Body.token; $tS=$st.Body.token
 Check 'E0' 'logins: parent/co-parent/unauthorized/sitter' `
   ($pA.Status -eq 200 -and $pB.Status -eq 200 -and $pX.Status -eq 200 -and $st.Status -eq 200) `
   "$($pA.Status)/$($pB.Status)/$($pX.Status)/$($st.Status)"
+
+# Do not continue with empty tokens or null responses. Several older checks
+# could pass vacuously when the API was unreachable (for example, null ids
+# compared equal, or an empty response was counted as a discovered scope).
+if ($pA.Status -ne 200 -or $pB.Status -ne 200 -or $pX.Status -ne 200 -or $st.Status -ne 200) {
+  Write-Host 'RUNTIME RESULT: BLOCKED (one or more login requests did not reach the API successfully)'
+  exit 2
+}
 
 # E1 parent starts monitoring
 $s = Api POST '/api/monitoring/session/start' $tA @{ jobId=$JOB; childId=$CHILD }
@@ -28,7 +75,8 @@ Check 'E2' 'Sitter can read the active session' ($ss.Status -eq 200 -and $ss.Bod
 # E22 no duplicate monitoring session (idempotent start)
 $s2 = Api POST '/api/monitoring/session/start' $tA @{ jobId=$JOB; childId=$CHILD }
 Check 'E22' 'Repeat start returns the SAME session (idempotent)' `
-  ($s2.Body.MonitorSessionId -eq $s.Body.MonitorSessionId) "first=$($s.Body.MonitorSessionId) second=$($s2.Body.MonitorSessionId)"
+  ($s.Status -eq 200 -and $s2.Status -eq 200 -and $s.Body.MonitorSessionId -gt 0 -and $s2.Body.MonitorSessionId -eq $s.Body.MonitorSessionId) `
+  "first=$($s.Body.MonitorSessionId) second=$($s2.Body.MonitorSessionId)"
 
 # E3 cry incident creation
 $c1 = Api POST '/api/monitoring/cry' $tS @{ jobId=$JOB; childId=$CHILD }
@@ -142,9 +190,9 @@ Check 'E18' 'Co-parent discovers scope via Guardian' `
 $scA = Api GET '/api/monitoring/accessible-scopes' $tA $null
 Check 'E18b' 'Owner parent discovers the scope' ($scA.Status -eq 200 -and @($scA.Body).Count -gt 0) "n=$(@($scA.Body).Count)"
 $scX = Api GET '/api/monitoring/accessible-scopes' $tX $null
-Check 'E17c' 'Unauthorized parent sees NO scope' (@($scX.Body).Count -eq 0) "n=$(@($scX.Body).Count)"
+Check 'E17c' 'Unauthorized parent sees NO scope' ($scX.Status -eq 200 -and @($scX.Body).Count -eq 0) "status=$($scX.Status) n=$(@($scX.Body).Count)"
 $scS = Api GET '/api/monitoring/accessible-scopes' $tS $null
-Check 'E2b' 'Sitter discovers the assigned scope' (@($scS.Body).Count -gt 0) "n=$(@($scS.Body).Count)"
+Check 'E2b' 'Sitter discovers the assigned scope' ($scS.Status -eq 200 -and @($scS.Body).Count -gt 0) "status=$($scS.Status) n=$(@($scS.Body).Count)"
 
 # E19/E20 media endpoint
 $mA = Api GET "/api/monitoring/media?jobId=$JOB&childId=$CHILD" $tA $null

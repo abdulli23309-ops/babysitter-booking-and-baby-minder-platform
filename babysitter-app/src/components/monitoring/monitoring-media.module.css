@@ -1,0 +1,177 @@
+/* ============================================================
+   MonitoringMediaPanel - styles.
+
+   Design intent: the video area must read as ONE calm surface. When a stream is
+   live it is dark (cameras look right on dark chrome) and carries a restrained
+   "Live" marker; when there is no stream the same frame becomes a light,
+   clearly NON-video surface with centred explanatory copy. The contrast between
+   those two presentations is what stops an empty panel from ever being mistaken
+   for a live one.
+
+   All colours, spacing and radii come from the shared tokens in
+   src/styles/tokens.css so this stays consistent with the rest of the app and no
+   one has to invent local values.
+   ============================================================ */
+
+/* --- Live state ---------------------------------------------------------- */
+.frame {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-sm);
+}
+
+.liveBar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  /* A short gradient keeps the marker legible over any camera image without
+     tinting the whole frame. */
+  background: linear-gradient(180deg, rgba(12, 16, 28, 0.62) 0%, rgba(12, 16, 28, 0) 100%);
+  color: #fff;
+}
+
+.liveDot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: #b8c0cc;
+}
+
+.liveDot[data-connected='true'] {
+  background: #77d6a0;
+  box-shadow: 0 0 0 3px rgba(119, 214, 160, 0.2);
+}
+
+.liveText {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.liveDivider {
+  width: 1px;
+  height: 12px;
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.liveMeta {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.player {
+  width: 100%;
+  height: 100%;
+}
+
+.frame[data-state='connecting'],
+.frame[data-state='lost'],
+.frame[data-state='error'] {
+  background: var(--color-media-canvas);
+}
+
+/* --- Honest empty state -------------------------------------------------- */
+/* `data-tone` is set by the component, so the copy and the colour can never
+   disagree: pending=amber, blocked=red, neutral=slate. */
+.frame[data-tone='neutral'] {
+  background: linear-gradient(180deg, var(--color-surface-alt) 0%, var(--color-surface) 100%);
+}
+.frame[data-tone='pending'] {
+  background: var(--color-warning-soft);
+  border-color: rgba(243, 156, 18, 0.28);
+}
+.frame[data-tone='blocked'] {
+  background: var(--color-danger-soft);
+  border-color: var(--color-danger-border);
+}
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  height: 100%;
+  padding: var(--space-5) var(--space-4);
+  text-align: center;
+}
+
+.emptyIcon {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: var(--radius-full);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  box-shadow: var(--shadow-sm);
+  margin-bottom: var(--space-1);
+}
+
+.frame[data-tone='pending'] .emptyIcon { color: var(--color-warning); }
+.frame[data-tone='blocked'] .emptyIcon { color: var(--color-danger); }
+
+.emptyTitle {
+  margin: 0;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+}
+
+.emptyBody {
+  margin: 0;
+  /* Capped so the explanatory text never pushes the layout on a 320px phone. */
+  max-width: 34ch;
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-normal);
+  color: var(--color-text-secondary);
+}
+
+.emptyNote {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin: var(--space-2) 0 0;
+  max-width: 40ch;
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-normal);
+  color: var(--color-text-muted);
+}
+
+.emptyNote svg { flex: none; }
+
+/* A single, slow rotation. Deliberately minimal: this is a status surface, not
+   an attention-grabbing animation. */
+.spin {
+  animation: mediaSpin 1.1s linear infinite;
+}
+
+@keyframes mediaSpin {
+  to { transform: rotate(360deg); }
+}
+
+/* Respect a user's reduced-motion preference. */
+@media (prefers-reduced-motion: reduce) {
+  .spin { animation: none; }
+}
+
+/* Short phones: drop to a wider aspect so the copy has room and the frame does
+   not dominate the viewport. */
+@media (max-width: 360px) {
+  .frame { aspect-ratio: 4 / 3; }
+  .empty { padding: var(--space-4) var(--space-3); }
+  .emptyNote { display: none; }
+}

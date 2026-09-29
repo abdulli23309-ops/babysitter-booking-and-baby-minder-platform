@@ -5,7 +5,8 @@
 // CONSTRAINTS:
 // - Database-Backed Opaque Tokens (GUIDs, NOT JWT).
 // - No client-side token decoding (treated purely as an opaque string).
-// - Stores 'userId', 'role', 'user', and 'token'.
+// - Stores identity/profile fields in localStorage and the bearer token in
+//   tab-scoped sessionStorage. Credential fields never enter the profile blob.
 
 export const SESSION_KEYS = {
   USER_ID: 'userId',
@@ -39,7 +40,12 @@ export function getUser() {
   const raw = localStorage.getItem(SESSION_KEYS.USER);
   if (!raw) return null;
   try {
-    return JSON.parse(raw);
+    const user = JSON.parse(raw);
+    const safeUser = withoutCredentials(user);
+    if (JSON.stringify(safeUser) !== JSON.stringify(user)) {
+      localStorage.setItem(SESSION_KEYS.USER, JSON.stringify(safeUser));
+    }
+    return safeUser;
   } catch {
     return null;
   }
@@ -47,7 +53,26 @@ export function getUser() {
 
 /** Read the opaque session token. Returns null when absent. */
 export function getToken() {
-  return localStorage.getItem(SESSION_KEYS.TOKEN);
+  const current = sessionStorage.getItem(SESSION_KEYS.TOKEN);
+  if (current) return current;
+
+  // Migrate and remove bearer tokens written by older app versions.
+  const legacy = localStorage.getItem(SESSION_KEYS.TOKEN);
+  if (legacy) {
+    sessionStorage.setItem(SESSION_KEYS.TOKEN, legacy);
+    localStorage.removeItem(SESSION_KEYS.TOKEN);
+  }
+  return legacy;
+}
+
+// Login responses carry the opaque bearer token beside profile data. Never
+// persist token-shaped fields as part of the user's display profile.
+function withoutCredentials(value) {
+  if (Array.isArray(value)) return value.map(withoutCredentials);
+  if (!value || typeof value !== 'object') return value;
+  return Object.fromEntries(Object.entries(value)
+    .filter(([key]) => !['token', 'sessiontoken', 'jwt', 'authorization'].includes(key.toLowerCase()))
+    .map(([key, item]) => [key, withoutCredentials(item)]));
 }
 
 /** True when an opaque token exists. */
@@ -75,7 +100,7 @@ export function setSession(data) {
 
   const userId = data.userId ?? data.UserId ?? data.id ?? data.sitterId;
   const role = data.role ?? data.Role;
-  const user = data.user ?? data;
+  const user = withoutCredentials(data.user ?? data);
   const token = data.token ?? data.Token ?? data.sessionToken ?? data.SessionToken;
   const expiresAt = data.expiresAt ?? data.ExpiresAt;
 
@@ -89,7 +114,8 @@ export function setSession(data) {
     localStorage.setItem(SESSION_KEYS.USER, JSON.stringify(user));
   }
   if (token !== undefined && token !== null) {
-    localStorage.setItem(SESSION_KEYS.TOKEN, String(token));
+    sessionStorage.setItem(SESSION_KEYS.TOKEN, String(token));
+    localStorage.removeItem(SESSION_KEYS.TOKEN);
   }
   if (expiresAt !== undefined && expiresAt !== null) {
     localStorage.setItem(SESSION_KEYS.EXPIRES_AT, String(expiresAt));
@@ -102,6 +128,7 @@ export function clearSession() {
   localStorage.removeItem(SESSION_KEYS.ROLE);
   localStorage.removeItem(SESSION_KEYS.USER);
   localStorage.removeItem(SESSION_KEYS.TOKEN);
+  sessionStorage.removeItem(SESSION_KEYS.TOKEN);
   localStorage.removeItem(SESSION_KEYS.EXPIRES_AT);
 }
 

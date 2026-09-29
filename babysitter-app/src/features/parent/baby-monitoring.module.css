@@ -53,33 +53,6 @@
 }
 
 /* Live Header Status Badge */
-.statusHeader {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  margin-bottom: var(--space-3, 12px);
-}
-
-.livePill {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  background: var(--color-surface, #ffffff);
-  border: 1px solid rgb(var(--danger-rgb) / 0.25);
-  border-radius: var(--radius-full, 9999px);
-  padding: 6px 16px;
-  box-shadow: 0 4px 14px rgb(var(--danger-rgb) / 0.08);
-}
-
-.liveBeacon {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: var(--color-danger);
-  animation: liveBeaconPulse 1.8s infinite ease-in-out;
-}
-
 @keyframes liveBeaconPulse {
   0% {
     transform: scale(0.95);
@@ -93,20 +66,6 @@
     transform: scale(0.95);
     box-shadow: 0 0 0 0 rgb(var(--danger-rgb) / 0);
   }
-}
-
-.liveTag {
-  font-size: var(--font-size-xs, 12px);
-  font-weight: var(--font-weight-extrabold, 800);
-  color: var(--color-danger);
-  letter-spacing: 1.2px;
-}
-
-.locationSubtitle {
-  margin: 0;
-  font-size: var(--font-size-xs, 12px);
-  color: var(--color-text-muted, #64748B);
-  font-weight: var(--font-weight-medium, 500);
 }
 
 /* 16:9 Glassmorphic Camera Feed Frame */
@@ -123,50 +82,6 @@
 }
 
 /* Environmental Overlays */
-.sensorOverlay {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  z-index: 10;
-}
-
-.sensorBadge {
-  background: rgb(var(--ink-rgb) / 0.65);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border: 1px solid rgb(var(--edge-rgb) / 0.18);
-  border-radius: var(--radius-full, 9999px);
-  padding: 4px 10px;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  color: var(--color-text-inverse);
-  font-size: 11px;
-  font-weight: 600;
-}
-
-.secureBadge {
-  position: absolute;
-  bottom: 10px;
-  right: 10px;
-  background: rgb(var(--ink-rgb) / 0.65);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border: 1px solid rgb(var(--edge-rgb) / 0.18);
-  border-radius: var(--radius-full, 9999px);
-  padding: 4px 10px;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  color: var(--color-text-inverse);
-  font-size: 11px;
-  font-weight: 600;
-  z-index: 10;
-}
-
 /* Hardware Controls Row */
 .controlsRow {
   display: flex;
@@ -289,42 +204,6 @@
   font-weight: var(--font-weight-bold, 700);
 }
 
-/* Contained Jitsi Call Shell */
-.meetingContainer {
-  width: 100%;
-  max-width: var(--shell-max-width, 480px);
-  margin: 0 auto;
-  min-height: 100vh;
-  position: relative;
-  background: var(--color-media-canvas);
-  display: flex;
-  flex-direction: column;
-}
-
-.leaveMeetingFloatingBtn {
-  position: absolute;
-  bottom: 24px;
-  right: 20px;
-  z-index: 1000;
-  padding: 12px 24px;
-  border-radius: var(--radius-full, 9999px);
-  background: var(--color-danger);
-  color: var(--color-text-inverse);
-  border: none;
-  font-size: var(--font-size-sm, 14px);
-  font-weight: var(--font-weight-bold, 700);
-  cursor: pointer;
-  box-shadow: 0 6px 20px rgb(var(--danger-rgb) / 0.4);
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  transition: transform var(--transition-fast, 150ms ease);
-}
-
-.leaveMeetingFloatingBtn:hover {
-  transform: translateY(-2px);
-}
-
 /* =====================================================================
    PHASE 8 - monitoring status / controls added to this screen.
    Appended (existing rules above untouched) and built only from the existing
@@ -354,17 +233,6 @@
   overflow-wrap: anywhere;
 }
 
-.mediaNote {
-  margin: 0 0 12px;
-  padding: 10px 12px;
-  border-radius: 10px;
-  background: var(--color-warning-tint, #fef3c7);
-  border: 1px solid var(--color-warning-border, #fde68a);
-  color: var(--color-text, #111);
-  font-size: 0.82rem;
-  overflow-wrap: anywhere;
-}
-
 .startMonitorBtn {
   width: 100%;
   min-height: 48px;
@@ -389,3 +257,59 @@
 }
 
 
+
+/* =====================================================================
+   PHASE 12 - child identity header.
+
+   Replaces the old "LIVE" pill + "Nursery - HD 1080p" subtitle. A parent
+   opening this screen first needs to confirm they are looking at the right
+   child, so the header states exactly that and nothing else. All media truth
+   lives in MonitoringMediaPanel, which renders it once and consistently.
+   ===================================================================== */
+.childHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.childAvatar {
+  display: grid;
+  place-items: center;
+  /* 44px satisfies the 44x44 minimum touch-target guidance even though this
+     element is decorative and not interactive. */
+  width: 44px;
+  height: 44px;
+  flex: none;
+  border-radius: var(--radius-full);
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  line-height: 1;
+}
+
+.childHeaderText {
+  display: flex;
+  flex-direction: column;
+  /* gap 2px keeps the label tight under the name without extra margins. */
+  gap: 2px;
+  min-width: 0;
+}
+
+.childHeaderLabel {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.childHeaderName {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-tight);
+  color: var(--color-text);
+  /* A long child name must wrap rather than push the layout sideways. */
+  overflow-wrap: anywhere;
+}

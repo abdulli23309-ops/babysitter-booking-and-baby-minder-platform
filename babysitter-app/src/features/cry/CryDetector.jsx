@@ -257,7 +257,19 @@ export default function CryDetector() {
         setStatusText('Cry reported. The sitter has been alerted.');
         addLog('Cry incident created; escalation is now server-controlled');
       }
-    } catch {
+    } catch (err) {
+      // Phase 12: the server refuses a cry claim while a parent pause is active
+      // and answers 409 with { error: 'paused' }. That is a normal, expected
+      // state - not a failure - so the detector must say so plainly instead of
+      // claiming the network is broken. This keeps Phone 2 honest during the
+      // 150-second window without touching the frozen business rule.
+      const code = err?.response?.status ?? err?.status;
+      if (code === 409) {
+        setStatusText('Cry detection is paused by a parent right now.');
+        addLog('Cry not reported: a parent pause is active');
+        // Keep listening: detection resumes automatically when the pause expires.
+        return;
+      }
       setStatusText('Could not reach the server to report the cry.');
       addLog('Network error dispatching cry alert');
     }
