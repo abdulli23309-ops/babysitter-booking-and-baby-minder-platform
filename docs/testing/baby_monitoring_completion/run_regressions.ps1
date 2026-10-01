@@ -17,10 +17,19 @@ function New-HarnessConfig($work, $exe, $templatePath) {
     $cfg = Get-Content $templatePath -Raw
     $cfg = $cfg.Replace('&lt;YOUR-SERVER&gt;', $server).Replace('<YOUR-SERVER>', $server)
     # The ops-sweep assertions drive the controller in-process and need this key.
-    $cfg = $cfg.Replace('<connectionStrings>', "  <appSettings>
+    if ($cfg -match '<appSettings>') {
+      if ($cfg -notmatch 'key="MonitoringOpsSweepKey"') {
+        $cfg = $cfg.Replace('</appSettings>', "    <add key=`"MonitoringOpsSweepKey`" value=`"harness-ops-key`" />`n  </appSettings>")
+      }
+    } else {
+      $harnessSettings = @'
+  <appSettings>
     <add key="MonitoringOpsSweepKey" value="harness-ops-key" />
   </appSettings>
-  <connectionStrings>")
+  <connectionStrings>
+'@
+      $cfg = $cfg.Replace('<connectionStrings>', $harnessSettings)
+    }
   } else {
     $cfg = "<?xml version=`"1.0`" encoding=`"utf-8`"?>`n<configuration>`n  <connectionStrings>`n    $connEntry`n  </connectionStrings>`n  $provider`n</configuration>"
   }
