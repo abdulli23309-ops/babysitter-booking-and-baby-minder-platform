@@ -274,7 +274,7 @@ namespace WebApplication2.Controllers
             int parentId = ClaimsPrincipalHelper.GetUserId();
             var row = _db.Database.SqlQuery<ParentSessionRow>(
                 @"SELECT TOP 1 s.IndependentMonitoringSession_ID SessionId,s.Child_ID ChildId,c.ChildName,s.Status,s.StartedAtUtc,s.LastDeviceSeenAtUtc,
-                    CASE WHEN EXISTS(SELECT 1 FROM dbo.MonitoringDeviceSession d WHERE d.IndependentMonitoringSession_ID=s.IndependentMonitoringSession_ID AND d.RevokedAtUtc IS NULL AND d.ExpiresAtUtc>GETUTCDATE()) THEN 1 ELSE 0 END DeviceAuthorized
+                    CAST(CASE WHEN EXISTS(SELECT 1 FROM dbo.MonitoringDeviceSession d WHERE d.IndependentMonitoringSession_ID=s.IndependentMonitoringSession_ID AND d.RevokedAtUtc IS NULL AND d.ExpiresAtUtc>GETUTCDATE()) THEN 1 ELSE 0 END AS bit) DeviceAuthorized
                     ,CASE WHEN s.Status='Active' AND s.LastDeviceSeenAtUtc>=DATEADD(SECOND,-45,GETUTCDATE()) THEN CAST(1 AS bit) ELSE CAST(0 AS bit) END DeviceConnected
                   FROM dbo.IndependentMonitoringSession s
                   JOIN dbo.Child c ON c.Child_ID=s.Child_ID AND c.IsDeleted=0
