@@ -26,6 +26,7 @@
 // SitterPausedBanner was built in Phase 7 and is intentionally MOUNTED here
 // (rather than duplicated) so the sitter sees the pause through the normal
 // active-job journey.
+import { useState } from 'react';
 import SitterPausedBanner from '../../features/babysitter/SitterPausedBanner.jsx';
 import styles from './sitter-monitoring.module.css';
 
@@ -44,6 +45,7 @@ export default function SitterMonitoringPanel({
   busy = false,
   canRespond = true,
 }) {
+  const [dismissedConnectionKey, setDismissedConnectionKey] = useState('');
   const sessionActive = session?.Status === 'Active';
   const urgent = isActiveIncident(incident);
   // `!offline` is deliberate and easy to misread. `offline` means WE cannot reach
@@ -54,6 +56,12 @@ export default function SitterMonitoringPanel({
   const connectionLost = sessionActive && !offline
     && (session.ParentConnection === 'Lost' || session.SitterConnection === 'Lost');
 
+  const connectionKey = [
+    session?.MonitorSession_ID ?? '',
+    session?.ParentConnection === 'Lost' ? session.ParentHeartbeatUtc ?? '' : '',
+    session?.SitterConnection === 'Lost' ? session.SitterHeartbeatUtc ?? '' : '',
+  ].join('|');
+
   return (
     <section className={styles.panel} aria-label="Child monitoring">
       {/* Pause is a PARENT action. The sitter only ever sees the resulting
@@ -61,15 +69,26 @@ export default function SitterMonitoringPanel({
           sitter pause endpoint, and this component exposes no pause controls. */}
       <SitterPausedBanner session={session} />
 
-      {connectionLost ? (
+      {connectionLost && dismissedConnectionKey !== connectionKey ? (
         <div role="alert" className={styles.warnBox}>
-          <strong>Child Monitoring Connection Lost</strong>
-          <p>
-            We cannot currently confirm the connection to the monitoring session. The
-            session is still active on our side - this does not mean monitoring has
-            stopped, and it does not confirm the child&apos;s status. It will
-            reconnect automatically once the connection returns.
-          </p>
+          <div className={styles.warnContent}>
+            <span className={styles.warnDot} aria-hidden="true" />
+            <div>
+              <strong>Child monitoring connection lost</strong>
+              <p>
+                The session remains active. We cannot currently confirm the monitoring
+                connection; status will update automatically when it returns.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            className={styles.dismissWarning}
+            aria-label="Dismiss connection warning"
+            onClick={() => setDismissedConnectionKey(connectionKey)}
+          >
+            ×
+          </button>
         </div>
       ) : null}
 

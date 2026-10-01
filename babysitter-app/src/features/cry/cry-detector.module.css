@@ -11,6 +11,16 @@
   transition: background var(--transition-base);
 }
 
+.embeddedDetector {
+  min-height: auto;
+  max-width: none;
+  padding: var(--space-4) 0 0;
+}
+
+.embeddedDetector .topBar {
+  display: none;
+}
+
 .cryContainerAlarmed {
   background: var(--color-danger-tint);
   animation: alarmPulse 1.6s ease-in-out infinite alternate;

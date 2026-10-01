@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import BabysitterBottomNav from '../../components/layout/BabysitterBottomNav';
-import BackButton from '../../components/ui/BackButton';
 import EmptyState from '../../components/ui/EmptyState';
 import Button from '../../components/ui/Button';
 import CopyButton from '../../components/ui/CopyButton';
@@ -12,8 +11,8 @@ import SitterMonitoringPanel from '../../components/monitoring/SitterMonitoringP
 import useMonitoring from '../../hooks/useMonitoring';
 import { API } from '../../services/api';
 import { useToast } from '../../components/ui/ToastContext';
-
-const orange = 'var(--color-primary)';
+import { formatLocalDate } from '../../utils/dateUtils';
+import styles from '../parent/live-session.module.css';
 
 const Icons = {
   chevronBack: () => (
@@ -90,6 +89,11 @@ export default function ActiveJobDetails() {
   // order changes between renders (react-hooks/rules-of-hooks).
   const children = job.Children ?? job.children ?? [];
   const monitoredChild = children[monitorChildIndex] ?? null;
+
+  // The children are fixed by the BOOKING (JobChildren) and are only ever
+  // REPORTED by this screen. Which child the monitoring phone watches is a
+  // monitoring decision, so that choice lives inside the "Child monitoring"
+  // block below - not in the general session area.
 
   const monitoring = useMonitoring({
     jobId: numericJobId,
@@ -263,7 +267,7 @@ export default function ActiveJobDetails() {
     dotColor = { background: '#DC2626' };
     timerCaption = 'Session exceeded scheduled time';
     exceededBanner = (
-      <div style={{ background: '#DC2626', color: '#fff', padding: '10px 16px', borderRadius: 8, marginTop: 12, fontSize: 13, fontWeight: 500, lineHeight: 1.4 }}>
+      <div className={styles.exceededBanner}>
         ⚠ This session is running past its scheduled time. Please end the session as soon as possible.
       </div>
     );
@@ -316,12 +320,24 @@ export default function ActiveJobDetails() {
     );
   }
 
-  // Multi-child fix: the single-child chip is misleading when there are 2+
-  // children (it only ever showed the first one) — hide it in that case; the
-  // "Caring for N children" line below already lists everyone.
+  // Multi-child: the single-child chip is misleading when there are 2+
+  // children (it only ever showed the first one), so with several children the
+  // dedicated "Children in this session" list above is the one place that names
+  // them.
   const childCount = (job.Children ?? job.children ?? []).length;
   const showPrimaryChip = childCount <= 1;
   const childAge = job.ChildAge ?? (job.Child_DOB ? calculateAge(job.Child_DOB) : '?');
+
+  // Session date + booked window. Both come from the job the API already
+  // returned (no extra request) and are the SAME two facts the parent's
+  // active-session screen shows, so both roles read the session identically.
+  const careSlotTimes = Array.isArray(job.SlotTimes) ? job.SlotTimes : [];
+  const careTimeRange = careSlotTimes.length > 0
+    ? `${String(careSlotTimes[0].StartTime || '').slice(0, 5)} - ${String(careSlotTimes[careSlotTimes.length - 1].EndTime || '').slice(0, 5)}`
+    : ((job.StartTime || job.EndTime)
+      ? `${String(job.StartTime || '').slice(0, 5)} - ${String(job.EndTime || '').slice(0, 5)}`
+      : 'Full session');
+  const sessionDateLabel = job.JobDate ? formatLocalDate(job.JobDate) : 'Date unavailable';
 
   // ==================================================================
   // PHASE 8 - child monitoring for the assigned sitter
@@ -330,65 +346,78 @@ export default function ActiveJobDetails() {
   // ABOVE the early returns in this component (see the top of the file) so the
   // hook order never changes between renders.
   return (
-    <div style={{
-      minHeight: '100vh',
-      maxWidth: 'var(--shell-max-width, 480px)',
-      margin: '0 auto',
-      background: 'var(--gradient-pastel-soft)',
-      paddingBottom: '100px',
-      boxSizing: 'border-box',
-    }}>
-      <div style={{ padding: '24px 16px 100px' }}>
+    <div className={styles.sessionContainer}>
+      <main className={styles.sessionContent}>
         {/* Top Header */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: '12px',
-          marginBottom: '16px',
-        }}>
-          <BackButton onClick={() => navigate('/babysitter-my-jobs')} />
-          <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: 'var(--color-text)' }}>
-            Active Session
-          </h2>
-          <div style={{ width: '42px' }} />
+        <div className={styles.topActions}>
+          <button
+            type="button"
+            onClick={() => navigate('/babysitter-my-jobs')}
+            className={styles.backBtn}
+            aria-label="Back"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M15 18l-6-6 6-6" />
+            </svg>
+          </button>
+          <h1 className={styles.screenTitle}>Active Session</h1>
+          <div className={styles.headerSpacer} />
         </div>
+
+        {/* ── Children in this session (READ-ONLY) ──
+            The booking already established who is being cared for
+            (JobChildren), so the general active-session area only REPORTS the
+            children. It never asks the sitter to choose one. With a single
+            child the existing "Caring for ..." line above already says it, so
+            this list is rendered only when there is more than one - exactly the
+            case where the old "Child to monitor" dropdown used to appear. */}
+        {childCount > 1 ? (
+          <div className={styles.sessionChildrenCard}>
+            <p className={styles.sessionChildrenLabel}>
+              Children in this session ({childCount})
+            </p>
+            <ul className={styles.sessionChildrenList}>
+              {children.map((c, i) => (
+                <li key={c.Child_ID ?? i} className={styles.sessionChildRow}>
+                  <span aria-hidden="true">👶</span>
+                  <span>{c.ChildName ?? `Child ${c.Child_ID}`}</span>
+                  {c.ChildAge != null ? (
+                    <span className={styles.sessionChildAge}>
+                      · {c.ChildAge}y
+                    </span>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
 
         {/* ==================================================================
             PHASE 8 - child monitoring, reachable from the normal sitter flow.
             Shows: the parent-approved pause banner, connection-loss warning, and
             the cry alert with the three sitter responses. The sitter has NO
             pause/guardian/DND controls here by design - a pause is a parent
-            action, and the sitter only ever sees its effect. */}
-        {children.length > 0 ? (
-          <div style={{ marginBottom: '16px' }}>
-            {children.length > 1 ? (
-              <label
-                htmlFor="monitor-child-select"
-                style={{
-                  display: 'block',
-                  marginBottom: '10px',
-                  fontSize: '13px',
-                  fontWeight: '600',
-                  color: 'var(--color-text)',
-                }}
-              >
-                Child to monitor
+            action, and the sitter only ever sees its effect.
+
+            The monitoring-scope chooser lives INSIDE this block, not in the
+            general session area above: monitoring is scoped PER CHILD
+            (Phase 2), so which child the monitoring phone watches is a
+            monitoring setting rather than a property of the booking. Choosing
+            here grants nothing - MonitoringAccess still decides on the server
+            whether this sitter may monitor that child. */}
+        {childCount > 0 ? (
+          <section className={styles.monitoringSection}>
+            <h3 className={styles.sectionHeading}>
+              Child monitoring
+            </h3>
+            {childCount > 1 ? (
+              <label htmlFor="monitor-child-select">
+                Which child is the monitoring phone watching?
                 <select
                   id="monitor-child-select"
                   value={String(monitorChildIndex)}
                   onChange={(e) => setMonitorChildIndex(Number(e.target.value))}
-                  style={{
-                    display: 'block',
-                    width: '100%',
-                    minHeight: '44px',
-                    marginTop: '6px',
-                    padding: '8px 10px',
-                    borderRadius: '10px',
-                    border: '1px solid var(--color-border-subtle)',
-                    background: 'var(--color-surface)',
-                    color: 'var(--color-text)',
-                  }}
+                  className={styles.monitorSelect}
                 >
                   {children.map((c, i) => (
                     <option key={c.Child_ID} value={String(i)}>
@@ -432,48 +461,27 @@ export default function ActiveJobDetails() {
             />
 
             {monitoring.error ? (
-              <p role="alert" style={{ color: 'var(--color-danger)', fontSize: '13px', fontWeight: 600 }}>
+              <p role="alert" className={styles.monitorError}>
                 {monitoring.error}
               </p>
             ) : null}
-          </div>
+          </section>
         ) : null}
 
         {/* ── Job Reference + Copy / Last Updated ── */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: '10px',
-            padding: '10px 14px',
-            borderRadius: '14px',
-            background: 'var(--color-surface)',
-            border: '1px solid var(--color-border-subtle)',
-            marginBottom: '16px',
-          }}
-        >
+        <div className={styles.jobReference}>
           <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-text-secondary)' }}>
             Job Reference: <strong style={{ color: 'var(--color-text)' }}>#{job.Job_ID ?? '—'}</strong>
           </span>
           <CopyButton value={String(job.Job_ID ?? '')} label="Copy Job Reference" />
         </div>
-        <p style={{ margin: '0 0 12px', fontSize: '11px', color: 'var(--color-text-faint)' }}>
+        <p className={styles.lastUpdated}>
           Last updated: {new Date().toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}
         </p>
 
         {/* ── Parent Card ── */}
-        <div style={{
-          background: 'var(--color-surface)',
-          borderRadius: '22px',
-          padding: '16px 18px',
-          boxShadow: '0 6px 20px rgb(var(--shadow-ink-rgb) / 0.07)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '14px',
-          marginBottom: '28px',
-        }}>
-          <div style={{ position: 'relative', flexShrink: 0 }}>
+        <div className={styles.caregiverCard}>
+          <div className={styles.avatarWrapper}>
             <UserAvatar
               src={job.ParentPic}
               name={job.ParentName || 'Parent'}
@@ -481,201 +489,105 @@ export default function ActiveJobDetails() {
               type="Parents"
               alt="parent"
             />
-            <div style={{
-              position: 'absolute',
-              bottom: '2px',
-              right: '2px',
-              width: '18px',
-              height: '18px',
-              background: 'var(--color-success)',
-              borderRadius: '50%',
-              border: '2px solid var(--glass-border)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}>
-              <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="var(--color-text-inverse)" strokeWidth="1.8">
-                <path d="M2 5l2 2.5L8 3" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </div>
           </div>
 
-          <div>
-            <p style={{ margin: '0 0 2px', fontWeight: '700', fontSize: '16px', color: 'var(--color-text)' }}>
+          <div className={styles.caregiverDetails}>
+            <p className={styles.caregiverName}>
               {job.ParentName || 'Parent'}
             </p>
-            <p style={{ margin: '0 0 8px', fontSize: '12px', color: 'var(--color-text-muted)' }}>
+            <p className={styles.caregiverId}>
               ID: PK-{String(job.Job_ID).padStart(5, '0')}
             </p>
             {showPrimaryChip && (
-              <div style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '5px',
-                background: 'var(--color-primary-tint-soft)',
-                borderRadius: '20px',
-                padding: '4px 10px',
-              }}>
+              <div className={styles.childPill}>
                 <span style={{ fontSize: '14px' }}>☺</span>
-                <span style={{ fontSize: '12px', fontWeight: '600', color: orange }}>
+                <span>
                   {job.ChildName || 'Child'} ({childAge}y)
                 </span>
               </div>
             )}
-            <p style={{
-                marginTop: showPrimaryChip ? 6 : 10,
-                fontSize: showPrimaryChip ? 13 : 14,
-                fontWeight: showPrimaryChip ? 400 : 700,
-                color: showPrimaryChip ? 'var(--color-text-muted)' : 'var(--color-primary)',
-                background: showPrimaryChip ? 'transparent' : 'var(--color-primary-tint-soft)',
-                padding: showPrimaryChip ? 0 : '6px 10px',
-                borderRadius: showPrimaryChip ? 0 : 10,
-                display: 'inline-block',
-              }}>
-              {formatChildren(job)}
-            </p>
+            {showPrimaryChip && formatChildren(job) ? (
+              <p className={styles.profileChildren}>
+                {formatChildren(job)}
+              </p>
+            ) : null}
           </div>
         </div>
 
         {/* ── Live Duration Timer ── */}
-        <div style={{
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          marginBottom: '28px',
-          position: 'relative',
-        }}>
-          <div style={{
-            position: 'absolute',
-            width: '290px',
-            height: '290px',
-            borderRadius: '50%',
-            border: '1.5px solid rgba(180,180,200,0.30)',
-            pointerEvents: 'none',
-          }} />
-
-          <div style={{
-            width: '250px',
-            height: '250px',
-            borderRadius: '50%',
-            background: 'var(--color-surface)',
-            boxShadow: '0 8px 32px rgb(var(--shadow-ink-rgb) / 0.08)',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            position: 'relative',
-            zIndex: 1,
-          }}>
-            <p style={{
-              margin: '0 0 8px',
-              fontSize: '11px',
-              fontWeight: '700',
-              color: orange,
-              letterSpacing: '1.5px',
-              textTransform: 'uppercase',
-            }}>
-              Live Duration
-            </p>
-
-            <h1 style={{
-              margin: '0 0 12px',
-              fontSize: '36px',
-              fontWeight: '800',
-              color: 'var(--color-text)',
-              letterSpacing: '1px',
-              fontVariantNumeric: 'tabular-nums',
-              fontFamily: 'monospace',
-              lineHeight: 1,
-              ...timerColor,
-            }}>
+        <div className={styles.durationSection}>
+          <div className={styles.ringOuter} />
+          <div className={styles.ringInner} />
+          <div className={styles.timerDisc}>
+            <span className={styles.timerLabel}>Session · Live Duration</span>
+            <h1 className={styles.timerDigits} style={timerColor}>
               {timerDisplay}
             </h1>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <div style={{
-                width: '8px',
-                height: '8px',
-                borderRadius: '50%',
-                background: dotColor?.background ?? (sessionStart ? 'var(--color-success)' : 'var(--color-text-faint)'),
-                boxShadow: '0 0 0 3px rgb(var(--success-rgb) / 0.2)',
-                flexShrink: 0,
-              }} />
-              <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
-                {timerCaption}
-              </span>
+            <div className={styles.startedStatus}>
+              <span className={styles.pulsingDot} style={dotColor} />
+              <span>{timerCaption}</span>
             </div>
           </div>
         </div>
         {exceededBanner}
 
         {/* ── Info Card ── */}
-        <div style={{
-          background: 'var(--color-surface)',
-          borderRadius: '22px',
-          padding: '6px 18px',
-          boxShadow: '0 6px 20px rgb(var(--shadow-ink-rgb) / 0.07)',
-        }}>
+        <div className={styles.infoCard}>
+          {/* Session row — the date and booked window. These are the SAME facts
+              the parent's active-session screen shows, so both roles describe
+              the session identically. */}
+          <div className={styles.infoRow}>
+            <div className={styles.iconCircleCalendar}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                <line x1="16" y1="2" x2="16" y2="6" />
+                <line x1="8" y1="2" x2="8" y2="6" />
+                <line x1="3" y1="10" x2="21" y2="10" />
+              </svg>
+            </div>
+            <div className={styles.infoTextCol}>
+              <p className={styles.infoLabel}>
+                Session
+              </p>
+              <p className={styles.infoValue}>
+                {sessionDateLabel} · {careTimeRange}
+              </p>
+            </div>
+          </div>
+
           {/* Location row */}
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '14px',
-            padding: '16px 0',
-            borderBottom: '1px solid var(--color-surface-sunken)',
-          }}>
-            <div style={{
-              width: '40px',
-              height: '40px',
-              borderRadius: '12px',
-              background: 'var(--color-info-tint)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0,
-            }}>
+          <hr className={styles.cardDivider} />
+          <div className={styles.infoRow}>
+            <div className={styles.iconCircleLocation}>
               <Icons.locationOutline />
             </div>
-            <div>
-              <p style={{ margin: '0 0 2px', fontSize: '11px', color: 'var(--color-text-faint)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            <div className={styles.infoTextCol}>
+              <p className={styles.infoLabel}>
                 Location
               </p>
-              <p style={{ margin: 0, fontWeight: '600', fontSize: '15px', color: 'var(--color-text)' }}>
+              <p className={styles.infoValue}>
                 {job.City || 'N/A'}
               </p>
             </div>
           </div>
 
           {/* Payment row */}
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '14px',
-            padding: '16px 0',
-          }}>
-            <div style={{
-              width: '40px',
-              height: '40px',
-              borderRadius: '12px',
-              background: 'var(--badge-success-bg)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0,
-            }}>
+          <hr className={styles.cardDivider} />
+          <div className={styles.infoRow}>
+            <div className={styles.iconCirclePayment}>
               <Icons.cashOutline />
             </div>
-            <div>
-              <p style={{ margin: '0 0 2px', fontSize: '11px', color: 'var(--color-text-faint)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            <div className={styles.infoTextCol}>
+              <p className={styles.infoLabel}>
                 SESSION TOTAL
               </p>
-              <p style={{ margin: 0, fontWeight: '600', fontSize: '15px', color: 'var(--color-text)' }}>
+              <p className={styles.infoValue}>
                 PKR {Number(job.Payment ?? 0).toLocaleString()}
               </p>
             </div>
           </div>
         </div>
-      </div>
+      </main>
 
       <BabysitterBottomNav />
     </div>

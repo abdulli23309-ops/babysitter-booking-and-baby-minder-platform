@@ -106,15 +106,14 @@ export default function MonitoringMediaPanel({ status, media, canPublish, reason
     // handed a publish control.
     startWithAudioMuted: !canPublish,
     startWithVideoMuted: !canPublish,
+    prejoinPageEnabled: false,
     disableDeepLinking: true,
   }), [canPublish]);
   const interfaceConfigOverwrite = useMemo(() => ({
     SHOW_JITSI_WATERMARK: false,
     SHOW_WATERMARK_FOR_GUESTS: false,
-    TOOLBAR_BUTTONS: canPublish
-      ? ['microphone', 'camera', 'fullscreen', 'hangup']
-      : ['fullscreen', 'hangup'],
-  }), [canPublish]);
+    TOOLBAR_BUTTONS: [],
+  }), []);
   const bindConferenceEvents = useCallback((api) => {
     if (!api) return;
     const update = (nextStatus) => setConference({ scopeKey, status: nextStatus });

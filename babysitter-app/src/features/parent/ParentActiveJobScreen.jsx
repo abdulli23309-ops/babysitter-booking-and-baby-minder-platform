@@ -6,6 +6,9 @@ import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import { useToast } from '../../components/ui/ToastContext';
 import { getAvatarUrl } from '../../utils/imageUtils';
 import { API } from '../../services/api';
+import useMonitoring from '../../hooks/useMonitoring';
+import MonitoringStatusBar from '../../components/monitoring/MonitoringStatusBar';
+import { formatLocalDate } from '../../utils/dateUtils';
 import ParentBottomNav from '../../components/layout/ParentBottomNav';
 import styles from './live-session.module.css';
 const formatChildren = (job) => {
@@ -76,6 +79,33 @@ export default function ParentActiveJobScreen() {
     const t = setInterval(() => setTick(Date.now()), 1000);
     return () => clearInterval(t);
   }, [job?.Status, job?.SessionStartedAt]);
+
+  // ==================================================================
+  // Children are fixed by the BOOKING (JobChildren)
+  // ------------------------------------------------------------------
+  // This screen only ever REPORTS them. The parent is never asked to re-select
+  // which child the sitter is caring for, and monitoring scope is chosen inside
+  // the monitoring flow, never here.
+  //
+  // These declarations and the hook below MUST stay above every early return,
+  // otherwise the hook order changes between renders
+  // (react-hooks/rules-of-hooks).
+  const sessionChildren = job?.Children ?? job?.children ?? [];
+  const monitorChildId = sessionChildren[0]?.Child_ID ?? null;
+  const monitorChildName = sessionChildren[0]?.ChildName ?? job?.ChildName ?? null;
+
+  // CHILD MONITORING is a SEPARATE fact from the babysitting session: the
+  // session stays In Progress while the monitoring connection can be Lost,
+  // paused, or not started at all. This shared hook reads it from the server, so
+  // the two states can be shown apart instead of the parent having to leave the
+  // session screen to find out. autoStart is deliberately OFF: this screen never
+  // creates a monitoring session, it only reports the one the monitoring flow
+  // owns.
+  const monitoring = useMonitoring({
+    jobId: numericJobId,
+    childId: monitorChildId,
+    role: 'parent',
+  });
 
   const handleEndSession = async (jobId) => {
     setEnding(true);
@@ -152,7 +182,7 @@ export default function ParentActiveJobScreen() {
     dotColor = { background: '#DC2626' };
     timerCaption = 'Session exceeded scheduled time';
     exceededBanner = (
-      <div style={{ background: '#DC2626', color: '#fff', padding: '10px 16px', borderRadius: 8, marginTop: 12, fontSize: 13, fontWeight: 500, lineHeight: 1.4 }}>
+      <div className={styles.exceededBanner}>
         ⚠ This session is running past its scheduled time. Please end the session as soon as possible.
       </div>
     );
@@ -203,28 +233,37 @@ export default function ParentActiveJobScreen() {
   const sitterName = job.SitterName || 'Caregiver';
   const childName = job.ChildName || 'Child';
   const childAge = job.ChildAge;
-  // Multi-child: hide the single-child chip when 2+ children are booked,
-  // and let the formatChildren line below take over, highlighted.
-  const childCount = (job.Children ?? job.children ?? []).length;
+  // Multi-child: with 2+ children a single-child chip would only ever name the
+  // first one, so the dedicated "Children in this session" list below is the one
+  // place that names them all.
+  const childCount = sessionChildren.length;
   const showPrimaryChip = childCount <= 1;
   const locationName = job.City || 'Location unavailable';
   const sitterIdText = job.SitterCode || `ID: PK-${String(job.Job_ID ?? 0).padStart(5, '0')}`;
 
+  // Session date + booked window: the same two facts the sitter's
+  // active-session screen shows, taken from the job the API already returned.
+  const careSlotTimes = Array.isArray(job.SlotTimes) ? job.SlotTimes : [];
+  const careTimeRange = careSlotTimes.length > 0
+    ? `${String(careSlotTimes[0].StartTime || '').slice(0, 5)} - ${String(careSlotTimes[careSlotTimes.length - 1].EndTime || '').slice(0, 5)}`
+    : ((job.StartTime || job.EndTime)
+      ? `${String(job.StartTime || '').slice(0, 5)} - ${String(job.EndTime || '').slice(0, 5)}`
+      : 'Full session');
+  const sessionDateLabel = job.JobDate ? formatLocalDate(job.JobDate) : 'Date unavailable';
+
   const resolvedAvatar = getAvatarUrl(job.SitterPicture, 'Sitters');
 
-  // Phase 8: monitoring is scoped per child, so the entry point needs the real
-  // Child_ID. It comes from the job's own child list - never from a URL or a
-  // guess. With several children the first is offered; the monitoring screen
-  // itself can switch child.
-  const monitorChildId = (job.Children ?? job.children ?? [])[0]?.Child_ID ?? null;
-
+  // Phase 8: the monitoring entry point needs the real Child_ID. It comes from
+  // the job's own child list (resolved above, before the early returns) - never
+  // from a URL or a guess. With several children the first is offered; the
+  // monitoring flow itself owns any per-child choice.
   const openMonitoring = () => {
     if (!monitorChildId) return;
     navigate('/baby-monitoring', {
       state: {
         jobId: job.Job_ID ?? job.jobId,
         childId: monitorChildId,
-        childName: (job.Children ?? job.children ?? [])[0]?.ChildName ?? childName,
+        childName: monitorChildName ?? childName,
       },
     });
   };
@@ -279,6 +318,7 @@ export default function ParentActiveJobScreen() {
             <path d="M15 18l-6-6 6-6" />
           </svg>
         </button>
+        <h1 className={styles.screenTitle}>Active Session</h1>
         <button
           type="button"
           onClick={() => setShowEndConfirm(true)}
@@ -303,11 +343,6 @@ export default function ParentActiveJobScreen() {
               {sitterName.charAt(0).toUpperCase()}
             </div>
           )}
-          <div className={styles.verifiedBadge}>
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-inverse)" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="20 6 9 17 4 12" />
-            </svg>
-          </div>
         </div>
 
         <div className={styles.caregiverDetails}>
@@ -319,27 +354,56 @@ export default function ParentActiveJobScreen() {
               <span>{childName}{childAge != null ? ` (${childAge}y)` : ''}</span>
             </div>
           )}
-          <p style={{
-            marginTop: showPrimaryChip ? 6 : 10,
-            fontSize: showPrimaryChip ? 13 : 14,
-            fontWeight: showPrimaryChip ? 400 : 700,
-            color: showPrimaryChip ? 'var(--color-text-muted)' : 'var(--color-primary)',
-            background: showPrimaryChip ? 'transparent' : 'var(--color-primary-tint-soft)',
-            padding: showPrimaryChip ? 0 : '6px 10px',
-            borderRadius: showPrimaryChip ? 0 : 10,
-            display: 'inline-block',
-          }}>
-            {formatChildren(job)}
-          </p>
+          {/* Single-child line only: with 2+ children the dedicated
+              "Children in this session" list below is the one place that names
+              them, so the same list is never stated twice. */}
+          {showPrimaryChip && formatChildren(job) ? (
+            <p style={{
+              marginTop: 6,
+              fontSize: 13,
+              fontWeight: 400,
+              color: 'var(--color-text-muted)',
+              background: 'transparent',
+              padding: 0,
+              borderRadius: 0,
+              display: 'inline-block',
+            }}>
+              {formatChildren(job)}
+            </p>
+          ) : null}
         </div>
       </div>
+
+      {/* ── Children in this session (READ-ONLY) ──
+          The booking already established who is being cared for, so the parent
+          is never asked to pick a child on this screen. With one child the chip
+          on the caregiver card above already names them, so this list is
+          rendered only when there is more than one. */}
+      {sessionChildren.length > 1 ? (
+        <div className={styles.sessionChildrenCard}>
+          <p className={styles.sessionChildrenLabel}>
+            Children in this session ({sessionChildren.length})
+          </p>
+          <ul className={styles.sessionChildrenList}>
+            {sessionChildren.map((c, i) => (
+              <li key={c.Child_ID ?? i} className={styles.sessionChildRow}>
+                <span aria-hidden="true">👶</span>
+                <span>{c.ChildName ?? `Child ${c.Child_ID}`}</span>
+                {c.ChildAge != null ? (
+                  <span className={styles.sessionChildAge}>· {c.ChildAge}y</span>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
 
       {/* ── 4-State Live Duration Widget ── */}
       <div className={styles.durationSection}>
         <div className={styles.ringOuter} />
         <div className={styles.ringInner} />
         <div className={styles.timerDisc}>
-          <span className={styles.timerLabel}>Live Duration</span>
+          <span className={styles.timerLabel}>Session · Live Duration</span>
           <h1 className={styles.timerDigits} style={timerColor}>
             {timerDisplay}
           </h1>
@@ -354,8 +418,54 @@ export default function ParentActiveJobScreen() {
       </div>
       {exceededBanner}
 
+      {/* ── CHILD MONITORING — a SEPARATE fact from the session above ──
+          The clock above describes the BABYSITTING session. This block describes
+          the monitoring session and its connection, which the server reports
+          independently: a lost monitoring connection is never the end of the
+          babysitting session, and nothing here can change the job status. */}
+      {monitorChildId ? (
+        monitoring.error ? (
+          <p
+            role="alert"
+            className={`${styles.monitoringSummary} ${styles.monitorError}`}
+          >
+            {monitoring.error}
+          </p>
+        ) : (
+          <MonitoringStatusBar
+            className={styles.monitoringSummary}
+            session={monitoring.session}
+            incident={monitoring.incident}
+            offline={monitoring.offline}
+            // This screen reads ONLY the monitoring session, never the Phase 7
+            // pause/DND surface, so it must not claim "Not paused".
+            showPauseAndDnd={false}
+          />
+        )
+      ) : null}
+
       {/* ── Location & Payment Info Card ── */}
       <div className={styles.infoCard}>
+        {/* Session Row — the date and booked window. The same two facts the
+            sitter's active-session screen shows, so both roles read the session
+            identically. */}
+        <div className={styles.infoRow}>
+          <div className={styles.iconCircleCalendar}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+              <line x1="16" y1="2" x2="16" y2="6" />
+              <line x1="8" y1="2" x2="8" y2="6" />
+              <line x1="3" y1="10" x2="21" y2="10" />
+            </svg>
+          </div>
+          <div className={styles.infoTextCol}>
+            <span className={styles.infoLabel}>SESSION</span>
+            <span className={styles.infoValue}>{sessionDateLabel} · {careTimeRange}</span>
+          </div>
+        </div>
+
+        <hr className={styles.cardDivider} />
+
         {/* Location Row */}
         <div className={styles.infoRow}>
           <div className={styles.iconCircleLocation}>
@@ -419,7 +529,7 @@ export default function ParentActiveJobScreen() {
             </button>
             <span className={styles.infoLabel} style={{ marginTop: 8 }}>
               {monitorChildId
-                ? `Live status, cry alerts, pause and do-not-disturb for ${childName}.`
+                ? `Live status, cry alerts, pause and do-not-disturb for ${monitorChildName ?? childName}.`
                 : 'Monitoring becomes available once this booking has a child attached.'}
             </span>
           </div>

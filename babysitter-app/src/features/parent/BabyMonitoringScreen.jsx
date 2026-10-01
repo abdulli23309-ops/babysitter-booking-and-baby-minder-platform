@@ -182,33 +182,40 @@ export default function BabyMonitoringScreen() {
   // both are only ever DISPLAYED from server state; the panel issues the
   // mutations and re-reads afterwards.
   const [pause, setPause] = useState(null);
+  const [pauseUpdatedAt, setPauseUpdatedAt] = useState(0);
   const [dndStates, setDndStates] = useState([]);
 
-  const refreshPauseAndDnd = useCallback(async () => {
-    if (!scope.jobId || !scope.childId) return;
+  const refreshPauseAndDnd = useCallback(async (signal) => {
+    if (signal?.aborted) return;
+    // Guard: only request pause state for a server-confirmed active session.
+    if (!scope.jobId || !scope.childId || session?.Status !== 'Active' || offline) {
+      setPause(null);
+      setPauseUpdatedAt(0);
+      setDndStates([]);
+      return;
+    }
     try {
       const [p, d] = await Promise.all([
-        API.getPause(scope.jobId, scope.childId).catch(() => null),
-        API.getDndStates(scope.jobId, scope.childId).catch(() => []),
+        API.getPause(scope.jobId, scope.childId, { signal }),
+        API.getDndStates(scope.jobId, scope.childId, { signal }),
       ]);
+      if (signal?.aborted) return;
       setPause(p ?? null);
+      setPauseUpdatedAt(Date.now());
       setDndStates(Array.isArray(d) ? d : []);
     } catch {
+      if (signal?.aborted) return;
       /* keep the last known values; the server stays authoritative */
     }
-  }, [scope.jobId, scope.childId]);
+  }, [scope.jobId, scope.childId, session?.Status, offline]);
 
   // Re-read whenever the server says the pause state may have moved (a fresh
   // poll) so the countdown and the pending-approval row never go stale. Deferred
   // out of the effect body because this synchronizes with an external system.
   useEffect(() => {
-    let cancelled = false;
-    Promise.resolve().then(() => {
-      if (!cancelled) refreshPauseAndDnd();
-    });
-    return () => {
-      cancelled = true;
-    };
+    const controller = new AbortController();
+    Promise.resolve().then(() => refreshPauseAndDnd(controller.signal));
+    return () => controller.abort();
   }, [refreshPauseAndDnd, session?.IsPaused, pause?.Status]);
 
   // ---- PHASE 11: media is SERVER-ISSUED, never client-derived ----
@@ -254,21 +261,16 @@ export default function BabyMonitoringScreen() {
         </button>
       </header>
 
-      {/* ---- PHASE 12: child identity header ----
-          This used to be a "LIVE" pill plus a "Nursery - HD 1080p" subtitle.
-          Both were removed: the pill duplicated the media panel, and the
-          subtitle asserted a resolution for a stream that usually did not exist.
-          What remains identifies the CHILD, which is the fact a parent actually
-          needs to confirm at a glance that they are looking at the right baby. */}
-      <div className={styles.childHeader}>
-        <span className={styles.childAvatar} aria-hidden="true">
-          {(scope.childName || '').trim().charAt(0).toUpperCase()}
-        </span>
-        <span className={styles.childHeaderText}>
-          <span className={styles.childHeaderLabel}>Monitoring</span>
-          <span className={styles.childHeaderName}>{scope.childName || 'Child'}</span>
-        </span>
-      </div>
+      {/* The media surface is the hero of this screen; status remains directly
+          beneath it so connection and incident information is visible without
+          pushing the video below a stack of summary cards. */}
+      <MonitoringMediaPanel
+        status={media.status}
+        media={media.media}
+        canPublish={media.canPublish}
+        reason={media.reason}
+        childName={scope.childName}
+      />
 
       {/* ---- Phase 8: real, server-driven monitoring state ----
           Previously this screen rendered a static "LIVE" pill over a mock camera
@@ -324,18 +326,15 @@ export default function BabyMonitoringScreen() {
         </>
       )}
 
-      {/* ---- PHASE 12: media surface ----
-          All seven media states render through one component, so the word
-          "Live" can only ever appear when the server issued a real signed
-          session. This block previously faked a camera frame and a "Secure
-          Connection" badge; neither is possible now. */}
-      <MonitoringMediaPanel
-        status={media.status}
-        media={media.media}
-        canPublish={media.canPublish}
-        reason={media.reason}
-        childName={scope.childName}
-      />
+      <div className={styles.childHeader}>
+        <span className={styles.childAvatar} aria-hidden="true">
+          {(scope.childName || '').trim().charAt(0).toUpperCase()}
+        </span>
+        <span className={styles.childHeaderText}>
+          <span className={styles.childHeaderLabel}>Monitoring</span>
+          <span className={styles.childHeaderName}>{scope.childName || 'Child'}</span>
+        </span>
+      </div>
 
       {/* ---- PHASE 12: session controls ----
           The local "Camera On / Mic Active" toggles were REMOVED. They were
@@ -346,20 +345,6 @@ export default function BabyMonitoringScreen() {
           success as the removed "HD 1080p" subtitle, so it goes too.
 
           What remains is a real action: leaving the screen. */}
-      <div className={styles.controlsRow}>
-        <div className={styles.controlItem}>
-          <button
-            type="button"
-            onClick={() => navigate(-1)}
-            className={`${styles.controlBtn} ${styles.controlBtnDanger}`}
-            aria-label="Exit monitoring"
-          >
-            <Icons.callEnd />
-          </button>
-          <span className={styles.controlLabel}>Exit</span>
-        </div>
-      </div>
-
       {/* Phase 7 family surface, now reachable from the normal parent journey
           instead of being a standalone component. It is parent-only and is
           rendered only when a real (job, child) scope exists, because every
@@ -371,8 +356,27 @@ export default function BabyMonitoringScreen() {
           design. A sitter's access to monitoring is the video and the cry
           response, not family administration. */}
       {role === 'parent' && scope.jobId && scope.childId ? (
-        <Phase7FamilyPanel jobId={scope.jobId} childId={scope.childId} />
+        <Phase7FamilyPanel
+          jobId={scope.jobId}
+          childId={scope.childId}
+          sessionActive={session?.Status === 'Active' && !offline}
+          pause={pause}
+          pauseUpdatedAt={pauseUpdatedAt}
+          dndStates={dndStates}
+          refreshMonitoring={refreshPauseAndDnd}
+        />
       ) : null}
+
+      <div className={styles.controlsRow}>
+        <button
+          type="button"
+          onClick={() => navigate(-1)}
+          className={styles.exitButton}
+        >
+          <Icons.callEnd />
+          <span>Exit monitoring</span>
+        </button>
+      </div>
 
       {/* Bottom Navigation */}
       {role === 'parent' ? <ParentBottomNav /> : <BabysitterBottomNav />}

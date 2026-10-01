@@ -1,0 +1,270 @@
+.page {
+  width: min(100%, 560px);
+  min-height: 100vh;
+  margin: 0 auto;
+  padding: 32px 20px 112px;
+  color: var(--color-text);
+  box-sizing: border-box;
+}
+
+.header {
+  margin: 0 0 24px;
+}
+
+.eyebrow,
+.step {
+  margin: 0;
+  color: var(--color-primary);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.header h1 {
+  margin: 7px 0 4px;
+  font-size: 28px;
+  line-height: 1.15;
+}
+
+.header > p:last-child {
+  margin: 0;
+  color: var(--color-text-secondary);
+}
+
+.viewSwitch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 4px;
+  margin-bottom: 16px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-alt);
+}
+
+.tab,
+.selectedTab {
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.tab {
+  background: transparent;
+  color: var(--color-text-secondary);
+}
+
+.selectedTab {
+  background: var(--color-surface);
+  color: var(--color-text);
+  box-shadow: var(--shadow-sm);
+}
+
+.parentPanel,
+.monitorPanel {
+  min-height: 380px;
+  padding: 24px;
+  border-radius: var(--radius-lg);
+  box-sizing: border-box;
+}
+
+.parentPanel {
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-md);
+}
+
+.parentPanel h2,
+.monitorPanel h2 {
+  margin: 12px 0 8px;
+  font-size: 22px;
+  line-height: 1.25;
+}
+
+.parentPanel > p,
+.monitorPanel > p {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.parentPanel > label {
+  display: block;
+  margin-top: 20px;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.parentPanel select {
+  width: 100%;
+  min-height: 48px;
+  margin-top: 7px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+}
+
+.code {
+  display: flex;
+  justify-content: center;
+  gap: clamp(5px, 2vw, 12px);
+  margin: 28px 0 22px;
+}
+
+.code span {
+  display: grid;
+  width: 42px;
+  aspect-ratio: 1;
+  place-items: center;
+  border-radius: var(--radius-sm);
+  background: var(--color-primary-tint);
+  color: var(--color-primary);
+  font-size: 24px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.incidents {
+  display: grid;
+  gap: 10px;
+  margin: 16px 0;
+}
+
+.incident {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid #f0c7c2;
+  border-radius: var(--radius-sm);
+  background: #fff7f5;
+  color: #8c332e;
+  font-size: 13px;
+}
+
+.incident button {
+  flex: 0 0 auto;
+  min-height: 36px;
+  padding: 6px 10px;
+  border: 1px solid #e5b3ae;
+  border-radius: var(--radius-sm);
+  background: #fff;
+  color: inherit;
+  font: inherit;
+  font-weight: 650;
+}
+
+.primaryButton,
+.monitorButton {
+  width: 100%;
+  min-height: 48px;
+  margin-top: 24px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  font: inherit;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.primaryButton:focus-visible,
+.monitorButton:focus-visible,
+.tab:focus-visible,
+.selectedTab:focus-visible {
+  outline: 3px solid rgb(var(--primary-rgb) / 0.35);
+  outline-offset: 2px;
+}
+
+.footnote {
+  margin: 14px 0 0 !important;
+  font-size: 12px !important;
+}
+
+.monitorPanel {
+  background: #11151b;
+  color: #f4f6f8;
+}
+
+.monitorMark {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  margin-bottom: 28px;
+  place-items: center;
+  border: 1px solid rgb(255 255 255 / 0.16);
+  border-radius: 13px;
+  color: #ff9b71;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.monitorPanel .step {
+  color: #ff9b71;
+}
+
+.monitorPanel > p {
+  color: #aab2bc;
+}
+
+.pinForm {
+  display: grid;
+  margin-top: 32px;
+}
+
+.pinForm label {
+  margin-bottom: 8px;
+  color: #c8ced6;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.pinForm input {
+  width: 100%;
+  min-height: 62px;
+  padding: 10px 14px;
+  border: 1px solid #3a424d;
+  border-radius: var(--radius-sm);
+  box-sizing: border-box;
+  background: #1a2028;
+  color: #fff;
+  font: inherit;
+  font-size: 27px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.18em;
+  text-align: center;
+}
+
+.pinForm input:focus-visible {
+  outline: 3px solid rgb(255 155 113 / 0.35);
+  border-color: #ff9b71;
+}
+
+.monitorButton:disabled {
+  background: #343b44;
+  color: #939da9;
+  cursor: not-allowed;
+}
+
+.message {
+  margin-top: 14px !important;
+  color: #d9e2ec !important;
+  font-size: 13px !important;
+}
+
+@media (max-width: 380px) {
+  .page { padding-right: 14px; padding-left: 14px; }
+  .parentPanel, .monitorPanel { padding: 20px; }
+  .code span { width: 38px; font-size: 21px; }
+}

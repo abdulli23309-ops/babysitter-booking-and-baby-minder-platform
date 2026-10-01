@@ -65,6 +65,19 @@ const menuItems = [
     ),
   },
   {
+    id: 'independent-monitoring',
+    title: 'Set Up Monitor Phone',
+    subtitle: 'Monitor your child without a booking',
+    route: '/independent-monitoring',
+    icon: (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="6" y="2.5" width="12" height="19" rx="2" />
+        <path d="M10 18h4" />
+        <path d="M9 9h6M9 12h6" />
+      </svg>
+    ),
+  },
+  {
     id: 'set-child-profile',
     title: 'Set Child Profile',
     subtitle: 'Add or edit child details',

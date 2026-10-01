@@ -4,15 +4,22 @@
   max-width: 480px;
   margin: 0 auto;
   min-height: 100vh;
-  background: linear-gradient(180deg, var(--color-danger-tint) 0%, var(--badge-purple-bg) 30%, var(--color-info-tint) 70%, var(--color-info-tint) 100%);
+  background: var(--color-background, #f7f8fb);
   display: flex;
   flex-direction: column;
   position: relative;
   box-sizing: border-box;
-  overflow: hidden;
-  padding: 10px 18px 12px;
+  overflow: visible;
+  padding: 12px 18px 110px;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
+}
+
+.sessionContent {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  padding-bottom: 12px;
 }
 
 /* ── Top Header Actions (BackButton + End Session option) ── */
@@ -22,6 +29,39 @@
   justify-content: space-between;
   margin-bottom: 12px;
 }
+
+.screenTitle {
+  flex: 1;
+  margin: 0;
+  text-align: center;
+  color: var(--color-text);
+  font-size: 18px;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+}
+
+.headerSpacer {
+  width: 42px;
+  flex: none;
+}
+
+.sessionContainer > .topActions,
+.sessionContent > .topActions { order: 0; }
+.sessionContainer > .caregiverCard,
+.sessionContent > .caregiverCard { order: 1; }
+.sessionContainer > .durationSection,
+.sessionContent > .durationSection { order: 2; }
+.sessionContainer > .sessionChildrenCard,
+.sessionContent > .sessionChildrenCard { order: 3; }
+.sessionContainer > .exceededBanner,
+.sessionContent > .exceededBanner { order: 4; }
+.sessionContainer > .infoCard,
+.sessionContent > .infoCard { order: 5; }
+.sessionContainer > .monitoringSummary,
+.sessionContent > .monitoringSummary { order: 6; }
+.sessionContent > .monitoringSection { order: 7; }
+.sessionContent > .jobReference { order: 8; }
+.sessionContent > .lastUpdated { order: 9; }
 
 .backBtn {
   width: 36px;
@@ -64,9 +104,10 @@
 /* ── Caregiver Banner Card ── */
 .caregiverCard {
   background: var(--color-surface);
-  border-radius: 28px;
-  padding: 16px 20px;
-  box-shadow: 0 6px 24px rgb(var(--purple-rgb) / 0.12);
+  border: 1px solid var(--color-border-subtle, rgba(0, 0, 0, 0.07));
+  border-radius: 22px;
+  padding: 16px 18px;
+  box-shadow: 0 8px 24px rgb(var(--shadow-ink-rgb) / 0.07);
   display: flex;
   align-items: center;
   gap: 16px;
@@ -142,6 +183,13 @@
   margin: 0 0 7px;
 }
 
+.profileChildren {
+  margin: 6px 0 0;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--color-text-muted);
+}
+
 .childPill {
   display: inline-flex;
   align-items: center;
@@ -161,39 +209,51 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  margin: 20px 0 28px;
+  margin: 16px 0 22px;
+  min-height: 290px;
 }
 
 .ringOuter {
   position: absolute;
-  width: 304px;
-  height: 304px;
+  width: min(78vw, 296px);
+  height: min(78vw, 296px);
   border-radius: 50%;
-  border: 1.5px solid rgb(var(--purple-rgb) / 0.45);
+  border: 1.5px solid rgb(var(--primary-rgb) / 0.22);
   pointer-events: none;
+  animation: timerPulse 2.8s ease-out infinite;
 }
 
 .ringInner {
   position: absolute;
-  width: 270px;
-  height: 270px;
+  width: min(68vw, 260px);
+  height: min(68vw, 260px);
   border-radius: 50%;
-  border: 1.5px solid rgb(var(--purple-rgb) / 0.55);
+  border: 1.5px solid rgb(var(--primary-rgb) / 0.16);
   pointer-events: none;
 }
 
 .timerDisc {
   position: relative;
   z-index: 2;
-  width: 236px;
-  height: 236px;
+  width: min(58vw, 224px);
+  height: min(58vw, 224px);
   border-radius: 50%;
   background: var(--color-surface);
-  box-shadow: 0 16px 42px rgb(var(--purple-rgb) / 0.22);
+  border: 1px solid var(--color-border-subtle, rgba(0, 0, 0, 0.06));
+  box-shadow: 0 18px 48px rgb(var(--shadow-ink-rgb) / 0.12);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
+}
+
+@keyframes timerPulse {
+  0% { transform: scale(0.96); opacity: 0.45; }
+  70%, 100% { transform: scale(1.04); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ringOuter, .pulsingDot { animation: none; }
 }
 
 .timerLabel {
@@ -243,10 +303,77 @@
 /* ── Location & Payment Info Card ── */
 .infoCard {
   background: var(--color-surface);
-  border-radius: 28px;
+  border: 1px solid var(--color-border-subtle, rgba(0, 0, 0, 0.07));
+  border-radius: 22px;
   padding: 18px 22px;
-  box-shadow: 0 6px 24px rgb(var(--purple-rgb) / 0.12);
+  box-shadow: 0 8px 24px rgb(var(--shadow-ink-rgb) / 0.07);
   margin-bottom: 24px;
+}
+
+.sectionHeading {
+  margin: 0 0 10px;
+  color: var(--color-text);
+  font-size: 15px;
+  font-weight: 750;
+}
+
+.jobReference {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 14px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 14px;
+  background: var(--color-surface);
+}
+
+.lastUpdated {
+  margin: 0;
+  color: var(--color-text-faint);
+  font-size: 11px;
+}
+
+.monitorSelect {
+  display: block;
+  width: 100%;
+  min-height: 46px;
+  margin-top: 7px;
+  padding: 10px 13px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 14px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  box-shadow: var(--shadow-sm);
+}
+
+.monitoringSection { margin: 16px 0; }
+.monitoringSummary { margin: 10px 0 16px; }
+.monitorError {
+  padding: 10px 13px;
+  border: 1px solid var(--color-danger-border);
+  border-radius: 13px;
+  background: var(--color-danger-tint);
+  color: var(--color-danger-strong);
+  font-size: 13px;
+  font-weight: 600;
+}
+.exceededBanner {
+  padding: 11px 15px;
+  margin: 0 0 14px;
+  border-radius: 14px;
+  background: var(--color-danger-tint);
+  color: var(--color-danger-strong);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.sessionChildrenCard { margin-top: 12px; }
+
+@media (max-width: 360px) {
+  .ringOuter { width: 78vw; height: 78vw; }
 }
 
 .infoRow {
@@ -305,6 +432,64 @@
   background: var(--color-surface-sunken);
   margin: 14px 0;
   border: none;
+}
+
+/* ── Children in this session (read-only list) ──
+   The children are fixed by the booking, so this is a statement of fact rather
+   than a control. Deliberately styled like the other calm surfaces. */
+.sessionChildrenCard {
+  background: var(--color-surface);
+  border-radius: 28px;
+  padding: 16px 22px;
+  box-shadow: 0 6px 24px rgb(var(--purple-rgb) / 0.12);
+  margin-bottom: 24px;
+}
+
+.sessionChildrenLabel {
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--color-text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  margin: 0 0 8px;
+}
+
+.sessionChildrenList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sessionChildRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.sessionChildAge {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--color-text-muted);
+}
+
+/* Calendar tile for the session date/window row, sized like the two icon
+   circles already used inside .infoCard. */
+.iconCircleCalendar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--color-primary-tint);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--color-primary);
 }
 
 /* ── Bottom App Nav ── */

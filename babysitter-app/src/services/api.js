@@ -172,8 +172,8 @@ export const API = {
   // ---- Family / guardians ----
   // GET guardians of a child: [{ Parent_ID, FullName, Relation, IsPrimary,
   //                              CanApprovePause, IsCurrentUser }]
-  getGuardians: (jobId, childId) =>
-    apiGet(`/monitoring/guardians?jobId=${jobId}&childId=${childId}`),
+  getGuardians: (jobId, childId, config) =>
+    apiGet(`/monitoring/guardians?jobId=${jobId}&childId=${childId}`, config),
 
   // POST a guardian invitation. `identifier` is a USERNAME or EMAIL, never a
   // Parent_ID. `relation` ("Father" | "Mother" | "Guardian") decides whether the
@@ -183,7 +183,7 @@ export const API = {
 
   // GET only the authenticated account's invitations (no parentId parameter is
   // accepted by the server, so one parent cannot list another's).
-  getMyGuardianInvitations: () => apiGet('/monitoring/guardian-invitations'),
+  getMyGuardianInvitations: (config) => apiGet('/monitoring/guardian-invitations', config),
   acceptGuardianInvitation: (id) => apiPost(`/monitoring/guardian-invitations/${id}/accept`),
   rejectGuardianInvitation: (id) => apiPost(`/monitoring/guardian-invitations/${id}/reject`),
   cancelGuardianInvitation: (id) => apiDelete(`/monitoring/guardian-invitations/${id}`),
@@ -196,7 +196,7 @@ export const API = {
   denyPause: (pauseId) => apiPost(`/monitoring/pause/${pauseId}/deny`),
   cancelPause: (pauseId) => apiDelete(`/monitoring/pause/${pauseId}`),
   // Returns the current pause with IsActive / SecondsRemaining, or null.
-  getPause: (jobId, childId) => apiGet(`/monitoring/pause?jobId=${jobId}&childId=${childId}`),
+  getPause: (jobId, childId, config) => apiGet(`/monitoring/pause?jobId=${jobId}&childId=${childId}`, config),
 
   // ---- Parent DND ----
   // DND is PRESENTATION ONLY: the notification is still persisted and the cry
@@ -205,7 +205,7 @@ export const API = {
   enableDnd: (jobId, childId) => apiPost('/monitoring/dnd', { jobId, childId }),
   // axios passes a DELETE body through the `data` key of the config object.
   disableDnd: (jobId, childId) => apiDelete('/monitoring/dnd', { data: { jobId, childId } }),
-  getDndStates: (jobId, childId) => apiGet(`/monitoring/dnd?jobId=${jobId}&childId=${childId}`),
+  getDndStates: (jobId, childId, config) => apiGet(`/monitoring/dnd?jobId=${jobId}&childId=${childId}`, config),
 
   // ==========================================================================
   // PHASE 3/4/5/6 + PHASE 8 - monitoring session, heartbeat and cry incident

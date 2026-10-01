@@ -19,9 +19,49 @@
 }
 
 .warnBox {
-  background: var(--color-warning-tint, #fef3c7);
-  border-color: var(--color-warning-border, #fde68a);
-  color: var(--color-text, #111);
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 12px;
+  background: var(--color-surface-alt);
+  border-color: var(--color-border-subtle);
+  color: var(--color-text-secondary);
+  border-radius: 12px;
+}
+
+.warnContent {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.warnDot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  margin-top: 5px;
+  border-radius: 50%;
+  background: var(--color-text-muted);
+}
+
+.dismissWarning {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  margin: -5px -5px 0 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.dismissWarning:hover {
+  background: rgb(0 0 0 / 0.06);
 }
 
 .alertBox {

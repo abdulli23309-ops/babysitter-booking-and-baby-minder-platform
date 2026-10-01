@@ -43,6 +43,7 @@ import CryDetector from '../features/cry/CryDetector';
 import BabyMonitoringScreen from '../features/parent/BabyMonitoringScreen';
 import ChildCryAlertScreen from '../features/parent/ChildCryAlertScreen';
 import SupportScreen from '../features/support/SupportScreen';
+import PhonePairingConcept from '../features/parent/PhonePairingConcept';
 
 function App() {
   return (
@@ -57,9 +58,15 @@ function App() {
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
               <Route path="/create-account" element={<CreateAccount />} />
+              <Route path="/monitor-device" element={<PhonePairingConcept initialView="monitor" />} />
 
               {/* ---- Parent-protected routes ---- */}
               <Route path="/parent-dashboard" element={<ProtectedRoute allowedRoles={['parent']}><ParentDashboard /></ProtectedRoute>} />
+              {/* PHASE 13: the parent view of independent monitoring. The earlier
+                  /phone-pairing-concept prototype path is kept as a redirect so
+                  no link or bookmark becomes a dead route. */}
+              <Route path="/phone-pairing-concept" element={<Navigate to="/independent-monitoring" replace />} />
+              <Route path="/independent-monitoring" element={<ProtectedRoute allowedRoles={['parent']}><PhonePairingConcept /></ProtectedRoute>} />
               <Route path="/main-screen" element={<ProtectedRoute allowedRoles={['parent']}><MainScreen /></ProtectedRoute>} />
               <Route path="/set-child-profile" element={<ProtectedRoute allowedRoles={['parent']}><SetChildProfile /></ProtectedRoute>} />
               <Route path="/babysitter-details" element={<ProtectedRoute allowedRoles={['parent']}><BabySitterDetails /></ProtectedRoute>} />

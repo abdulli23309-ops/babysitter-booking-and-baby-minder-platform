@@ -6,6 +6,7 @@ import Button from '../../components/ui/Button';
 import EmptyState from '../../components/ui/EmptyState';
 import { apiGet } from '../../services/apiClient';
 import { API } from '../../services/api';
+import { deviceReportCry } from '../../services/independentMonitoringApi';
 import styles from './cry-detector.module.css';
 
 /* ================================================================
@@ -93,7 +94,7 @@ function WaveformCanvas({ analyserRef, mode }) {
   );
 }
 
-export default function CryDetector() {
+export default function CryDetector({ independent = false, embedded = false }) {
   const navigate = useNavigate();
 
   const [isListening, setIsListening] = useState(false);
@@ -132,6 +133,7 @@ export default function CryDetector() {
 
   // Fetch active job on mount
   useEffect(() => {
+    if (independent) return undefined;
     const sitterId = Number(localStorage.getItem('userId'));
     if (!sitterId) return;
 
@@ -147,7 +149,7 @@ export default function CryDetector() {
       }
     };
     fetchActiveJob();
-  }, [addLog]);
+  }, [addLog, independent]);
 
   // ---- PHASE 11: resolve the MONITORING SCOPE, not the legacy child column ----
   // A cry incident is per (job, child), and MonitoringAccess treats the job's
@@ -167,6 +169,7 @@ export default function CryDetector() {
   const [monitorScope, setMonitorScope] = useState(null);
 
   useEffect(() => {
+    if (independent) return undefined;
     if (!activeJob?.jobId) return undefined;
     let cancelled = false;
 
@@ -192,7 +195,7 @@ export default function CryDetector() {
     return () => {
       cancelled = true;
     };
-  }, [activeJob?.jobId, addLog]);
+  }, [activeJob?.jobId, addLog, independent]);
 
   const stopListening = useCallback(() => {
     clearTimeout(tickTimerRef.current);
@@ -216,6 +219,22 @@ export default function CryDetector() {
   const sendAlert = useCallback(async () => {
     setAlertCount((prev) => prev + 1);
     addLog('CRITICAL: Infant cry verified - reporting to monitoring');
+
+    if (independent) {
+      try {
+        await deviceReportCry();
+        stopListening();
+        setStatusText('Cry detected and sent to the parent.');
+        addLog('Independent cry incident recorded by the server');
+      } catch (err) {
+        const code = err?.status ?? err?.response?.status;
+        setStatusText(code === 403
+          ? 'This monitor device is no longer authorized.'
+          : 'Could not send the cry event. Monitoring will continue.');
+        addLog('Independent cry event was not accepted by the server');
+      }
+      return;
+    }
 
     // The scope must be one the SERVER says this sitter may monitor. If we
     // could not resolve it (no active job, job not InProgress, or no child
@@ -273,7 +292,7 @@ export default function CryDetector() {
       setStatusText('Could not reach the server to report the cry.');
       addLog('Network error dispatching cry alert');
     }
-  }, [monitorScope, addLog, stopListening]);
+  }, [monitorScope, addLog, stopListening, independent]);
 
   // TensorFlow & YAMNet loaders (unchanged)
   function loadTFJS() {
@@ -515,7 +534,13 @@ export default function CryDetector() {
   }
 
   useEffect(() => {
-    return () => clearTimeout(tickTimerRef.current);
+    return () => {
+      clearTimeout(tickTimerRef.current);
+      if (scriptNodeRef.current) scriptNodeRef.current.disconnect();
+      if (mlCtxRef.current?.state !== 'closed') mlCtxRef.current?.close();
+      if (audioCtxRef.current?.state !== 'closed') audioCtxRef.current?.close();
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+    };
   }, []);
 
   // ---- PHASE 11: the emergency "video call" view is REMOVED ----
@@ -538,10 +563,10 @@ export default function CryDetector() {
   // Permission Denied View
   if (micPermissionDenied) {
     return (
-      <div className={styles.cryContainer}>
+      <div className={`${styles.cryContainer} ${embedded ? styles.embeddedDetector : ''}`}>
         <div className={styles.topBar}>
           <BackButton />
-          <h1 className={styles.pageTitle}>Microphone Permissions</h1>
+          <h1 className={styles.pageTitle}>{independent ? 'Cry Detection' : 'Microphone Permissions'}</h1>
           <div style={{ width: 42 }} />
         </div>
 
@@ -558,7 +583,7 @@ export default function CryDetector() {
   const isAlarmed = timer.active && timer.elapsed > 2;
 
   return (
-    <div className={`${styles.cryContainer} ${isAlarmed ? styles.cryContainerAlarmed : ''}`}>
+    <div className={`${styles.cryContainer} ${embedded ? styles.embeddedDetector : ''} ${isAlarmed ? styles.cryContainerAlarmed : ''}`}>
       {/* Top Bar */}
       <div className={styles.topBar}>
         <BackButton
@@ -568,7 +593,7 @@ export default function CryDetector() {
           }}
           ariaLabel="Back"
         />
-        <h1 className={styles.pageTitle}>AI Cry Minder</h1>
+        <h1 className={styles.pageTitle}>{independent ? 'On-device cry detection' : 'AI Cry Minder'}</h1>
         <div style={{ width: 42 }} />
       </div>
 

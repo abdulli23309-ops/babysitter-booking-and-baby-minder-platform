@@ -23,9 +23,10 @@
  *   affected data is re-fetched from the server, so the UI can never show an
  *   optimistic result that the backend rejected.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import API from '../../services/api.js';
 import { useAuth } from '../auth/AuthContext.jsx';
+import styles from './phase7-family-panel.module.css';
 
 const formatCountdown = (seconds) => {
   const s = Math.max(0, Math.floor(seconds ?? 0));
@@ -35,16 +36,23 @@ const formatCountdown = (seconds) => {
 
 const RELATIONS = ['Father', 'Mother', 'Guardian'];
 
-export default function Phase7FamilyPanel({ jobId, childId }) {
+export default function Phase7FamilyPanel({
+  jobId,
+  childId,
+  sessionActive = false,
+  pause: pauseState,
+  pauseUpdatedAt = 0,
+  dndStates = [],
+  refreshMonitoring,
+}) {
   const { userId } = useAuth();
   const [guardians, setGuardians] = useState([]);
   const [invitations, setInvitations] = useState([]);
-  const [pause, setPause] = useState(null);
-  const [dnd, setDnd] = useState([]);
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
   const [identifier, setIdentifier] = useState('');
   const [relation, setRelation] = useState('Father');
+  const aliveRef = useRef(true);
 
   const hasScope = Number(jobId) > 0 && Number(childId) > 0;
 
@@ -55,53 +63,42 @@ export default function Phase7FamilyPanel({ jobId, childId }) {
   // tick advances `now` so the label animates between polls, but a pause can
   // never be LENGTHENED by the client - the next poll overwrites both values
   // with the server's, and once they hit zero the label stops.
-  const [serverSeconds, setServerSeconds] = useState(0);
-  const [serverAt, setServerAt] = useState(0);
   const [now, setNow] = useState(0);
 
-  const loadMonitoring = useCallback(async () => {
-    if (!hasScope) return;
-    try {
-      const [p, d] = await Promise.all([
-        API.getPause(jobId, childId).catch(() => null),
-        API.getDndStates(jobId, childId).catch(() => []),
-      ]);
-      setPause(p ?? null);
-      setDnd(Array.isArray(d) ? d : []);
-      // Apply the authoritative value and stamp when it was received.
-      setServerSeconds(p?.SecondsRemaining ?? 0);
-      setServerAt(Date.now());
-    } catch {
-      /* keep the last known state; the server remains the source of truth */
-    }
-  }, [jobId, childId, hasScope]);
+  // The parent screen owns pause/DND reads so these facts are fetched once and
+  // only after its session poll confirms an Active monitoring session.
+  const pause = sessionActive ? pauseState : null;
+  const dnd = sessionActive ? dndStates : [];
+  const serverSeconds = pause?.SecondsRemaining ?? 0;
+  const serverAt = pauseUpdatedAt;
 
-  const loadFamily = useCallback(async () => {
-    if (!hasScope) return;
+  const loadFamily = useCallback(async (signal) => {
+    if (!hasScope || signal?.aborted || !aliveRef.current) return;
     try {
       const [g, inv] = await Promise.all([
-        API.getGuardians(jobId, childId).catch(() => []),
-        API.getMyGuardianInvitations().catch(() => []),
+        API.getGuardians(jobId, childId, { signal }).catch(() => []),
+        API.getMyGuardianInvitations({ signal }).catch(() => []),
       ]);
+      if (signal?.aborted || !aliveRef.current) return;
       setGuardians(Array.isArray(g) ? g : []);
       setInvitations(Array.isArray(inv) ? inv : []);
     } catch {
+      if (signal?.aborted || !aliveRef.current) return;
       /* non-fatal: the panel simply shows no data */
     }
   }, [jobId, childId, hasScope]);
 
   useEffect(() => {
-    // Data loading is synchronizing with an EXTERNAL system (the API), so it
-    // is deferred out of the effect body to avoid a cascading synchronous
-    // render. `alive` guards against updating after unmount.
-    let alive = true;
+    const controller = new AbortController();
+    aliveRef.current = true;
     Promise.resolve().then(() => {
-      if (!alive) return;
-      loadFamily();
-      loadMonitoring();
+      if (!controller.signal.aborted) loadFamily(controller.signal);
     });
-    return () => { alive = false; };
-  }, [loadFamily, loadMonitoring]);
+    return () => {
+      aliveRef.current = false;
+      controller.abort();
+    };
+  }, [loadFamily]);
 
   useEffect(() => {
     if (!pause?.IsActive) return undefined;
@@ -119,14 +116,14 @@ export default function Phase7FamilyPanel({ jobId, childId }) {
     setMessage('');
     try {
       await action();
-      setMessage(`${label} — done.`);
+      if (aliveRef.current) setMessage(`${label} — done.`);
     } catch (err) {
-      setMessage(`${label} failed: ${err?.message ?? 'Please try again.'}`);
+      if (aliveRef.current) setMessage(`${label} failed: ${err?.message ?? 'Please try again.'}`);
     } finally {
       // Always re-read server state so a rejected action never leaves the UI
       // showing an optimistic result.
       await after?.();
-      setBusy(false);
+      if (aliveRef.current) setBusy(false);
     }
   };
 
@@ -145,15 +142,15 @@ export default function Phase7FamilyPanel({ jobId, childId }) {
   if (!hasScope) return null;
 
   return (
-    <section aria-label="Family, pause and do-not-disturb">
-      {message ? <p role="status">{message}</p> : null}
+    <section className={styles.familyPanel} aria-label="Family, pause and do-not-disturb">
+      {message ? <p role="status" className={styles.feedback}>{message}</p> : null}
 
       {/* ---------------- Connected guardians ---------------- */}
-      <article>
-        <h3>Family &amp; guardians</h3>
-        <ul>
+      <article className={styles.card}>
+        <h3 className={styles.cardTitle}>Family &amp; guardians</h3>
+        <ul className={styles.list}>
           {guardians.map((g) => (
-            <li key={g.Parent_ID}>
+            <li className={styles.listItem} key={g.Parent_ID}>
               {g.FullName}
               {g.Relation ? ` (${g.Relation})` : ''}
               {g.IsPrimary ? ' — primary' : ''}
@@ -161,54 +158,60 @@ export default function Phase7FamilyPanel({ jobId, childId }) {
               {g.IsCurrentUser ? ' — you' : ''}
             </li>
           ))}
-          {guardians.length === 0 ? <li>No connected guardians.</li> : null}
+          {guardians.length === 0 ? <li className={styles.listItem}>No connected guardians.</li> : null}
         </ul>
 
-        <label htmlFor="phase7-invite-identifier">Invite the other parent</label>
-        <input
-          id="phase7-invite-identifier"
-          type="text"
-          value={identifier}
-          placeholder="username or email"
-          onChange={(e) => setIdentifier(e.target.value)}
-        />
-        <label htmlFor="phase7-invite-relation">Relationship</label>
-        <select
-          id="phase7-invite-relation"
-          value={relation}
-          onChange={(e) => setRelation(e.target.value)}
-        >
-          {RELATIONS.map((r) => (
-            <option key={r} value={r}>{r}</option>
-          ))}
-        </select>
-        <button
-          type="button"
-          disabled={busy || identifier.trim() === ''}
-          onClick={() => run('Invitation sent', async () => {
-            await API.createGuardianInvitation(Number(childId), identifier.trim(), relation);
-            setIdentifier('');
-          }, loadFamily)}
-        >
-          Send invitation
-        </button>
-        <p>
-          Enter a username or email — never an account id. The other parent accepts
-          the invitation from their own account.
-        </p>
+        <div className={styles.invitationForm}>
+          <label className={styles.fieldLabel} htmlFor="phase7-invite-identifier">Invite the other parent</label>
+          <input
+            className={styles.field}
+            id="phase7-invite-identifier"
+            type="text"
+            value={identifier}
+            placeholder="username or email"
+            onChange={(e) => setIdentifier(e.target.value)}
+          />
+          <label className={styles.fieldLabel} htmlFor="phase7-invite-relation">Relationship</label>
+          <select
+            className={styles.field}
+            id="phase7-invite-relation"
+            value={relation}
+            onChange={(e) => setRelation(e.target.value)}
+          >
+            {RELATIONS.map((r) => (
+              <option key={r} value={r}>{r}</option>
+            ))}
+          </select>
+          <button
+            className={styles.actionButton}
+            type="button"
+            disabled={busy || identifier.trim() === ''}
+            onClick={() => run('Invitation sent', async () => {
+              await API.createGuardianInvitation(Number(childId), identifier.trim(), relation);
+              setIdentifier('');
+            }, loadFamily)}
+          >
+            Send invitation
+          </button>
+          <p className={styles.hint}>
+            Enter a username or email — never an account id. The other parent accepts
+            the invitation from their own account.
+          </p>
+        </div>
       </article>
 
       {/* ---------------- Invitations addressed to me ---------------- */}
       {invitations.some((i) => i.Status === 'Pending') ? (
-        <article>
-          <h4>Invitations for you</h4>
-          <ul>
+        <article className={styles.card}>
+          <h4 className={styles.cardTitle}>Invitations for you</h4>
+          <ul className={styles.list}>
             {invitations
               .filter((i) => i.Status === 'Pending')
               .map((i) => (
-                <li key={i.GuardianInvitation_ID}>
+                <li className={styles.listItem} key={i.GuardianInvitation_ID}>
                   Help monitor {i.ChildName} (invited by {i.InviterName})
                   <button
+                    className={styles.actionButton}
                     type="button"
                     disabled={busy}
                     onClick={() => run('Invitation accepted', () =>
@@ -217,6 +220,7 @@ export default function Phase7FamilyPanel({ jobId, childId }) {
                     Accept
                   </button>
                   <button
+                    className={styles.secondaryButton}
                     type="button"
                     disabled={busy}
                     onClick={() => run('Invitation declined', () =>
@@ -231,8 +235,8 @@ export default function Phase7FamilyPanel({ jobId, childId }) {
       ) : null}
 
       {/* ---------------- Pause ---------------- */}
-      <article>
-        <h3>Monitoring pause</h3>
+      <article className={styles.card}>
+        <h3 className={styles.cardTitle}>Monitoring pause</h3>
         {pause?.Status === 'Approved' ? (
           <p role="status">
             {pause.IsActive
@@ -249,28 +253,31 @@ export default function Phase7FamilyPanel({ jobId, childId }) {
                 are for the other guardian; the server refuses self-approval. */}
             {iRequestedPause ? (
               <button
+                className={styles.secondaryButton}
                 type="button"
                 disabled={busy}
                 onClick={() => run('Request withdrawn', () =>
-                  API.cancelPause(pause.MonitoringPause_ID), loadMonitoring)}
+                    API.cancelPause(pause.MonitoringPause_ID), refreshMonitoring)}
               >
                 Withdraw
               </button>
             ) : (
               <>
                 <button
+                  className={styles.secondaryButton}
                   type="button"
                   disabled={busy}
                   onClick={() => run('Pause approved', () =>
-                    API.approvePause(pause.MonitoringPause_ID), loadMonitoring)}
+                    API.approvePause(pause.MonitoringPause_ID), refreshMonitoring)}
                 >
                   Approve
                 </button>
                 <button
+                  className={styles.secondaryButton}
                   type="button"
                   disabled={busy}
                   onClick={() => run('Pause declined', () =>
-                    API.denyPause(pause.MonitoringPause_ID), loadMonitoring)}
+                    API.denyPause(pause.MonitoringPause_ID), refreshMonitoring)}
                 >
                   Decline
                 </button>
@@ -279,15 +286,16 @@ export default function Phase7FamilyPanel({ jobId, childId }) {
           </p>
         ) : (
           <button
+            className={styles.actionButton}
             type="button"
             disabled={busy}
             onClick={() => run('Pause requested', () =>
-              API.requestPause(Number(jobId), Number(childId)), loadMonitoring)}
+              API.requestPause(Number(jobId), Number(childId)), refreshMonitoring)}
           >
             Request a pause
           </button>
         )}
-        <p>
+        <p className={styles.hint}>
           A pause lasts exactly 2 minutes 30 seconds and must be approved by the other
           guardian. While it is active no new cry alert is raised for this child, and
           the sitter sees &quot;Monitoring temporarily paused by parent&quot;.
@@ -295,40 +303,42 @@ export default function Phase7FamilyPanel({ jobId, childId }) {
       </article>
 
       {/* ---------------- DND ---------------- */}
-      <article>
-        <h3>Do not disturb</h3>
+      <article className={styles.card}>
+        <h3 className={styles.cardTitle}>Do not disturb</h3>
         {myDndActive ? (
           <p role="status">
             DND is on for you until {new Date(myDndActive.DndUntilUtc).toLocaleTimeString()}.
             Alerts are still recorded — you simply will not be rung.
             <button
+              className={styles.secondaryButton}
               type="button"
               disabled={busy}
               onClick={() => run('DND turned off', () =>
-                API.disableDnd(Number(jobId), Number(childId)), loadMonitoring)}
+                API.disableDnd(Number(jobId), Number(childId)), refreshMonitoring)}
             >
               Turn off DND
             </button>
           </p>
         ) : (
           <button
+            className={styles.actionButton}
             type="button"
             // The server refuses this when the other parent is already DND; the
             // disabled state only avoids a pointless round trip.
             disabled={busy || Boolean(otherGuardianDnd)}
             onClick={() => run('DND turned on', () =>
-              API.enableDnd(Number(jobId), Number(childId)), loadMonitoring)}
+              API.enableDnd(Number(jobId), Number(childId)), refreshMonitoring)}
           >
             Turn on DND
           </button>
         )}
         {otherGuardianDnd ? (
-          <p>
+          <p className={styles.hint}>
             {otherGuardianDnd.FullName} has DND on, so you stay alertable. Only one
             parent can be on DND for a session at a time.
           </p>
         ) : null}
-        <p>
+        <p className={styles.hint}>
           DND never stops a cry alert from being recorded or sent to the other parent.
           It only silences your own sound and vibration.
         </p>

@@ -142,7 +142,16 @@ export default function BookingStatus() {
   useEffect(() => {
     const s = (job?.Status || '').toString().trim().toLowerCase().replace(/[\s_-]+/g, '');
     if (s === 'inprogress') {
-      navigate('/parent-active-job', { state: { job } });
+      // The live session screen is /parent-active-job/:jobId (see App.jsx): this
+      // booking/lifecycle screen is NOT duplicated for an active session, it
+      // hands off to that one screen. Carrying the id in the URL keeps the live
+      // screen addressable across a refresh or a share instead of relying on
+      // navigation state alone.
+      const liveId = job?.Job_ID ?? job?.jobId;
+      navigate(
+        liveId != null ? `/parent-active-job/${liveId}` : '/parent-active-job',
+        { state: { job } },
+      );
     }
   }, [job, navigate]);
 
@@ -238,6 +247,8 @@ export default function BookingStatus() {
   // 'Open' — that default was the reason a Cancelled job could render the
   // orange "Waiting for Babysitter Confirmation" badge.
   const currentStatus = (job.Status || '').toString().trim();
+  const normalizedCurrentStatus = currentStatus.toLowerCase().replace(/[\s_-]+/g, '');
+  const isActiveBooking = normalizedCurrentStatus === 'inprogress';
   const badge = getStatusBadge(currentStatus);
   // Workflow redesign: 'SitterArrived' = sitter on-site, parent must confirm.
   const sitterArrived = currentStatus.toLowerCase() === 'sitterarrived';
@@ -407,10 +418,18 @@ export default function BookingStatus() {
             Assigned/Confirmed booking, which is exactly the state that screen
             is designed for. */}
         {(currentStatus.toLowerCase() === 'assigned'
-          || currentStatus.toLowerCase() === 'confirmed') && (
+          || currentStatus.toLowerCase() === 'confirmed'
+          || isActiveBooking) && (
           <button
             type="button"
-            onClick={() => navigate('/parent-upcoming-job', { state: { job } })}
+            onClick={() => {
+              const targetId = job.Job_ID ?? activeJobId;
+              if (isActiveBooking && targetId) {
+                navigate(`/parent-active-job/${targetId}`, { state: { job } });
+              } else {
+                navigate('/parent-upcoming-job', { state: { job } });
+              }
+            }}
             style={{
               width: '100%',
               padding: '14px 18px',
@@ -751,7 +770,13 @@ export default function BookingStatus() {
         {(currentStatus.toLowerCase() === 'in progress' || currentStatus.toLowerCase() === 'inprogress') && (
           <button
             type="button"
-            onClick={() => navigate('/parent-active-job', { state: { job } })}
+            onClick={() => {
+              const liveId = job.Job_ID ?? activeJobId;
+              navigate(
+                liveId != null ? `/parent-active-job/${liveId}` : '/parent-active-job',
+                { state: { job } },
+              );
+            }}
             style={{
               width: '100%',
               padding: '14px 18px',

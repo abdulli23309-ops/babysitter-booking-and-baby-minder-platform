@@ -12,6 +12,16 @@
  *     4. ALERT      - cry incident state (Phase 5/6)
  *     5. DND        - own state, and whether the other parent is DND
  *
+ * SEPARATE FROM THE BABYSITTING SESSION
+ *   A babysitting session and a child-monitoring session are DIFFERENT facts: a
+ *   job can be In Progress while its monitoring session has never started, is
+ *   paused, or has lost its connection. Nothing in this component describes the
+ *   babysitting session, so a lost monitoring connection can never be read as
+ *   "the babysitting job ended". The two screens that show both (the parent's
+ *   and the sitter's active-session screens) render the session clock and this
+ *   bar as two separate blocks, and this bar's heading names the monitoring
+ *   fact explicitly.
+ *
  * BACKEND IS AUTHORITATIVE
  *   Every word below is derived from server values:
  *     - "Connection lost" comes from ParentConnection/SitterConnection, which
@@ -83,6 +93,12 @@ export default function MonitoringStatusBar({
   dndStates = [],
   offline = false,
   currentUserId = null,
+  className = '',
+  // Some screens (e.g. the parent's active-session screen) read ONLY the
+  // monitoring session and never the Phase 7 pause/DND surface. They pass false
+  // here, because rendering "Not paused" without ever having asked the server
+  // would be a claim this client cannot support.
+  showPauseAndDnd = true,
 }) {
   const sessionState = describeSession(session, offline);
   const connectionState = describeConnection(session, offline);
@@ -97,44 +113,50 @@ export default function MonitoringStatusBar({
   const otherDnd = dndStates.find((d) => d.UserId !== currentUserId && d.IsActive);
 
   return (
-    <div className={styles.bar}>
-      <h2 className={styles.title}>Monitoring status</h2>
+    <div className={[styles.bar, className].filter(Boolean).join(' ')} aria-label="Child monitoring status">
       <ul className={styles.list}>
         <li className={styles.row} data-tone={sessionState.tone}>
-          <span className={styles.label}>Session</span>
+          <span className={styles.dot} aria-hidden="true" />
+          <span className={styles.label}>Status</span>
           <span className={styles.value}>{sessionState.text}</span>
         </li>
 
         {connectionState ? (
           <li className={styles.row} data-tone={connectionState.tone}>
+            <span className={styles.dot} aria-hidden="true" />
             <span className={styles.label}>Connection</span>
             <span className={styles.value}>{connectionState.text}</span>
           </li>
         ) : null}
 
-        <li
-          className={styles.row}
-          data-tone={pauseActive || pausePending ? 'warn' : 'muted'}
-        >
-          <span className={styles.label}>Pause</span>
-          <span className={styles.value}>
-            {pauseActive
-              ? `Monitoring temporarily paused by parent — ${formatPause(
-                  session.PauseSecondsRemaining,
-                )} remaining`
-              : pausePending
-                ? 'Pause request pending approval'
-                : 'Not paused'}
-          </span>
-        </li>
+        {showPauseAndDnd ? (
+          <li
+            className={styles.row}
+            data-tone={pauseActive || pausePending ? 'warn' : 'muted'}
+          >
+            <span className={styles.dot} aria-hidden="true" />
+            <span className={styles.label}>Pause</span>
+            <span className={styles.value}>
+              {pauseActive
+                ? `Monitoring temporarily paused by parent — ${formatPause(
+                    session.PauseSecondsRemaining,
+                  )} remaining`
+                : pausePending
+                  ? 'Pause request pending approval'
+                  : 'Not paused'}
+            </span>
+          </li>
+        ) : null}
 
         <li className={styles.row} data-tone={incidentState.tone} aria-live="polite">
+          <span className={styles.dot} aria-hidden="true" />
           <span className={styles.label}>Alert</span>
           <span className={styles.value}>{incidentState.text}</span>
         </li>
 
-        {dndStates.length ? (
+        {showPauseAndDnd && dndStates.length ? (
           <li className={styles.row} data-tone={myDnd ? 'muted' : 'ok'}>
+            <span className={styles.dot} aria-hidden="true" />
             <span className={styles.label}>Do not disturb</span>
             <span className={styles.value}>
               {myDnd

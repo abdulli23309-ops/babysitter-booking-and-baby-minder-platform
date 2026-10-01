@@ -5,18 +5,7 @@
    row wraps rather than truncating so a long status is always readable. */
 
 .bar {
-  background: var(--color-surface, #fff);
-  border: 1px solid var(--color-border, rgba(0, 0, 0, 0.08));
-  border-radius: 14px;
-  padding: 14px 16px;
-  margin: 0 0 16px;
-}
-
-.title {
-  margin: 0 0 10px;
-  font-size: 0.95rem;
-  font-weight: 700;
-  color: var(--color-text, #111);
+  margin: 12px 0 16px;
 }
 
 .list {
@@ -24,68 +13,76 @@
   margin: 0;
   padding: 0;
   display: flex;
-  flex-direction: column;
+  flex-flow: row wrap;
   gap: 8px;
+  align-items: center;
 }
 
 .row {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 8px 10px;
-  border-radius: 10px;
-  border-left: 4px solid transparent;
-  background: var(--color-bg-subtle, rgba(0, 0, 0, 0.03));
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 5px 11px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border-subtle, rgba(0, 0, 0, 0.08));
+  background: var(--color-surface, #fff);
+  box-shadow: var(--shadow-sm, 0 1px 2px rgba(0, 0, 0, 0.04));
   /* Long status text wraps instead of overflowing horizontally on a 360px phone. */
   overflow-wrap: anywhere;
 }
 
 .label {
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--color-text-muted, #666);
+  white-space: nowrap;
 }
 
 .value {
-  font-size: 0.92rem;
+  font-size: 0.78rem;
   font-weight: 600;
   color: var(--color-text, #111);
+  overflow-wrap: anywhere;
 }
+
+.dot {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--color-border, #cbd5e1);
+}
+
+.row[data-tone='ok'] .dot { background: var(--color-success, #16a34a); }
+.row[data-tone='warn'] .dot { background: var(--color-warning, #d97706); }
+.row[data-tone='alert'] .dot { background: var(--color-danger, #dc2626); }
 
 /* Tone is a SECONDARY cue only. Every state also carries a text label, so the
    UI is never colour-alone (accessibility requirement). */
 .row[data-tone='ok'] {
-  border-left-color: var(--color-success, #16a34a);
+  border-color: var(--color-success-border, rgba(22, 163, 74, 0.22));
+  background: var(--color-success-tint, rgba(22, 163, 74, 0.07));
 }
 
 .row[data-tone='warn'] {
-  border-left-color: var(--color-warning, #d97706);
+  border-color: var(--color-warning-border, rgba(217, 119, 6, 0.24));
+  background: var(--color-warning-tint, rgba(217, 119, 6, 0.08));
 }
 
 .row[data-tone='alert'] {
-  border-left-color: var(--color-danger, #dc2626);
+  border-color: var(--color-danger-border-strong, rgba(220, 38, 38, 0.24));
   background: var(--color-danger-tint, #fef2f2);
 }
 
 .row[data-tone='muted'] {
-  border-left-color: var(--color-border, rgba(0, 0, 0, 0.15));
+  border-color: var(--color-border-subtle, rgba(0, 0, 0, 0.08));
+  background: var(--color-bg-subtle, rgba(0, 0, 0, 0.025));
 }
 
 .row[data-tone='muted'] .value {
   color: var(--color-text-muted, #666);
   font-weight: 500;
-}
-
-@media (min-width: 480px) {
-  .row {
-    flex-direction: row;
-    align-items: baseline;
-    gap: 12px;
-  }
-
-  .label {
-    min-width: 108px;
-  }
 }
