@@ -381,11 +381,23 @@ namespace WebApplication2.Controllers
         {
             int parentId = ClaimsPrincipalHelper.GetUserId();
             DateTime now = DateTime.UtcNow;
-            int changed = _db.Database.ExecuteSqlCommand(
-                @"UPDATE s SET Status='Ended',EndedAtUtc=@p0
-                  FROM dbo.IndependentMonitoringSession s WHERE s.Parent_ID=@p1 AND s.Status='Active' AND s.IsDeleted=0;
-                  UPDATE d SET RevokedAtUtc=@p0 FROM dbo.MonitoringDeviceSession d JOIN dbo.IndependentMonitoringSession s ON s.IndependentMonitoringSession_ID=d.IndependentMonitoringSession_ID WHERE s.Parent_ID=@p1 AND d.RevokedAtUtc IS NULL",
-                now, parentId);
+            int changed;
+            using (var tx = _db.Database.BeginTransaction(IsolationLevel.Serializable))
+            {
+                changed = _db.Database.ExecuteSqlCommand(
+                    @"UPDATE s SET Status='Ended',EndedAtUtc=@p0
+                      FROM dbo.IndependentMonitoringSession s WHERE s.Parent_ID=@p1 AND s.Status='Active' AND s.IsDeleted=0",
+                    now, parentId);
+                _db.Database.ExecuteSqlCommand(
+                    @"UPDATE d SET RevokedAtUtc=@p0 FROM dbo.MonitoringDeviceSession d
+                      JOIN dbo.IndependentMonitoringSession s ON s.IndependentMonitoringSession_ID=d.IndependentMonitoringSession_ID
+                      WHERE s.Parent_ID=@p1 AND d.RevokedAtUtc IS NULL", now, parentId);
+                _db.Database.ExecuteSqlCommand(
+                    @"UPDATE e SET ResolvedAtUtc=@p0 FROM dbo.IndependentCryEvent e
+                      JOIN dbo.IndependentMonitoringSession s ON s.IndependentMonitoringSession_ID=e.IndependentMonitoringSession_ID
+                      WHERE s.Parent_ID=@p1 AND e.ResolvedAtUtc IS NULL", now, parentId);
+                tx.Commit();
+            }
             return Ok(new { stopped = true, affected = changed });
         }
 
