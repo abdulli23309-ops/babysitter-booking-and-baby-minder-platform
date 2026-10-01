@@ -27,9 +27,11 @@ namespace WebApplication2.Services.Implementations
     ///   1. The caller must first pass the CENTRALIZED chain MonitoringAccess
     ///      (job InProgress, identity via assigned sitter OR ChildGuardian, child
     ///      in JobChildren). Media adds no authorization rules of its own.
-    ///   2. The participant ROLE is derived from the authenticated role on the
-    ///      server. A sitter is ALWAYS receive-only; the client cannot ask to
-    ///      publish.
+    ///   2. The participant role is derived from the authenticated application
+    ///      role. A sitter always receives Role=viewer and CanPublish=false;
+    ///      JaaS's documented JWT schema has no per-user camera/microphone publish
+    ///      claim, so provider-side receive-only enforcement must be verified
+    ///      separately and must not be inferred from hidden client controls.
     ///   3. The provider JWT is signed HERE with a private key held only in server
     ///      configuration. It never reaches the browser, the database or a log.
     ///   4. Fail CLOSED. With no provider configured the service returns
@@ -37,24 +39,32 @@ namespace WebApplication2.Services.Implementations
     ///      never falls back to a public room server, and never returns an
     ///      unsigned token.
     ///
-    /// PROVIDER CONFIGURATION (all three required, Web.config appSettings)
+    /// PROVIDER CONFIGURATION (all five required, external appSettings)
     ///     MonitoringMediaEnabled    "true" | "false"   master switch
-    ///     MonitoringMediaDomain     tenant host, e.g. "meet.example.com"
-    ///     MonitoringMediaPrivateKey RSA private key (PEM or base64 PKCS#8) used
-    ///                                only to sign short-lived RS256 JWTs
+    ///     MonitoringMediaDomain     JaaS host (8x8.vc)
+    ///     MonitoringMediaAppId      JaaS tenant namespace and JWT subject
+    ///     MonitoringMediaApiKeyId   JaaS JWT header kid
+    ///     MonitoringMediaPrivateKey local PEM key, used only for RS256 signing
+    /// The private key never leaves this service. JaaS requires iss=chat,
+    /// sub=AppId, an AppID-prefixed room and the API key id in the JWT header.
+    /// React receives only the server-issued domain, room and signed token.
     /// If any is missing/blank the endpoint answers Configured = false, which is
     /// the intended state until a real provider account is supplied.
     ///
     /// E2E flow: Phone 2 starts MonitorSession -> Phone 2 requests media (server
-    /// authorizes and issues a publisher token) -> mother/sitter request media
-    /// (server authorizes, issues a receive-only viewer token) -> an unauthorized
+    /// authorizes and issues a publisher-role token) -> mother/sitter request media
+    /// (server authorizes and issues a viewer-role token) -> an unauthorized
     /// user is rejected by MonitoringAccess before any token can exist.
     /// </summary>
     public class MediaSessionService : IDisposable
     {
         private const string KeyEnabled = "MonitoringMediaEnabled";
         private const string KeyDomain = "MonitoringMediaDomain";
+        private const string KeyAppId = "MonitoringMediaAppId";
+        private const string KeyApiKeyId = "MonitoringMediaApiKeyId";
         private const string KeyPrivateKey = "MonitoringMediaPrivateKey";
+        private const string JaasAppId = "vpaas-magic-cookie-a60732c436244ceb82319194c84f2443";
+        private const string JaasApiKeyId = JaasAppId + "/d2feb3";
 
         private readonly BabySitterBooking_and_BabyMinderEntities _db;
         private readonly bool _ownsContext;
@@ -83,7 +93,8 @@ namespace WebApplication2.Services.Implementations
         ///
         /// The room is derived from the ALREADY EXISTING MonitorSession, so media
         /// shares the monitoring lifecycle instead of creating a second, parallel
-        /// video system. No new entity and no new lifecycle is introduced.
+        /// video system. Its AppID namespace makes the provider room name valid
+        /// for this JaaS tenant; MonitoringAccess remains the authorization gate.
         /// </summary>
         /// <param name="jobId">Job being monitored.</param>
         /// <param name="childId">Child within that job.</param>
@@ -113,8 +124,9 @@ namespace WebApplication2.Services.Implementations
                 throw new KeyNotFoundException("No active monitoring session for this job and child.");
 
             // (3) Role derived server-side. The monitoring phone (a parent acting
-            //     on the baby-side device) and the sitter are DIFFERENT people,
-            //     so only a parent may publish; a sitter is always receive-only.
+            //     on the baby-side device) and the sitter are DIFFERENT people.
+            //     The server DTO and JaaS moderator claim are derived from this
+            //     authenticated role; the browser cannot request a different role.
             bool isParent = string.Equals(currentRole, UserRole.Parent.ToDisplayString(), StringComparison.OrdinalIgnoreCase);
 
             var dto = new MonitoringMediaDto
@@ -128,10 +140,17 @@ namespace WebApplication2.Services.Implementations
 
             // (4) Fail closed when the provider is not configured.
             string domain = ConfigurationManager.AppSettings[KeyDomain];
+            string appId = ConfigurationManager.AppSettings[KeyAppId];
+            string apiKeyId = ConfigurationManager.AppSettings[KeyApiKeyId];
             string key = ConfigurationManager.AppSettings[KeyPrivateKey];
             bool masterOn = string.Equals(ConfigurationManager.AppSettings[KeyEnabled], "true", StringComparison.OrdinalIgnoreCase);
 
-            if (!masterOn || string.IsNullOrWhiteSpace(domain) || string.IsNullOrWhiteSpace(key))
+            // Require the complete tenant tuple; a partial or mismatched config
+            // must never mint a token for a different JaaS account.
+            if (!masterOn || !string.Equals(domain?.Trim(), "8x8.vc", StringComparison.OrdinalIgnoreCase) ||
+                !string.Equals(appId?.Trim(), JaasAppId, StringComparison.Ordinal) ||
+                !string.Equals(apiKeyId?.Trim(), JaasApiKeyId, StringComparison.Ordinal) ||
+                string.IsNullOrWhiteSpace(key))
             {
                 dto.Reason = "Live video is not configured on this deployment. " +
                              "Monitoring, cry alerts and pause controls are unaffected.";
@@ -141,8 +160,8 @@ namespace WebApplication2.Services.Implementations
             // (5) Server-side token issuance. The room is namespaced by the
             //     monitoring session so two jobs can never collide in one room.
             dto.Domain = domain.Trim();
-            dto.RoomName = BuildRoomName(session.MonitorSession_ID);
-            dto.Token = BuildToken(dto.RoomName, dto.DisplayName, dto.Role, currentUserId, key);
+            dto.RoomName = BuildRoomName(appId.Trim(), session.MonitorSession_ID);
+            dto.Token = BuildToken(dto.RoomName, dto.DisplayName, isParent, currentUserId, appId.Trim(), apiKeyId.Trim(), key);
 
             if (string.IsNullOrEmpty(dto.Token))
             {
@@ -158,6 +177,84 @@ namespace WebApplication2.Services.Implementations
             return dto;
         }
 
+        /// <summary>Issues a parent-only viewer token for the parent's active independent session.</summary>
+        public MonitoringMediaDto GetIndependentParentMedia(int parentId)
+        {
+            var session = _db.Database.SqlQuery<IndependentMediaRow>(
+                @"SELECT TOP 1 s.IndependentMonitoringSession_ID SessionId,s.Parent_ID ParentId,s.Child_ID ChildId,s.RoomName
+                  FROM dbo.IndependentMonitoringSession s JOIN dbo.Child c ON c.Child_ID=s.Child_ID AND c.IsDeleted=0
+                  WHERE s.Parent_ID=@p0 AND s.Status='Active' AND s.IsDeleted=0
+                    AND EXISTS(SELECT 1 FROM dbo.ChildGuardian g WHERE g.Child_ID=s.Child_ID AND g.Parent_ID=s.Parent_ID AND g.IsDeleted=0)
+                  ORDER BY s.IndependentMonitoringSession_ID DESC", parentId).FirstOrDefault();
+            if (session == null) throw new KeyNotFoundException("No authorized active independent monitoring session.");
+            return BuildIndependentMedia(session, parentId.ToString(System.Globalization.CultureInfo.InvariantCulture), "Parent", canPublish: false);
+        }
+
+        /// <summary>Issues a publisher token only after validating the dedicated device credential.</summary>
+        public MonitoringMediaDto GetIndependentDeviceMedia(string credential)
+        {
+            if (string.IsNullOrWhiteSpace(credential) || credential.Length != 64)
+                throw new MonitoringAccessException(MonitoringDenial.InvalidRole);
+            string hash;
+            using (var sha = SHA256.Create())
+                hash = BitConverter.ToString(sha.ComputeHash(Encoding.UTF8.GetBytes(credential))).Replace("-", string.Empty).ToLowerInvariant();
+            var session = _db.Database.SqlQuery<IndependentMediaRow>(
+                @"SELECT TOP 1 s.IndependentMonitoringSession_ID SessionId,s.Parent_ID ParentId,s.Child_ID ChildId,s.RoomName,
+                    d.MonitoringDeviceSession_ID DeviceSessionId
+                  FROM dbo.MonitoringDeviceSession d JOIN dbo.IndependentMonitoringSession s ON s.IndependentMonitoringSession_ID=d.IndependentMonitoringSession_ID
+                  JOIN dbo.Child c ON c.Child_ID=s.Child_ID AND c.IsDeleted=0 JOIN dbo.Parent p ON p.Parent_ID=s.Parent_ID AND p.IsDeleted=0
+                  WHERE d.CredentialHash=@p0 AND d.RevokedAtUtc IS NULL AND d.ExpiresAtUtc>GETUTCDATE() AND s.Status='Active' AND s.IsDeleted=0
+                    AND EXISTS(SELECT 1 FROM dbo.ChildGuardian g WHERE g.Child_ID=s.Child_ID AND g.Parent_ID=s.Parent_ID AND g.IsDeleted=0)",
+                hash).FirstOrDefault();
+            if (session == null) throw new MonitoringAccessException(MonitoringDenial.InvalidRole);
+            return BuildIndependentMedia(session, "device-" + session.DeviceSessionId.ToString(System.Globalization.CultureInfo.InvariantCulture), "Monitor device", canPublish: true);
+        }
+
+        private static MonitoringMediaDto BuildIndependentMedia(IndependentMediaRow session, string userId, string displayName, bool canPublish)
+        {
+            var dto = new MonitoringMediaDto
+            {
+                MonitorSessionId = session.SessionId,
+                Role = canPublish ? "publisher" : "viewer",
+                DisplayName = displayName,
+                CanPublish = canPublish,
+                Configured = false
+            };
+            string domain = ConfigurationManager.AppSettings[KeyDomain];
+            string appId = ConfigurationManager.AppSettings[KeyAppId];
+            string apiKeyId = ConfigurationManager.AppSettings[KeyApiKeyId];
+            string key = ConfigurationManager.AppSettings[KeyPrivateKey];
+            bool enabled = string.Equals(ConfigurationManager.AppSettings[KeyEnabled], "true", StringComparison.OrdinalIgnoreCase);
+            if (!enabled || !string.Equals(domain?.Trim(), "8x8.vc", StringComparison.OrdinalIgnoreCase) ||
+                !string.Equals(appId?.Trim(), JaasAppId, StringComparison.Ordinal) ||
+                !string.Equals(apiKeyId?.Trim(), JaasApiKeyId, StringComparison.Ordinal) || string.IsNullOrWhiteSpace(key))
+            {
+                dto.Reason = "Live video is not configured on this deployment.";
+                return dto;
+            }
+            dto.Domain = domain.Trim();
+            dto.RoomName = appId.Trim() + "/lc-independent-" + session.SessionId;
+            dto.Token = BuildToken(dto.RoomName, displayName, canPublish,
+                int.Parse(userId.StartsWith("device-", StringComparison.Ordinal) ? userId.Substring(7) : userId,
+                    System.Globalization.CultureInfo.InvariantCulture), appId.Trim(), apiKeyId.Trim(), key);
+            if (string.IsNullOrEmpty(dto.Token))
+            {
+                dto.Domain = null; dto.RoomName = null; dto.Reason = "Live video could not be started. Please try again.";
+                return dto;
+            }
+            dto.Configured = true;
+            return dto;
+        }
+
+        private sealed class IndependentMediaRow
+        {
+            public int SessionId { get; set; }
+            public int ParentId { get; set; }
+            public int ChildId { get; set; }
+            public string RoomName { get; set; }
+            public int DeviceSessionId { get; set; }
+        }
+
 
         /// <summary>
         /// Room name bound to the monitoring session, derived on the server so a
@@ -165,7 +262,7 @@ namespace WebApplication2.Services.Implementations
         /// a room name alone must never grant access, which is why every call
         /// still passes MonitoringAccess first.
         /// </summary>
-        private static string BuildRoomName(int monitorSessionId)
+        private static string BuildRoomName(string appId, int monitorSessionId)
         {
             // Every authorized participant for this MonitorSession must receive
             // the same room identifier. A random suffix per request created a
@@ -173,17 +270,22 @@ namespace WebApplication2.Services.Implementations
             // ever meeting. This identifier is deterministic, but is NOT an
             // authorization secret: MonitoringAccess and the signed provider
             // token are still required on every request.
-            return "lc-monitor-" + monitorSessionId;
+            return appId + "/lc-monitor-" + monitorSessionId;
         }
 
         /// <summary>
-        /// Signs the provider JWT (RS256) on the server.
+        /// Signs the provider JWT (RS256) on the server. The caller has already
+        /// passed MonitoringAccess and supplies only identity/role derived from
+        /// authentication; JaaS gets AppID namespace, short expiry and server
+        /// identity claims. Sitter receives the viewer DTO and moderator="false".
+        /// JaaS's documented token claims do not themselves restrict camera/mic
+        /// publishing for a non-moderator; the UI setting is not that boundary.
         ///
         /// The payload carries no secret beyond the room and the role, and the
         /// private key is used only in memory here. If signing fails the caller
         /// still receives Configured = false rather than a partial token.
         /// </summary>
-        private static string BuildToken(string room, string displayName, string role, int userId, string privateKey)
+        private static string BuildToken(string room, string displayName, bool isParent, int userId, string appId, string apiKeyId, string privateKey)
         {
             try
             {
@@ -194,16 +296,32 @@ namespace WebApplication2.Services.Implementations
                 {
                     rsa.ImportParameters(parameters.Value);
                     long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-                    string header = "{\"alg\":\"RS256\",\"typ\":\"JWT\"}";
-                    string payload = "{\"aud\":\"jitsi\",\"iss\":\"little-care\"" +
-                                      ",\"sub\":\"lc-" + userId + "\"" +
-                                      ",\"room\":\"" + room + "\"" +
-                                      ",\"role\":\"" + role + "\"" +
-                                      ",\"name\":\"" + displayName + "\"" +
-                                      ",\"exp\":" + (now + 3600) +
-                                      ",\"iat\":" + now + "}";
-                    string signingInput = B64Url(Encoding.UTF8.GetBytes(header)) + "." +
-                                          B64Url(Encoding.UTF8.GetBytes(payload));
+                    var header = new { alg = "RS256", kid = apiKeyId, typ = "JWT" };
+                    var payload = new
+                    {
+                        aud = "jitsi",
+                        iss = "chat",
+                        sub = appId,
+                        room = room,
+                        exp = now + 3600,
+                        nbf = now,
+                        context = new
+                        {
+                            user = new
+                            {
+                                id = userId.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                                name = displayName,
+                                // JaaS documents this claim as the string "true"/"false".
+                                // A JSON boolean is not equivalent for consumers that
+                                // compare the documented string value strictly.
+                                moderator = isParent ? "true" : "false"
+                            }
+                        }
+                    };
+                    string headerJson = Newtonsoft.Json.JsonConvert.SerializeObject(header);
+                    string payloadJson = Newtonsoft.Json.JsonConvert.SerializeObject(payload);
+                    string signingInput = B64Url(Encoding.UTF8.GetBytes(headerJson)) + "." +
+                                          B64Url(Encoding.UTF8.GetBytes(payloadJson));
                     byte[] signature = rsa.SignData(
                         Encoding.UTF8.GetBytes(signingInput), CryptoConfig.MapNameToOID("SHA256"));
                     return signingInput + "." + B64Url(signature);
@@ -212,20 +330,20 @@ namespace WebApplication2.Services.Implementations
             catch (Exception ex)
             {
                 // Never surface key/parse detail to the client; log server-side only.
-                Trace.TraceError("MediaSessionService: failed to sign media token: {0}", ex);
+                Trace.TraceError("MediaSessionService: token signing failed ({0}).", ex.GetType().Name);
                 return null;
             }
         }
 
 
         /// <summary>
-        /// Accepts a PKCS#8 RSA private key as PEM text or as raw base64 and
+        /// Accepts PKCS#8 or PKCS#1 RSA private key PEM text (or raw base64) and
         /// returns the RSA parameters.
         ///
         /// WHY A HAND-ROLLED READER: .NET Framework 4.7.2 has no
         /// RSA.ImportFromPem (that arrived with .NET Core 3.0), and this project
         /// must not take a new dependency just to parse one key. This reads the
-        /// standard PKCS#8 structure and returns false on anything unexpected, so
+        /// standard PKCS#8/PKCS#1 structures and returns false on anything unexpected, so
         /// a malformed key fails CLOSED instead of half-enabling media.
         /// </summary>
         private static bool TryReadPrivateKey(string key, out RSAParameters? result)
@@ -234,6 +352,9 @@ namespace WebApplication2.Services.Implementations
             if (string.IsNullOrWhiteSpace(key)) return false;
 
             string base64 = key.Trim();
+            bool isPkcs1 = base64.Contains("-----BEGIN RSA PRIVATE KEY-----");
+            bool hasPkcs8Marker = base64.Contains("-----BEGIN PRIVATE KEY-----");
+            if (base64.Contains("-----BEGIN") && !isPkcs1 && !hasPkcs8Marker) return false;
             if (base64.Contains("-----BEGIN"))
             {
                 var lines = base64.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
@@ -247,29 +368,50 @@ namespace WebApplication2.Services.Implementations
 
             try
             {
-                // PKCS#8: SEQUENCE { version, AlgorithmIdentifier, OCTET STRING }
-                int pos = 0, length;
-                byte tag;
-                if (!ReadTlv(der, ref pos, out tag, out length)) return false;   // outer SEQUENCE
-                if (!ReadTlv(der, ref pos, out tag, out length)) return false;   // version
-                if (!ReadTlv(der, ref pos, out tag, out length)) return false;   // algorithm id
-                if (!ReadTlv(der, ref pos, out tag, out length)) return false;   // alg body
-                pos += length;
-                if (!ReadTlv(der, ref pos, out tag, out length)) return false;   // OCTET STRING
-                byte[] pkcs1 = new byte[length];
-                Array.Copy(der, pos, pkcs1, 0, length);
+                byte[] pkcs1 = der;
+                if (!isPkcs1)
+                {
+                    // PKCS#8: SEQUENCE { version INTEGER, algorithm SEQUENCE,
+                    // privateKey OCTET STRING }. Advance over every full TLV.
+                    int outer = 0, outerLength;
+                    byte outerTag;
+                    if (!ReadTlv(der, ref outer, out outerTag, out outerLength) || outerTag != 0x30 || outer + outerLength != der.Length) return false;
+                    int end = outer + outerLength;
+                    int fieldLength;
+                    if (!ReadTlv(der, ref outer, out outerTag, out fieldLength) || outerTag != 0x02) return false;
+                    outer += fieldLength;
+                    if (!ReadTlv(der, ref outer, out outerTag, out fieldLength) || outerTag != 0x30) return false;
+                    outer += fieldLength;
+                    if (!ReadTlv(der, ref outer, out outerTag, out fieldLength) || outerTag != 0x04 || outer + fieldLength != end) return false;
+                    pkcs1 = new byte[fieldLength];
+                    Array.Copy(der, outer, pkcs1, 0, fieldLength);
+                }
 
-                // PKCS#1: SEQUENCE { version, n, e, d, p, q, dp, dq, qInv }
-                int inner = 0;
-                if (!ReadTlv(pkcs1, ref inner, out tag, out length)) return false;
+                // PKCS#1: SEQUENCE { version, n, e, d, p, q, dp, dq, qInv }.
+                int inner = 0, sequenceLength;
+                byte tag;
+                if (!ReadTlv(pkcs1, ref inner, out tag, out sequenceLength) || tag != 0x30 || inner + sequenceLength != pkcs1.Length) return false;
+                int sequenceEnd = inner + sequenceLength;
+                int length;
                 var parts = new byte[8][];
+                if (!ReadTlv(pkcs1, ref inner, out tag, out length) || tag != 0x02) return false;
+                inner += length; // version
                 for (int i = 0; i < 8; i++)
                 {
-                    if (!ReadTlv(pkcs1, ref inner, out tag, out length)) return false;
+                    if (!ReadTlv(pkcs1, ref inner, out tag, out length) || tag != 0x02) return false;
                     parts[i] = new byte[length];
                     Array.Copy(pkcs1, inner, parts[i], 0, length);
+                    // DER INTEGERs are signed and commonly have a leading 00
+                    // to keep the RSA magnitude positive. RSAParameters expects
+                    // unsigned magnitudes without that sign-padding byte.
+                    int firstMagnitudeByte = 0;
+                    while (firstMagnitudeByte < parts[i].Length - 1 && parts[i][firstMagnitudeByte] == 0)
+                        firstMagnitudeByte++;
+                    if (firstMagnitudeByte > 0)
+                        parts[i] = parts[i].Skip(firstMagnitudeByte).ToArray();
                     inner += length;
                 }
+                if (inner != sequenceEnd) return false;
                 result = new RSAParameters
                 {
                     Modulus = parts[0], Exponent = parts[1],
@@ -293,7 +435,7 @@ namespace WebApplication2.Services.Implementations
             if (n == 0 || n > 4 || pos + n > data.Length) return false;
             length = 0;
             for (int i = 0; i < n; i++) length = (length << 8) | data[pos++];
-            return pos + length <= data.Length;
+            return length >= 0 && pos + length <= data.Length;
         }
 
         private static string B64Url(byte[] data)

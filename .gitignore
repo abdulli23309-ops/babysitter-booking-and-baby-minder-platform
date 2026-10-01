@@ -29,6 +29,7 @@ packages/
 .env.local
 *.local
 appsettings.Development.json
+WebApplication2/Web.MonitoringMedia.config
 
 # ── Editor ────────────────────────────────────────
 .vscode/

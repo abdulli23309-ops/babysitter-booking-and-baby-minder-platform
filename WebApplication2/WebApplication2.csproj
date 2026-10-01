@@ -157,6 +157,7 @@
     <Compile Include="Controllers\MatchingController.cs" />
     <Compile Include="Controllers\NotificationsController.cs" />
     <Compile Include="Controllers\MonitoringController.cs" />
+    <Compile Include="Controllers\IndependentMonitoringController.cs" />
     <Compile Include="Controllers\ParentController.cs" />
     <Compile Include="Controllers\ReviewController.cs" />
     <Compile Include="DTOs\AvailabilityDto.cs" />
@@ -176,6 +177,7 @@
     <Compile Include="DTOs\JobInvitationDtos.cs" />
     <Compile Include="DTOs\NotificationDto.cs" />
     <Compile Include="DTOs\MonitoringDtos.cs" />
+    <Compile Include="DTOs\IndependentMonitoringDtos.cs" />
     <Compile Include="DTOs\ParentDTOs.cs" />
     <Compile Include="DTOs\ReviewDTO.cs" />
     <Compile Include="DTOs\SearchSittersDTO.cs" />
@@ -281,6 +283,9 @@
     </Compile>
     <Compile Include="Models\UserSession.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\docs\database\phase13_independent_monitoring.sql" />
   </ItemGroup>
   <ItemGroup>
     <EntityDeploy Include="Models\Model1.edmx">

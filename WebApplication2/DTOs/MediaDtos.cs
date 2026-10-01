@@ -30,9 +30,8 @@ namespace WebApplication2.DTOs
         public string Domain { get; set; }
 
         /// <summary>
-        /// Opaque room name bound to this (job, child, session). It is a routing
-        /// detail only - it is NOT authorization, and it is never used as a
-        /// capability by itself.
+        /// Provider room identifier, namespaced with the JaaS AppID and anchored
+        /// to this session. It is routing data only, never authorization.
         /// </summary>
         public string RoomName { get; set; }
 
