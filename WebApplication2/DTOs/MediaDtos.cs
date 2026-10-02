@@ -48,7 +48,7 @@ namespace WebApplication2.DTOs
 
         /// <summary>
         /// Pre-encoded, server-composed path for the media surface, e.g.
-        /// "/join/lc-i-1042-5d5f4f94?name=Parent". The browser uses
+        /// "/join/?room=lc-i-1042-5d5f4f94&amp;name=Parent". The browser uses
         /// ServerUrl + JoinPath as the iframe source. The display name is
         /// URL-encoded HERE, on the server, so the client never builds it.
         /// </summary>

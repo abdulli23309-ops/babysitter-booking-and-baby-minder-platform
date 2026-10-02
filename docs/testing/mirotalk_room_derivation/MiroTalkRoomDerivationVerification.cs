@@ -2,7 +2,7 @@
 // MediaSessionService. It is deliberately PURE: no SQL Server, no IIS, no
 // MiroTalk instance, no browser, no network, no credentials and no database.
 // The helpers are internal, so they are invoked through reflection exactly as
-// the existing JaaS offline regression does.
+// the previous offline regression did.
 //
 // The salt used below is a THROWAWAY generated in memory for this run. It is
 // never the deployed MonitoringMediaRoomSalt and is never printed.

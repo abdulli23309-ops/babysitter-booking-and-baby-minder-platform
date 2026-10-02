@@ -117,7 +117,7 @@ namespace WebApplication2.Services.Implementations
         public MonitoringMediaDto GetIndependentParentMedia(int parentId)
         {
             var session = _db.Database.SqlQuery<IndependentMediaRow>(
-                @"SELECT TOP 1 s.IndependentMonitoringSession_ID SessionId,s.Parent_ID ParentId,s.Child_ID ChildId,s.RoomName
+                @"SELECT TOP 1 s.IndependentMonitoringSession_ID SessionId,s.Parent_ID ParentId,s.Child_ID ChildId
                   FROM dbo.IndependentMonitoringSession s JOIN dbo.Child c ON c.Child_ID=s.Child_ID AND c.IsDeleted=0
                   WHERE s.Parent_ID=@p0 AND s.Status='Active' AND s.IsDeleted=0
                     AND EXISTS(SELECT 1 FROM dbo.ChildGuardian g WHERE g.Child_ID=s.Child_ID AND g.Parent_ID=s.Parent_ID AND g.IsDeleted=0)
@@ -135,7 +135,7 @@ namespace WebApplication2.Services.Implementations
             using (var sha = SHA256.Create())
                 hash = BitConverter.ToString(sha.ComputeHash(Encoding.UTF8.GetBytes(credential))).Replace("-", string.Empty).ToLowerInvariant();
             var session = _db.Database.SqlQuery<IndependentMediaRow>(
-                @"SELECT TOP 1 s.IndependentMonitoringSession_ID SessionId,s.Parent_ID ParentId,s.Child_ID ChildId,s.RoomName,
+                @"SELECT TOP 1 s.IndependentMonitoringSession_ID SessionId,s.Parent_ID ParentId,s.Child_ID ChildId,
                     d.MonitoringDeviceSession_ID DeviceSessionId
                   FROM dbo.MonitoringDeviceSession d JOIN dbo.IndependentMonitoringSession s ON s.IndependentMonitoringSession_ID=d.IndependentMonitoringSession_ID
                   JOIN dbo.Child c ON c.Child_ID=s.Child_ID AND c.IsDeleted=0 JOIN dbo.Parent p ON p.Parent_ID=s.Parent_ID AND p.IsDeleted=0
@@ -165,7 +165,6 @@ namespace WebApplication2.Services.Implementations
             public int SessionId { get; set; }
             public int ParentId { get; set; }
             public int ChildId { get; set; }
-            public string RoomName { get; set; }
             public int DeviceSessionId { get; set; }
         }
 

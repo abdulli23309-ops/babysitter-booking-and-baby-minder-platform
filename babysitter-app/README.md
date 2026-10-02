@@ -1,4 +1,4 @@
-﻿# Little Care - Babysitter Booking & Baby Minder FYP
+# Little Care - Babysitter Booking & Baby Minder FYP
 
 An elite, full-featured modern web application connecting verified caregivers with parents, featuring real-time AI acoustic baby cry detection and WebRTC video monitoring.
 
@@ -12,7 +12,7 @@ An elite, full-featured modern web application connecting verified caregivers wi
   - **Design System:** Glassmorphism 2.0 (translucent frosted overlays, layered depth, soft drop shadows)
   - **Desktop Constraint:** Centered 480px app-shell frame replicating a native mobile app feel
   - **Zero UI Frameworks:** 0 Tailwind, 0 Bootstrap, 0 external UI bloat
-- **Backend Architecture:** ASP.NET Core Web API
+- **Backend Architecture:** ASP.NET Web API 2 on .NET Framework 4.7.2, EF6 Database-First, SQL Server
 - **Authentication:** Database-Backed Opaque Session Tokens (No client-side JWT decoding)
 - **AI & Real-Time Media:**
   - **Acoustic Cry Detection:** TensorFlow.js (YAMNet) neural graph model with dual spectral frequency fallback
@@ -86,3 +86,11 @@ npm run preview
 Developed for Final Year Project (FYP) â€” All rights reserved.
 
 
+
+## LAN HTTPS development
+
+The Vite development server binds to `0.0.0.0` and uses HTTPS with the LAN development certificate pair from `E:/MiroTalkPOC/app/ssl/cert.pem` and `key.pem`. Override the paths with `VITE_TLS_CERT` and `VITE_TLS_KEY`. Camera and microphone access on other devices requires a secure origin.
+
+The MiroTalk server and the frontend must both use hostnames/IP addresses covered by certificates trusted on every demo phone and browser. For the existing LAN certificate, install its issuing CA certificate (`E:/MiroTalkPOC/app/ssl/ca.crt`) into each test device's trusted root certificate store, then open the frontend and MiroTalk HTTPS URLs and verify that neither shows a certificate warning. Do not bypass a warning or install the leaf server certificate as a root. The local IIS Express API certificate must also be trusted by the Node/Vite proxy because proxy TLS verification is enabled.
+
+This repository does not contain certificates or private keys. Certificate trust and the physical two-phone media flow still require verification on the actual demo devices.

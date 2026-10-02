@@ -747,7 +747,7 @@ namespace Phase56Harness
                 Scalar(db, "SELECT COUNT(*) FROM CryAlert WHERE IsDeleted = 0 AND Status IN ('Open','Acknowledged') " +
                            "AND NextEscalationDueAt IS NULL AND EscalationStage < 2") == 0);
 
-            Expect("T5-boundary: NO later-phase feature was used (DND / pause / calming video / JaaS untouched)",
+            Expect("T5-boundary: NO later-phase feature was used (DND / pause / calming video / media untouched)",
                 Scalar(db, "SELECT COUNT(*) FROM MonitorSession WHERE ParentDndUntilUtc IS NOT NULL OR " +
                            "SitterDndUntilUtc IS NOT NULL OR CalmingVideoRequired = 1 OR CalmingVideoWatchedAt IS NOT NULL") == 0 &&
                 Scalar(db, "SELECT COUNT(*) FROM ChildGuardian WHERE CanApprovePause = 1") == 0);
@@ -834,4 +834,3 @@ namespace Phase56Harness
         }
     }
 }
-
