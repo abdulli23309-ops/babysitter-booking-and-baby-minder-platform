@@ -47,13 +47,18 @@ internal static class MiroTalkRoomDerivationVerification
         var derive = t.GetMethod("DeriveRoomId", BindingFlags.NonPublic | BindingFlags.Static,
             null, new[] { typeof(string), typeof(int), typeof(string) }, null);
         var normalize = t.GetMethod("NormalizeServerUrl", BindingFlags.NonPublic | BindingFlags.Static, null, new[] { typeof(string) }, null);
+        var buildJoinPath = t.GetMethod("BuildJoinPath", BindingFlags.NonPublic | BindingFlags.Static, null,
+            new[] { typeof(string), typeof(string), typeof(bool) }, null);
 
         Check("harness: DeriveRoomId(scope,int,string) is reachable", derive != null);
         Check("harness: NormalizeServerUrl(string) is reachable", normalize != null);
-        if (derive == null || normalize == null) { Console.WriteLine("0 passed, {0} failed", failed); return 1; }
+        Check("harness: BuildJoinPath(room,name,canPublish) is reachable", buildJoinPath != null);
+        if (derive == null || normalize == null || buildJoinPath == null) { Console.WriteLine("0 passed, {0} failed", failed); return 1; }
 
         string Derive(string scope, int id, string salt) => (string)derive.Invoke(null, new object[] { scope, id, salt });
         string Norm(string v) => (string)normalize.Invoke(null, new object[] { v });
+        string Join(string room, string name, bool canPublish) =>
+            (string)buildJoinPath.Invoke(null, new object[] { room, name, canPublish });
 
         // Throwaway salts. Deterministic constants let the expected values be
         // recomputed independently below.
@@ -113,6 +118,14 @@ internal static class MiroTalkRoomDerivationVerification
             job == Expected(ScopeJob, 1042, saltA) && ind == Expected(ScopeIndependent, 1042, saltA));
         Check("13b. example shape lc-m-1042-3f9a1c07", Regex.IsMatch(job, @"^lc-m-1042-[0-9a-f]{8}$"));
 
+        // --- Supported MiroTalk direct-join presentation options -------------
+        string viewerPath = Join(ind, "Parent", false);
+        string publisherPath = Join(ind, "Monitor device", true);
+        Check("13c. viewer path hides only its own participant tile", viewerPath.Contains("&hide=1"));
+        Check("13d. viewer cannot request camera or microphone", viewerPath.Contains("&audio=0&video=0"));
+        Check("13e. publisher keeps its local preview and media enabled",
+            publisherPath.Contains("&audio=1&video=1") && publisherPath.Contains("&hide=0"));
+
         Console.WriteLine();
         Console.WriteLine("sample job room        : {0}", job);
         Console.WriteLine("sample independent room: {0}", ind);
@@ -141,6 +154,28 @@ internal static class MiroTalkRoomDerivationVerification
             !json.Contains("API_KEY_SECRET") && !json.Contains("JWT_SECRET"));
         Check("19. role and canPublish are server-set values echoed verbatim",
             dto.Role == "publisher" && dto.CanPublish);
+
+        // --- Join path contract -------------------------------------------------
+        // The browser must never build the join URL, so assert the server does
+        // and that it carries the flags the media UI depends on.
+        string viewer = Join("lc-i-1042-5d5f4f94", "Parent", false);
+        string publisher = Join("lc-m-1042-3f9a1c07", "Baby monitor", true);
+
+        Check("22. viewer joins with audio/video OFF (never publishes)",
+            viewer.Contains("&audio=0") && viewer.Contains("&video=0"));
+        Check("23. publisher joins with audio/video ON",
+            publisher.Contains("&audio=1") && publisher.Contains("&video=1"));
+        Check("24. viewer suppresses its own self tile (hide=1)", viewer.Contains("&hide=1"));
+        Check("25. publisher keeps its local preview (hide=0)", publisher.Contains("&hide=0"));
+        Check("26. chat and screen share stay off", viewer.Contains("&chat=0") && viewer.Contains("&screen=0"));
+        Check("27. join path opts into the embed bridge (embed=1)",
+            viewer.Contains("&embed=1") && publisher.Contains("&embed=1"));
+        Check("28. room is URL-encoded in the path", viewer.Contains("room=lc-i-1042-5d5f4f94"));
+        Check("29. display name is URL-encoded, never raw",
+            publisher.Contains("name=Baby%20monitor") && !publisher.Contains("name=Baby monitor"));
+        Check("30. join path never contains the salt or a secret",
+            viewer.IndexOf(saltA, StringComparison.Ordinal) < 0
+            && !viewer.Contains("API_KEY_SECRET") && !viewer.Contains("JWT_SECRET"));
 
         Console.WriteLine();
         Console.WriteLine("{0} passed, {1} failed", passed, failed);

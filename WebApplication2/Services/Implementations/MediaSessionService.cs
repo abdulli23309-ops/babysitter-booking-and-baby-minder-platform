@@ -217,10 +217,21 @@ namespace WebApplication2.Services.Implementations
         {
             string audio = canPublish ? "1" : "0";
             string video = canPublish ? "1" : "0";
+            // MiroTalk's supported direct-join `hide` option hides this local
+            // participant's own tile. Use it for viewers so the parent sees
+            // only the monitor device's actual camera feed, while keeping the
+            // publisher's local preview available on Phone 2.
+            string hideSelf = canPublish ? "0" : "1";
+            // embed=1 opts this room into the Little Care embed bridge that
+            // ships with our own self-hosted deployment (public/js/
+            // littlecare-embed.js). It hides the SFU's conference chrome and
+            // accepts real control commands from the parent. It is inert on
+            // any other join, so a normal MiroTalk room is unaffected.
             return "/join/?room=" + Uri.EscapeDataString(roomId) +
                 "&roomPassword=0&name=" + Uri.EscapeDataString(displayName ?? string.Empty) +
                 "&audio=" + audio + "&video=" + video +
-                "&screen=0&hide=0&notify=0&chat=0&duration=unlimited";
+                "&screen=0&hide=" + hideSelf + "&notify=0&chat=0&duration=unlimited" +
+                "&embed=1";
         }
         // Room derivation helpers are shared by job-linked and independent
         // monitoring issuance. They have no database or client-side state.

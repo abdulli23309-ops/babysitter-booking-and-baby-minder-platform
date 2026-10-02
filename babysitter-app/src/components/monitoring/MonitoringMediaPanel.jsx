@@ -25,7 +25,7 @@
  *   reason     - the server's own human-readable explanation
  *   childName  - used in the empty states so the panel is never context-free
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import styles from './monitoring-media.module.css';
 
 /* Inline icons keep this dependency-free and legible down to 320px. */
@@ -121,6 +121,7 @@ export default function MonitoringMediaPanel({ status, media, canPublish, reason
   // backend authorised for this specific session.
   const scopeKey = media ? `${media.MonitorSessionId}:${media.RoomId}` : '';
   const frameSrc = media && media.ServerUrl && media.JoinPath ? `${media.ServerUrl}${media.JoinPath}` : '';
+  const frameOrigin = media && media.ServerUrl ? new URL(media.ServerUrl).origin : '';
 
   /* The "connecting" state is DERIVED rather than stored, which is what the
      project already does in useMonitoringMedia: we have no load confirmation
@@ -137,6 +138,41 @@ export default function MonitoringMediaPanel({ status, media, canPublish, reason
     return () => clearTimeout(timer);
   }, [frameSrc, scopeKey]);
 
+  /* ---- Native controls, backed by the real media layer -------------------
+     The SFU runs on a different origin, so this app cannot reach into it and
+     cannot simply call its API. What it CAN do is talk to the embed bridge
+     that ships with our own self-hosted deployment, which is loaded only
+     because the server put ?embed=1 in the join path.
+
+     The bridge does not simulate anything: it clicks the SFU's own
+     start/stop audio and video buttons and reports the resulting true track
+     state back. Until that bridge has actually answered, `bridgeReady` is
+     false and the controls render DISABLED. We would rather show a control
+     that is visibly unavailable than a button that silently does nothing. */
+  const [mediaState, setMediaState] = useState({ audio: false, video: false });
+  const [bridgeReady, setBridgeReady] = useState(false);
+  const frameRef = useRef(null);
+
+  useEffect(() => {
+    if (!frameLoaded || !frameOrigin) return undefined;
+    const onMessage = (event) => {
+      // Only the SFU origin may drive these controls.
+      if (event.origin !== frameOrigin) return;
+      if (!event.data || event.data.type !== 'littlecare:state') return;
+      setMediaState({ audio: Boolean(event.data.audio), video: Boolean(event.data.video) });
+      setBridgeReady(true);
+    };
+    window.addEventListener('message', onMessage);
+    return () => window.removeEventListener('message', onMessage);
+  }, [frameLoaded, frameOrigin]);
+
+  const sendCommand = (action) => {
+    const target = frameRef.current?.contentWindow;
+    if (!target) return;
+    // postMessage to the SFU origin, never '*'.
+    target.postMessage({ type: 'littlecare:command', action }, frameOrigin);
+  };
+
   const conferenceStatus = !frameSrc
     ? 'error'
     : frameLoaded
@@ -147,44 +183,35 @@ export default function MonitoringMediaPanel({ status, media, canPublish, reason
   // --- REAL live state: the server issued an authorised media session -------
   if (status === 'ready' && media) {
     const frameClass = variant === 'card' ? `${styles.frame} ${styles.cardFrame}` : styles.frame;
-    /* A publisher is the device holding the camera, so its rows describe THIS
-       client. A viewer only receives, so we must not imply it controls a
-       camera it does not have. Both readings are true on their own side. */
-    const rowState = 'checking';
+    /* These states are OURS. They deliberately describe the monitoring
+       session, not the SFU: the user should never see two competing
+       "connecting / unavailable" messages, and must never see raw provider
+       vocabulary inside the feed. */
+    const stateLabel = !frameSrc
+      ? 'Preparing live video'
+      : conferenceStatus === 'error'
+        ? 'Connection lost'
+        : frameLoaded
+          ? 'Monitoring active'
+          : 'Opening monitoring room';
     return (
       <section className={styles.mediaSurface} aria-label="Live monitoring media">
         <div className={frameClass} data-state={conferenceStatus}>
-          {/* This bar is the ONLY thing labelling the video, and it is entirely
-              our React markup. It carries the whole "this is a baby monitor, not
-              a meeting" message: who is being watched, that the feed is live, and
-              whether this device is the one holding the camera. */}
-          <div className={styles.liveBar} role="status">
-            <span className={styles.liveDot} aria-hidden="true" data-connected="false" />
-            <span className={styles.liveText}>
-              {conferenceStatus === 'error' ? 'Room unavailable' : frameLoaded ? 'Room loaded' : 'Opening room'}
-            </span>
-            <span className={styles.liveDivider} aria-hidden="true" />
-            <span className={styles.liveMeta}>
-              {/* Deliberately NOT "receive only": that is transport vocabulary
-                  and reads as a caller's permissions panel. This says whose
-                  camera is on screen, which is what a monitor is about. */}
-              {frameLoaded ? 'Media status is not available here' : 'Opening the monitoring room'}
-            </span>
-          </div>
           {frameSrc ? (
-            /* The media surface itself. The SFU is a separate origin on purpose:
-               it can neither read our DOM nor our session, and we cannot read
-               its internals. Only the server decides which room this is. The
-               `allow` list is what permits the SFU to ask for the camera and
-               microphone - it grants the PERMISSION PROMPT, nothing more. */
+            /* The media surface. The SFU is a separate origin on purpose: it
+               can neither read our DOM nor our session. The join URL carries
+               ?embed=1, which makes the SFU hide its own conference chrome and
+               accept the control commands below. The `allow` list is what lets
+               the SFU ask for camera and microphone - it grants the permission
+               PROMPT only. A viewer is not granted camera/microphone at all,
+               so the parent's browser is never prompted to publish. */
             <iframe
               key={frameSrc}
+              ref={frameRef}
               className={styles.frameElement}
               title={`Live monitoring media${childName ? ` for ${childName}` : ''}`}
               src={frameSrc}
-              allow={canPublish
-                ? 'camera; microphone; fullscreen; display-capture; autoplay'
-                : 'fullscreen; autoplay'}
+              allow={canPublish ? 'camera; microphone; fullscreen; autoplay' : 'fullscreen; autoplay'}
               allowFullScreen
               referrerPolicy="no-referrer"
               onLoad={() => setLoadedScopeKey(scopeKey)}
@@ -197,31 +224,52 @@ export default function MonitoringMediaPanel({ status, media, canPublish, reason
             </div>
           )}
         </div>
-        {/* These rows describe OUR OWN ROLE, which the server derived. They are
-            not a claim about the remote feed: a cross-origin surface cannot tell
-            us whether the baby's camera is momentarily muted, and we will not
-            invent that. */}
-        <div className={styles.mediaDetails} aria-label="Camera and microphone status">
-          <span className={styles.mediaFact} data-state={rowState}>
-            <span className={styles.factDot} aria-hidden="true" />
-            {canPublish ? 'Publisher role' : 'Viewer role'}
-          </span>
-          <span className={styles.mediaFact} data-state={rowState}>
-            <span className={styles.factDot} aria-hidden="true" />
-            {canPublish ? 'Camera and microphone permission available' : 'Camera and microphone disabled'}
-          </span>
-          {/* The one-line statement of what the screen is, rendered by us.
-              "Listening in" is the viewer's role: they are watching a baby, not
-              in a meeting. */}
-          <span className={styles.mediaFact} data-state={rowState}>
-            <span className={styles.factDot} aria-hidden="true" />
-            {frameLoaded ? 'Monitoring room page loaded' : 'Monitoring room opening'}
+
+        {/* ONE honest status line, owned by Little Care. */}
+        <div className={styles.liveBar} role="status">
+          <span
+            className={styles.liveDot}
+            aria-hidden="true"
+            data-connected={frameLoaded ? 'true' : 'false'}
+          />
+          <span className={styles.liveText}>{stateLabel}</span>
+          <span className={styles.liveDivider} aria-hidden="true" />
+          <span className={styles.liveMeta}>
+            {canPublish ? `${childName || 'Baby'}’s camera` : 'Listening in'}
           </span>
         </div>
-        {/* Device controls are NOT rendered here. Mute/unmute is now performed
-            by the SFU's own in-frame toolbar, because we can no longer reach
-            across the origin boundary to command it. Rendering a second,
-            non-functional copy would be a lie. */}
+
+        {/* Native Little Care controls, in the document flow BELOW the video.
+            Only the publisher gets them: a viewer has no camera or microphone
+            to control, and offering those buttons to a parent would invite
+            exactly the accidental publishing this design forbids. */}
+        {canPublish ? (
+          <div className={styles.mediaControls} aria-label="Monitor device controls">
+            <button
+              type="button"
+              className={styles.mediaControl}
+              data-on={mediaState.video ? 'true' : 'false'}
+              disabled={!bridgeReady}
+              aria-pressed={mediaState.video}
+              onClick={() => sendCommand('toggleVideo')}
+            >
+              {mediaState.video ? 'Turn camera off' : 'Turn camera on'}
+            </button>
+            <button
+              type="button"
+              className={styles.mediaControl}
+              data-on={mediaState.audio ? 'true' : 'false'}
+              disabled={!bridgeReady}
+              aria-pressed={mediaState.audio}
+              onClick={() => sendCommand('toggleAudio')}
+            >
+              {mediaState.audio ? 'Mute microphone' : 'Unmute microphone'}
+            </button>
+            {!bridgeReady ? (
+              <span className={styles.mediaControlNote}>Preparing device controls…</span>
+            ) : null}
+          </div>
+        ) : null}
       </section>
     );
   }

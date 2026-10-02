@@ -32,20 +32,17 @@
   box-shadow: var(--shadow-sm);
 }
 
+/* The status line sits BELOW the video in normal document flow. It used to be
+   absolutely positioned over the top of the feed with a dark gradient, which
+   put Little Care chrome on top of the camera image. A baby monitor should not
+   cover the thing it exists to show, so it now reads as a caption under the
+   frame and uses the normal surface colours instead of white-on-image. */
 .liveBar {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 2;
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  padding: var(--space-2) var(--space-3);
-  /* A short gradient keeps the marker legible over any camera image without
-     tinting the whole frame. */
-  background: linear-gradient(180deg, rgba(12, 16, 28, 0.62) 0%, rgba(12, 16, 28, 0) 100%);
-  color: #fff;
+  padding: 0 var(--space-1);
+  color: var(--color-text);
 }
 
 .liveDot {
@@ -70,13 +67,53 @@
 .liveDivider {
   width: 1px;
   height: 12px;
-  background: rgba(255, 255, 255, 0.35);
+  background: var(--color-border);
 }
 
 .liveMeta {
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-medium);
-  color: rgba(255, 255, 255, 0.88);
+  color: var(--color-text-secondary);
+}
+
+/* Native device controls. These live in the document flow BELOW the frame so
+   they can never overlap the camera image. They are ordinary Little Care
+   buttons, deliberately not a copy of the SFU's own toolbar, and they are
+   laid out with wrapping so a 320px phone never scrolls sideways. */
+.mediaControls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-1);
+}
+
+.mediaControl {
+  /* 44px is the minimum comfortable touch target for a phone held one-handed. */
+  min-height: 44px;
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+}
+
+.mediaControl[data-on='true'] {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.mediaControl:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.mediaControlNote {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
 }
 
 .player {
@@ -150,43 +187,6 @@
 .mediaFact[data-state='unavailable'] .factDot,
 .mediaFact[data-state='muted'] .factDot { background: var(--color-warning); }
 
-/* PHASE 8.5 - the two device toggles are a deliberate 2-column grid with a
-   12px gutter and premium secondary (not primary) styling, so they read as
-   controls rather than as two competing call-to-actions. */
-.deviceControls {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-
-.deviceControl {
-  min-height: 44px;
-  padding: 8px 10px;
-  border: 1px solid var(--color-border-subtle);
-  border-radius: 12px;
-  background: var(--color-surface-muted, var(--color-surface-alt));
-  color: var(--color-text);
-  font: inherit;
-  font-size: var(--font-size-sm);
-  font-weight: 600;
-  text-align: center;
-  cursor: pointer;
-}
-
-.deviceControl:hover:not(:disabled) {
-  background: var(--color-surface-hover, var(--color-surface-alt));
-}
-
-.deviceControl:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
-.deviceControl:focus-visible {
-  outline: 3px solid rgb(var(--primary-rgb) / 0.25);
-  outline-offset: 2px;
-}
-
 .frame[data-state='connecting'],
 .frame[data-state='lost'],
 .frame[data-state='error'] {
@@ -200,8 +200,6 @@
   .liveText { font-size: 11px; }
   .liveMeta { font-size: 10px; }
   .mediaFact { min-height: 44px; padding: 0 9px; }
-  .deviceControls { gap: 6px; }
-  .deviceControl { padding: 7px 6px; font-size: 11px; }
 }
 
 /* --- Honest empty state -------------------------------------------------- */
