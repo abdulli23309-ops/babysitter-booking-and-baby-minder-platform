@@ -30,7 +30,7 @@ function indexDir(d) {
 }
 indexDir(src);
 
-const EXTERNALS = /^(react(-dom\/client|-router(-dom)?|\/jsx-(?:runtime|dev-runtime))?|@jitsi\/react-sdk|@react-oauth\/google|@tensorflow\/tfjs|react-leaflet|leaflet|lodash|date-fns|dayjs|axios|clsx|classnames|framer-motion|node:)$/;
+const EXTERNALS = /^(react(-dom\/client|-router(-dom)?|\/jsx-(?:runtime|dev-runtime))?|@react-oauth\/google|@tensorflow\/tfjs|react-leaflet|leaflet|lodash|date-fns|dayjs|axios|clsx|classnames|framer-motion|node:)$/;
 
 const caseMismatches = [];
 

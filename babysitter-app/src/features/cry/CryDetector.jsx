@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+﻿import { useEffect, useRef, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import BackButton from '../../components/ui/BackButton';
@@ -10,7 +10,7 @@ import { deviceReportCry } from '../../services/independentMonitoringApi';
 import styles from './cry-detector.module.css';
 
 /* ================================================================
-   CryDetector — Phase F5 Modernized UI with Preserved ML Engine
+   CryDetector â€” Phase F5 Modernized UI with Preserved ML Engine
    TensorFlow.js (YAMNet) & Web Audio Frequency Fallback
 ================================================================ */
 
@@ -254,7 +254,7 @@ export default function CryDetector({ independent = false, embedded = false }) {
       // That was false on both counts: the legacy endpoint inserts through the
       // STALE EDMX CryAlert mapping with NextEscalationDueAt = NULL, so the
       // sweeper could never escalate it and NOBODY was ever notified; and it
-      // then opened the PUBLIC meet.jit.si room from a locally generated
+      // then opened a public room from a locally generated
       // roomName. It also sent client-supplied parentId/babysitterId, which the
       // security audit flags as a client-controlled identity.
       //
@@ -441,14 +441,14 @@ export default function CryDetector({ independent = false, embedded = false }) {
       silenceCountRef.current = 0;
       if (!cryStartRef.current) {
         cryStartRef.current = Date.now();
-        setStatusText('⚠️ Infant crying detected — validating duration…');
+        setStatusText('âš ï¸ Infant crying detected â€” validating durationâ€¦');
         addLog('Infant cry pattern recognized');
       } else {
         const elapsed = (Date.now() - cryStartRef.current) / 1000;
         const required = fastModeRef.current ? FAST_SECONDS : INITIAL_SECONDS;
         setTimer({ elapsed, required, active: true, fastMode: fastModeRef.current });
         setStatusText(
-          `Crying sustained for ${elapsed.toFixed(0)}s${fastModeRef.current ? ' (Fast Mode ⚡)' : ''}`
+          `Crying sustained for ${elapsed.toFixed(0)}s${fastModeRef.current ? ' (Fast Mode âš¡)' : ''}`
         );
         if (elapsed >= required) {
           sendAlert();
@@ -463,10 +463,10 @@ export default function CryDetector({ independent = false, embedded = false }) {
         fastModeRef.current = false;
         silenceCountRef.current = 0;
         setTimer({ elapsed: 0, required: INITIAL_SECONDS, active: false, fastMode: false });
-        setStatusText('Acoustic environment calm · Listening for infant sounds…');
+        setStatusText('Acoustic environment calm Â· Listening for infant soundsâ€¦');
       } else if (cryStartRef.current) {
         const elapsed = (Date.now() - cryStartRef.current) / 1000;
-        setStatusText(`Pause detected (${silenceCountRef.current}/${SILENCE_CHECKS}) · ${elapsed.toFixed(0)}s elapsed`);
+        setStatusText(`Pause detected (${silenceCountRef.current}/${SILENCE_CHECKS}) Â· ${elapsed.toFixed(0)}s elapsed`);
       }
     }
     tickTimerRef.current = setTimeout(() => {
@@ -482,7 +482,7 @@ export default function CryDetector({ independent = false, embedded = false }) {
     setMicPermissionDenied(false);
     setMode('loading');
     modeRef.current = 'loading';
-    setStatusText('Initializing microphone hardware…');
+    setStatusText('Initializing microphone hardwareâ€¦');
 
     try {
       let str;
@@ -511,13 +511,13 @@ export default function CryDetector({ independent = false, embedded = false }) {
         await loadYAMNet();
         setMode('ml');
         modeRef.current = 'ml';
-        setStatusText('Neural YAMNet model listening for infant cries…');
+        setStatusText('Neural YAMNet model listening for infant criesâ€¦');
         addLog('YAMNet neural model activated');
       } catch (e) {
         console.warn('YAMNet fallback mode:', e.message);
         setMode('fallback');
         modeRef.current = 'fallback';
-        setStatusText('Acoustic frequency fallback listening…');
+        setStatusText('Acoustic frequency fallback listeningâ€¦');
         addLog('Frequency spectral analyzer activated');
       }
 
@@ -544,12 +544,12 @@ export default function CryDetector({ independent = false, embedded = false }) {
   }, []);
 
   // ---- PHASE 11: the emergency "video call" view is REMOVED ----
-  // This screen used to swap itself for a Jitsi meeting on a room name the
-  // DEVICE invented, hosted on the public meet.jit.si, labelled "LIVE VIDEO
+  // This screen used to swap itself for a media meeting on a room name the
+  // DEVICE invented, hosted publicly, labelled "LIVE VIDEO
   // CONNECTION". That was wrong three times over:
   //   * the room was not authorised by anything - any name that reached the
   //     browser was a way in,
-  //   * meet.jit.si is an uncontrolled public host, so the badge overstated
+  //   * the old provider was an uncontrolled public host, so the badge overstated
   //     the security of the call, and
   //   * it fired on a cry DETECTION, which inverted the whole design: cry
   //     detection is an ADDITIONAL capability, not the thing that starts the
@@ -558,7 +558,7 @@ export default function CryDetector({ independent = false, embedded = false }) {
   // Live video now lives in one place - /baby-monitoring - which requests a
   // server-issued, MonitoringAccess-gated media session. This screen keeps its
   // actual job: running YAMNet locally and reporting a cry claim to the server.
-  // The jitsiRoom / inCall state is gone with the view.
+  // The old room and call state is gone with the view.
 
   // Permission Denied View
   if (micPermissionDenied) {
@@ -618,11 +618,11 @@ export default function CryDetector({ independent = false, embedded = false }) {
         <div>
           {isAlarmed ? (
             <span className={`${styles.statusBadge} ${styles.statusCry}`}>
-              🚨 CRY DETECTED!
+              ðŸš¨ CRY DETECTED!
             </span>
           ) : isListening ? (
             <span className={`${styles.statusBadge} ${styles.statusListening}`}>
-              ● {mode === 'ml' ? 'Neural YAMNet Active' : 'Frequency Fallback Active'}
+              â— {mode === 'ml' ? 'Neural YAMNet Active' : 'Frequency Fallback Active'}
             </span>
           ) : (
             <span className={`${styles.statusBadge} ${styles.statusCalm}`}>
@@ -643,7 +643,7 @@ export default function CryDetector({ independent = false, embedded = false }) {
       {timer.active && (
         <section className={styles.timerCard}>
           <div className={styles.timerHeader}>
-            <span>{timer.fastMode ? '⚡ Sustained Cry (Fast Alert Mode)' : 'Infant Cry Duration'}</span>
+            <span>{timer.fastMode ? 'âš¡ Sustained Cry (Fast Alert Mode)' : 'Infant Cry Duration'}</span>
             <span style={{ color: 'var(--color-primary)' }}>
               {timer.elapsed.toFixed(0)}s / {timer.required}s
             </span>
@@ -662,7 +662,7 @@ export default function CryDetector({ independent = false, embedded = false }) {
         <div className={styles.metricCard}>
           <span className={styles.metricLabel}>Sound Level</span>
           <p className={styles.metricVal}>
-            {metrics.db != null ? `${metrics.db} dB` : '—'}
+            {metrics.db != null ? `${metrics.db} dB` : 'â€”'}
           </p>
           <span className={styles.metricSub}>Ambient volume</span>
         </div>
@@ -670,15 +670,15 @@ export default function CryDetector({ independent = false, embedded = false }) {
         <div className={styles.metricCard}>
           <span className={styles.metricLabel}>Cry Ratio</span>
           <p className={styles.metricVal}>
-            {metrics.intensity != null ? `${metrics.intensity}%` : '—'}
+            {metrics.intensity != null ? `${metrics.intensity}%` : 'â€”'}
           </p>
-          <span className={styles.metricSub}>300–600 Hz band</span>
+          <span className={styles.metricSub}>300â€“600 Hz band</span>
         </div>
 
         <div className={styles.metricCard}>
           <span className={styles.metricLabel}>ML Confidence</span>
           <p className={styles.metricVal}>
-            {metrics.conf != null ? `${metrics.conf}%` : '—'}
+            {metrics.conf != null ? `${metrics.conf}%` : 'â€”'}
           </p>
           <span className={styles.metricSub}>YAMNet threshold</span>
         </div>
@@ -703,7 +703,7 @@ export default function CryDetector({ independent = false, embedded = false }) {
           alignItems: 'center',
         }}>
           <span style={{ fontWeight: 700, color: 'var(--color-primary)' }}>
-            🚨 {alertCount} Alert{alertCount !== 1 ? 's' : ''} sent to parent
+            ðŸš¨ {alertCount} Alert{alertCount !== 1 ? 's' : ''} sent to parent
           </span>
           <button
             type="button"
@@ -755,4 +755,5 @@ export default function CryDetector({ independent = false, embedded = false }) {
     </div>
   );
 }
+
 

@@ -264,12 +264,13 @@ export const API = {
 
   // ENDPOINT  GET /api/monitoring/media?jobId=&childId=
   // PURPOSE   Ask the server for a media session for this monitoring scope. The
-  //           server runs MonitoringAccess first, then mints the room and the
-  //           short-lived provider JWT. This is the ONLY sanctioned way to get a
-  //           room - never derive one on the client.
+  //           server runs MonitoringAccess first, then derives the SFU room from
+  //           the active session. This is the ONLY sanctioned way to get a room -
+  //           never derive one on the client.
   // REQUEST   jobId, childId only. No actor, no role, no token from the client.
-  // RESPONSE  { Configured, Reason, Domain, RoomName, Token, Role, CanPublish,
-  //             MonitorSessionId }
+  // RESPONSE  { Configured, Reason, ServerUrl, RoomId, JoinPath, Role,
+  //             DisplayName, CanPublish, MonitorSessionId } - a MiroTalk SFU join
+  //             description. There is NO provider token and no room salt.
   //           Configured=false is a NORMAL 200 while no media provider is
   //           configured on the deployment. The UI must then show an honest
   //           "live video unavailable" message and render no video at all.

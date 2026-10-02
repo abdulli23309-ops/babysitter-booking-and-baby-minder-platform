@@ -62,8 +62,9 @@ where `<token>` is the 32-character opaque GUID returned upon successful login.
 - `GET /api/review/user/{userId}/{role}` — [AllowAnonymous] All reviews for user with reviewer names.
 
 ### 9. Cry Detection & Monitoring (`api/cry-detection`)
-- `POST /api/cry-detection/` — [SessionAuthorize] Records a cry detection event and creates Jitsi room.
+- `POST /api/cry-detection/` — [SessionAuthorize] Records a cry detection event and creates a cry alert.
 - `GET /api/cry-detection/latest` — [SessionAuthorize] Polls the latest cry alert (`?parentId=`).
 
 ### 10. Image Serving (`api/images`)
 - `GET /api/images/{type}/{filename}` — Public. Serves uploaded avatars and certificates. Enforces path traversal sanitization.
+

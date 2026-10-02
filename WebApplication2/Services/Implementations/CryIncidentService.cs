@@ -1030,7 +1030,7 @@ WHERE Id = @claimId;";
         /// IncidentId links the row to the CryAlert incident. ActorUserId = 0 with
         /// ActorRole "Server" marks a server-side step (escalation claim, automatic
         /// cancellation); user actions record the real id/role. Payloads never
-        /// contain tokens, passwords, room names, JaaS credentials or personal data.
+        /// contain tokens, passwords, room names, media credentials or personal data.
         /// </summary>
         private void WriteAudit(Guid? incidentId, int? jobId, int? childId, string eventType,
             int actorUserId, string actorRole, string payloadJson)

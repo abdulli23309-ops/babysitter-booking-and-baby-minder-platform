@@ -322,18 +322,6 @@
   padding-bottom: 0;
 }
 
-/* Jitsi Native Responsive Container */
-.jitsiWrapper {
-  border-radius: var(--radius-xl);
-  overflow: hidden;
-  box-shadow: var(--shadow-lg);
-  border: 1px solid var(--color-border);
-  background: var(--color-media-canvas);
-  position: relative;
-  aspect-ratio: 16 / 9;
-  width: 100%;
-}
-
 .liveBadge {
   position: absolute;
   top: 12px;

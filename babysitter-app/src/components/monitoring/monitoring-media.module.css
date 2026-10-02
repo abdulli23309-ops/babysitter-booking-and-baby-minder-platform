@@ -88,26 +88,19 @@
   background: #10151d;
 }
 
-/* PHASE 8.4 - `@jitsi/react-sdk` renders its own unclassed wrapper <div> inside
-   .player and sizes it by content, which is what produced the empty black gap.
-   `:global` targets that injected node so the feed fills the frame without
-   needing a class Jitsi does not provide. */
-.player > :global(div) {
-  display: block;
+/* The media surface is a single cross-origin iframe filling the frame. It is a
+   plain element we render ourselves, so a direct class is all that is needed -
+   no `:global` escape hatch and no runtime style patching. */
+.frameElement {
   position: absolute;
   inset: 0;
-  width: 100%;
-  height: 100%;
-  min-height: 100%;
-}
-
-.player iframe {
   display: block;
   width: 100%;
   height: 100%;
   min-height: 100%;
   border: 0;
   margin: 0;
+  background: #10151d;
 }
 
 .mediaSurface {

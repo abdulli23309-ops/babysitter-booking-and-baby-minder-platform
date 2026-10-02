@@ -1,10 +1,10 @@
-# Little Care - Babysitter Booking & Baby Minder FYP
+﻿# Little Care - Babysitter Booking & Baby Minder FYP
 
 An elite, full-featured modern web application connecting verified caregivers with parents, featuring real-time AI acoustic baby cry detection and WebRTC video monitoring.
 
 ---
 
-## 🚀 Tech Stack & Architecture
+## ðŸš€ Tech Stack & Architecture
 
 - **Frontend Framework:** React 19 + Vite (Fast HMR & Optimized Production Bundles)
 - **Routing:** React Router v7 with role-based route protection and 404 catch-all
@@ -16,36 +16,36 @@ An elite, full-featured modern web application connecting verified caregivers wi
 - **Authentication:** Database-Backed Opaque Session Tokens (No client-side JWT decoding)
 - **AI & Real-Time Media:**
   - **Acoustic Cry Detection:** TensorFlow.js (YAMNet) neural graph model with dual spectral frequency fallback
-  - **Live Video Monitoring:** WebRTC Video via Jitsi Meet SDK (`@jitsi/react-sdk`)
+  - **Live Video Monitoring:** Self-hosted MiroTalk SFU over HTTPS
 - **PWA Ready:** Installable Progressive Web App with standalone display mode and custom manifest
 
 ---
 
-## 📦 Project Structure
+## ðŸ“¦ Project Structure
 
 ```
 src/
-├── app/                  # Application root & role-based ProtectedRoute
-├── assets/               # Local static image assets and avatars
-├── components/
-│   ├── layout/           # Shared shell, AppLayout, ParentBottomNav, BabysitterBottomNav
-│   └── ui/               # Reusable Glassmorphic primitives (Button, Input, Modal, Toast, EmptyState)
-├── features/
-│   ├── auth/             # Login, Register, CreateAccount, RoleSelection, Splash, AuthContext
-│   ├── babysitter/       # Dashboard, My Jobs, Active/Upcoming/Completed details, Earnings
-│   ├── cry/              # Neural AI Cry Detector with radar animation & oscilloscope
-│   ├── error/            # NotFoundScreen (404) & global ErrorBoundary
-│   ├── notifications/    # Parent & Babysitter in-app notification centers
-│   ├── parent/           # Dashboard, Sitter Search, Booking, Live Monitor, Cry Alerts
-│   └── reviews/          # Post-session rating and review workflows
-├── styles/               # Design tokens, global resets, and typography
-├── index.css             # Base gradient background & shell layout
-└── main.jsx              # Application bootstrap & entry point
+â”œâ”€â”€ app/                  # Application root & role-based ProtectedRoute
+â”œâ”€â”€ assets/               # Local static image assets and avatars
+â”œâ”€â”€ components/
+â”‚   â”œâ”€â”€ layout/           # Shared shell, AppLayout, ParentBottomNav, BabysitterBottomNav
+â”‚   â””â”€â”€ ui/               # Reusable Glassmorphic primitives (Button, Input, Modal, Toast, EmptyState)
+â”œâ”€â”€ features/
+â”‚   â”œâ”€â”€ auth/             # Login, Register, CreateAccount, RoleSelection, Splash, AuthContext
+â”‚   â”œâ”€â”€ babysitter/       # Dashboard, My Jobs, Active/Upcoming/Completed details, Earnings
+â”‚   â”œâ”€â”€ cry/              # Neural AI Cry Detector with radar animation & oscilloscope
+â”‚   â”œâ”€â”€ error/            # NotFoundScreen (404) & global ErrorBoundary
+â”‚   â”œâ”€â”€ notifications/    # Parent & Babysitter in-app notification centers
+â”‚   â”œâ”€â”€ parent/           # Dashboard, Sitter Search, Booking, Live Monitor, Cry Alerts
+â”‚   â””â”€â”€ reviews/          # Post-session rating and review workflows
+â”œâ”€â”€ styles/               # Design tokens, global resets, and typography
+â”œâ”€â”€ index.css             # Base gradient background & shell layout
+â””â”€â”€ main.jsx              # Application bootstrap & entry point
 ```
 
 ---
 
-## 🛠️ Getting Started
+## ðŸ› ï¸ Getting Started
 
 ### 1. Prerequisites
 - Node.js (v18 or higher recommended)
@@ -82,6 +82,7 @@ npm run preview
 
 ---
 
-## 🛡️ License
-Developed for Final Year Project (FYP) — All rights reserved.
+## ðŸ›¡ï¸ License
+Developed for Final Year Project (FYP) â€” All rights reserved.
+
 

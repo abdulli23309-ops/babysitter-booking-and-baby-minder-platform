@@ -110,9 +110,9 @@ no evidence exists. Nothing is claimed as working without evidence.
 | X1 | Monitoring UI frame | Camera frame + controls render in the monitoring screens | Runtime (real browser) | Working | KEEP | — |
 | X2 | Room handling | `MonitorSession.RoomName` generated server-side as `pending-<12 hex>` placeholder | Runtime | Working | KEEP (AD8) | Placeholder is the honest state. |
 | X3 | Room/secret security | `RoomName` deliberately excluded from DTOs; no room or token in URL or storage | Runtime (E5) | Working | KEEP | — |
-| X4 | Jitsi/JaaS provider decision | `@jitsi/react-sdk` is a dependency; no provider chosen, no credentials | Static | Undecided | RESEARCH | Must be decided before any media work. |
-| X5 | **Actual media configuration** | None | — | **NOT CONFIGURED** | MODIFY | Required for a working demo; needs real JaaS/JWT/API credentials. |
-| X6 | **Actual media verification** | Never performed | — | **NOT VERIFIED** | — | No claim of working video is made anywhere. `meet.jit.si` must not be used as a shortcut. |
+| X4 | Monitoring media provider | Self-hosted MiroTalk SFU with server-derived Little Care rooms | Static | Deployment configured | IMPLEMENTED | HTTPS trust and physical device media still require verification. |
+| X5 | **Actual media configuration** | SFU URL + server-only room salt, held in the Git-ignored `Web.MonitoringMedia.config` | - | **CONFIGURED (dev)** | KEEP | Per-machine values stay out of Git. MiroTalk provider secrets are not required by the app. |
+| X6 | **Actual media verification** | Standalone two-device POC passed over HTTP; HTTPS + in-app media not yet physically re-verified | - | **PARTIALLY VERIFIED** | MODIFY | No claim of working in-app video is made until the two-phone test is repeated over trusted HTTPS. |
 
 ---
 
@@ -211,3 +211,5 @@ Full specification: `docs/requirements/FEEDING_FEATURE_REQUIREMENT.md`.
 | C6 | Resolution / cancellation / dedupe / persistence | `WithChild` resolves; lifecycle cancels; re-report reuses the open incident; plan survives restart | Runtime (E3/E4) + Phase 5/6 harness (atomic claim, 83/83) | Working | KEEP (AD6) | `CryAlert` is the incident record; do **not** add a second incident model. |
 | C7 | **Legacy `/cry-detection` endpoint** | `CryDetectionController` → `CryAlertService` uses the **stale EDMX entity**; inserts a row with `Child_ID=NULL`, `MonitorSession_ID=NULL`, **`NextEscalationDueAt=NULL`** | **Runtime (Phase 10 probe)** | **BROKEN** | REMOVE | The sweeper requires `NextEscalationDueAt IS NOT NULL`, so this row can **never** be claimed, escalated or notified — it is silent dead data. It is also the path the `/cry-detector` UI still calls, and that UI then shows a false "Parent connected. Video call stream open." Must not be carried forward; the detector must post to the monitoring incident pipeline. See `FINAL_SYSTEM_AUDIT.md` §F1. |
 | C8 | Ops-only sweeper | `POST /monitoring/ops/sweep`, `[AllowAnonymous]` + `X-Ops-Sweep-Key`, **fails closed 503** when unconfigured, constant-time compare, uniform error | Static + Phase 5/6 harness | Working | KEEP | Correct operator design. |
+
+

@@ -42,7 +42,7 @@ function resolveImport(imp, fromFile) {
 }
 
 // External packages — must match entire bare specifier (no partial matches)
-const EXTERNALS = /^(react(-dom\/client|-router(-dom)?|\/jsx-(?:runtime|dev-runtime))?|@jitsi\/react-sdk|@react-oauth\/google|react-leaflet|leaflet|lodash|date-fns|dayjs|axios|clsx|classnames|framer-motion|node:)$/;
+const EXTERNALS = /^(react(-dom\/client|-router(-dom)?|\/jsx-(?:runtime|dev-runtime))?|@react-oauth\/google|react-leaflet|leaflet|lodash|date-fns|dayjs|axios|clsx|classnames|framer-motion|node:)$/;
 
 const broken = [];
 const resolved = new Set();

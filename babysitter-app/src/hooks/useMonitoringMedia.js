@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+﻿import { useCallback, useEffect, useState } from 'react';
 import { API } from '../services/api';
 
 /**
@@ -7,7 +7,7 @@ import { API } from '../services/api';
  * PURPOSE
  * Fetches the SERVER-ISSUED media session for a monitoring scope and exposes it
  * to the UI. This is the only sanctioned way to obtain a room, because the room
- * and the provider JWT are both minted on the server after MonitoringAccess has
+ * and its join path is prepared on the server after MonitoringAccess has
  * approved the caller.
  *
  * WHY THIS EXISTS (and what it replaces)
@@ -18,14 +18,14 @@ import { API } from '../services/api';
  * The parent monitoring screen now asks the server instead.
  *
  * RULES THIS HOOK ENFORCES
- *   1. The client never invents a domain, room or token. If the server says
+ *   1. The client never invents an address, room or credential. If the server says
  *      `configured: false`, the UI shows an honest "live video unavailable"
  *      message and NOTHING else. It must never fall back to a public room
- *      server such as meet.jit.si.
+ *      external public media service.
  *   2. The client never decides its own role. `canPublish` comes from the
  *      server; a sitter is always receive-only.
- *   3. The token is held in component state only. It is never written to
- *      localStorage/sessionStorage, never put in a URL, and never logged.
+ *   3. The room description is held in component state only. It is never written
+ *      to localStorage/sessionStorage and never logged.
  *   4. A 403/404 means "you are not allowed to watch this baby". The hook
  *      reports that as `denied` so the UI can say so plainly, rather than
  *      pretending the video is merely still loading.
@@ -76,7 +76,7 @@ export default function useMonitoringMedia(jobId, childId, enabled = true, refre
     try {
       const data = await API.getMonitoringMedia(jobId, childId);
       // NOTE ON CASING: this API returns PASCAL-CASE JSON (Configured, Reason,
-      // RoomName, CanPublish) because that is what the Web API serialiser emits
+      // RoomId, JoinPath, CanPublish) because that is what the Web API serialiser emits
       // and what the rest of this app already reads (session.Status, d.MonitorSession_ID).
       // Reading data.configured here silently yielded undefined, which made every
       // deployment look unconfigured and showed a generic message instead of the
@@ -157,3 +157,5 @@ export default function useMonitoringMedia(jobId, childId, enabled = true, refre
     reload: load,
   };
 }
+
+

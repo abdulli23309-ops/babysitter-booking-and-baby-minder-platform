@@ -10,10 +10,16 @@ namespace WebApplication2.DTOs
     /// the ONLY thing the browser receives about media, and it is produced by the
     /// server AFTER MonitoringAccess has approved the caller.
     ///
+    /// PROVIDER: self-hosted MiroTalk SFU. The browser receives the SFU
+    /// address, the server-derived room, and a pre-encoded join path. It
+    /// receives NO token and NO signing material: a MiroTalk room is created
+    /// implicitly by the first participant to join, so authorisation comes
+    /// from Little Care BEFORE these values are ever issued.
+    ///
     /// When no media provider is configured, the server still answers 200 with
-    /// <see cref="Configured"/> = false and an explicit <see cref="Reason"/>. The
-    /// UI then shows an honest "live video unavailable" state. The server never
-    /// fabricates a room, and never returns a token it did not sign.
+    /// <see cref="Configured"/> = false and an explicit <see cref="Reason"/>.
+    /// The UI then shows an honest "live video unavailable" state. The server
+    /// never fabricates a room and never returns an unauthorised session.
     /// </summary>
     public class MonitoringMediaDto
     {
@@ -26,20 +32,27 @@ namespace WebApplication2.DTOs
         /// <summary>User-facing explanation when <see cref="Configured"/> is false.</summary>
         public string Reason { get; set; }
 
-        /// <summary>Provider host (e.g. "meet.example.com"). Null when not configured.</summary>
-        public string Domain { get; set; }
+        /// <summary>
+        /// Base address of the MiroTalk SFU, e.g. "https://192.168.1.19:3010".
+        /// Browser-reachable and not a secret.
+        /// </summary>
+        public string ServerUrl { get; set; }
 
         /// <summary>
-        /// Provider room identifier, namespaced with the JaaS AppID and anchored
-        /// to this session. It is routing data only, never authorization.
+        /// Server-derived room identifier, e.g. "lc-i-1042-5d5f4f94". Derived
+        /// from the monitoring session id using a keyed digest so it cannot be
+        /// guessed. It is ROUTING DATA ONLY and is never authorization on its
+        /// own: every request re-runs MonitoringAccess first.
         /// </summary>
-        public string RoomName { get; set; }
+        public string RoomId { get; set; }
 
         /// <summary>
-        /// Server-signed provider JWT. Generated ONLY on the server; never stored
-        /// in the database, never placed in a URL, never logged.
+        /// Pre-encoded, server-composed path for the media surface, e.g.
+        /// "/join/lc-i-1042-5d5f4f94?name=Parent". The browser uses
+        /// ServerUrl + JoinPath as the iframe source. The display name is
+        /// URL-encoded HERE, on the server, so the client never builds it.
         /// </summary>
-        public string Token { get; set; }
+        public string JoinPath { get; set; }
 
         /// <summary>Server-derived participant role: "publisher" or "viewer".</summary>
         public string Role { get; set; }

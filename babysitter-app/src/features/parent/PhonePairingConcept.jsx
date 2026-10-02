@@ -231,7 +231,7 @@ export default function PhonePairingConcept({ initialView = 'parent' }) {
       ) : (
         <section className={styles.monitorPanel}>
           {/* PHASE 8.5 - the "LC" mark is removed entirely. It was our own
-              element, not Jitsi's, and sat directly above the video reading as
+              element, not the media surface's, and sat directly above the video reading as
               leftover pre-join branding. */}
           <span className={styles.step}>PHONE 2</span>
           <h2>{credential ? 'Monitor device paired' : 'Connect this phone'}</h2>

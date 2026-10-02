@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+﻿import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import MonitoringMediaPanel from '../../components/monitoring/MonitoringMediaPanel';
 import ParentBottomNav from '../../components/layout/ParentBottomNav';
@@ -72,7 +72,7 @@ const Icons = {
 //   * it drew hard-coded sensor badges (22 C, 45% humidity) that nothing ever
 //     measured,
 //   * it showed a "Secure Connection" badge while the underlying media was the
-//     PUBLIC, unencrypted meet.jit.si room, and
+//     public room, and
 //   * it left the parent believing live video was available, which is exactly
 //     the false success state the Phase 10 audit recorded as E5 / PARTIAL.
 //
@@ -223,7 +223,7 @@ export default function BabyMonitoringScreen() {
   // browser through React Router navigation (originally derived from a legacy
   // cry alert). A room name is a routing detail, not a capability: anyone who
   // learned it could join, and nothing on the server had checked. The room and
-  // the provider JWT are now minted by the server AFTER MonitoringAccess
+  // the MiroTalk room and join path are now issued by the server AFTER MonitoringAccess
   // approves this caller, and `canPublish` is the server's answer, not ours.
   //
   // While no media provider is configured the server replies Configured=false
@@ -279,7 +279,7 @@ export default function BabyMonitoringScreen() {
           independently), each derived from the server. */}
       {scopeLoading ? (
         <p role="status" className={styles.monitorNote}>
-          Loading your active monitoring session…
+          Loading your active monitoring sessionâ€¦
         </p>
       ) : !scope.jobId || !scope.childId ? (
         <p role="status" className={styles.monitorNote}>
@@ -315,7 +315,7 @@ export default function BabyMonitoringScreen() {
               disabled={starting}
               onClick={start}
             >
-              {starting ? 'Starting monitoring…' : 'Start monitoring this child'}
+              {starting ? 'Starting monitoringâ€¦' : 'Start monitoring this child'}
             </button>
           ) : null}
 
@@ -384,4 +384,5 @@ export default function BabyMonitoringScreen() {
     </div>
   );
 }
+
 

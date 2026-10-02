@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ParentBottomNav from '../../components/layout/ParentBottomNav';
 import BackButton from '../../components/ui/BackButton';
@@ -72,7 +72,7 @@ export default function ChildCryAlertScreen() {
   // ---- PHASE 11: real incident source, no legacy endpoint, no public room ----
   // Replaces a poll of `/cry-detection/latest`, which read the stale EDMX
   // CryAlert mapping and returned a RoomName that this screen then joined on
-  // the PUBLIC `meet.jit.si` host. That was both a false success (the legacy
+  // an external room. That was both a false success (the legacy
   // rows were never escalated) and a room-name-only access path.
   //
   // The incident now comes from the same server-authoritative endpoint the rest
@@ -175,7 +175,7 @@ export default function ChildCryAlertScreen() {
       ) : (
         <div style={{ padding: 'var(--space-6, 24px) var(--space-4, 16px)' }}>
           <EmptyState
-            icon="🔔"
+            icon="ðŸ””"
             title="No Recent Alerts"
             description="Your baby is resting peacefully. Nursery acoustic detection is active and standing by."
           />
@@ -187,4 +187,5 @@ export default function ChildCryAlertScreen() {
     </div>
   );
 }
+
 
