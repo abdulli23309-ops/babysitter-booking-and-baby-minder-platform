@@ -69,9 +69,9 @@ export const deviceStore = {
  * callers behave the same as a revoked one, and every non-2xx answer produces
  * a plain message that never includes a raw response body.
  */
-async function deviceRequest(path, { method = 'GET', body } = {}) {
+async function deviceRequest(path, { method = 'GET', body, allowUnpaired = false } = {}) {
   const credential = deviceStore.getCredential();
-  if (!credential) {
+  if (!credential && !allowUnpaired) {
     const err = new Error('This device is not paired yet.');
     err.status = 401;
     throw err;
@@ -81,7 +81,7 @@ async function deviceRequest(path, { method = 'GET', body } = {}) {
     res = await fetch(`${API_ROOT}${BASE}${path}`, {
       method,
       headers: {
-        [DEVICE_HEADER]: credential,
+        ...(credential ? { [DEVICE_HEADER]: credential } : {}),
         ...(body ? { 'Content-Type': 'application/json' } : {}),
       },
       body: body ? JSON.stringify(body) : undefined,
@@ -99,7 +99,8 @@ async function deviceRequest(path, { method = 'GET', body } = {}) {
     let message = 'The monitoring device could not complete that request.';
     try {
       const data = await res.json();
-      if (data?.message) message = data.message;
+      if (typeof data === 'string' && data.trim()) message = data;
+      else if (data?.message) message = data.message;
     } catch {
       /* keep the generic message */
     }
@@ -147,7 +148,11 @@ export const getIndependentMedia = () => apiGet(`${BASE}/media`);
 export async function pairDevice(code, deviceName) {
   const data = await deviceRequest('/device/pair', {
     method: 'POST',
-    body: { code, deviceName: deviceName || 'Monitor device' },
+    allowUnpaired: true,
+    body: {
+      code: String(code ?? '').replace(/\s+/g, '').trim().toUpperCase(),
+      deviceName: deviceName || 'Monitor device',
+    },
   });
   deviceStore.save(data.deviceCredential, { sessionId: data.sessionId, childId: data.childId });
   return data;

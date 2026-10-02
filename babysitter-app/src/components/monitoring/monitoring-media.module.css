@@ -26,6 +26,12 @@
   background: #000;
 }
 
+.cardFrame {
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
 .liveBar {
   position: absolute;
   top: 0;
@@ -74,15 +80,135 @@
 }
 
 .player {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
+  overflow: hidden;
   background: #10151d;
+}
+
+/* PHASE 8.4 - `@jitsi/react-sdk` renders its own unclassed wrapper <div> inside
+   .player and sizes it by content, which is what produced the empty black gap.
+   `:global` targets that injected node so the feed fills the frame without
+   needing a class Jitsi does not provide. */
+.player > :global(div) {
+  display: block;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  min-height: 100%;
+}
+
+.player iframe {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 100%;
+  border: 0;
+  margin: 0;
+}
+
+.mediaSurface {
+  display: grid;
+  min-width: 0;
+  gap: var(--space-3);
+  width: 100%;
+}
+
+/* PHASE 8.5 - the status pills sit in a tight single row with breathing room
+   instead of the previous 10px gap wrapping unpredictably against the buttons. */
+.mediaDetails {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+/* PHASE 8.9 - these are status pills, not decorative chips, and the monitoring
+   panel is a surface people tap and glance at one-handed. 44px is the minimum
+   comfortable touch target, and the old 32px left the row feeling cramped next
+   to the 44px device buttons. The border and background keep them legible as
+   state, not as controls. */
+.mediaFact {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-full);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+}
+
+.factDot {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--color-text-muted);
+}
+
+.mediaFact[data-state='connected'] .factDot { background: var(--color-success); }
+.mediaFact[data-state='unavailable'] .factDot,
+.mediaFact[data-state='muted'] .factDot { background: var(--color-warning); }
+
+/* PHASE 8.5 - the two device toggles are a deliberate 2-column grid with a
+   12px gutter and premium secondary (not primary) styling, so they read as
+   controls rather than as two competing call-to-actions. */
+.deviceControls {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.deviceControl {
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 12px;
+  background: var(--color-surface-muted, var(--color-surface-alt));
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  text-align: center;
+  cursor: pointer;
+}
+
+.deviceControl:hover:not(:disabled) {
+  background: var(--color-surface-hover, var(--color-surface-alt));
+}
+
+.deviceControl:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.deviceControl:focus-visible {
+  outline: 3px solid rgb(var(--primary-rgb) / 0.25);
+  outline-offset: 2px;
 }
 
 .frame[data-state='connecting'],
 .frame[data-state='lost'],
 .frame[data-state='error'] {
   background: var(--color-media-canvas);
+}
+
+/* PHASE 8.9 - the 320/360px rules below must NOT reduce a touch target below
+   44px, so the pills keep their height and only the type and padding shrink. */
+@media (max-width: 360px) {
+  .liveBar { gap: 6px; padding: 7px 9px; }
+  .liveText { font-size: 11px; }
+  .liveMeta { font-size: 10px; }
+  .mediaFact { min-height: 44px; padding: 0 9px; }
+  .deviceControls { gap: 6px; }
+  .deviceControl { padding: 7px 6px; font-size: 11px; }
 }
 
 /* --- Honest empty state -------------------------------------------------- */

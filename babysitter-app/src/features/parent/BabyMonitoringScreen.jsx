@@ -295,6 +295,7 @@ export default function BabyMonitoringScreen() {
             dndStates={dndStates}
             offline={offline}
             currentUserId={userId}
+            compact
           />
 
           {error ? (

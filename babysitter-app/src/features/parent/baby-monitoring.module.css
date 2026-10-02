@@ -5,7 +5,7 @@
   background: var(--color-background, #FAFBFD);
   max-width: var(--shell-max-width, 480px);
   margin: 0 auto;
-  padding-bottom: calc(80px + var(--space-6, 24px));
+  padding-bottom: calc(190px + var(--space-4, 16px) + env(safe-area-inset-bottom, 0px));
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
@@ -85,12 +85,12 @@
 /* Hardware Controls Row */
 .controlsRow {
   position: sticky;
-  bottom: 80px;
+  bottom: calc(170px + env(safe-area-inset-bottom, 0px));
   z-index: 50;
   display: flex;
   justify-content: center;
   align-items: center;
-  padding: 16px;
+  padding: 10px 72px 10px 16px;
   border-top: 1px solid var(--color-border-subtle);
   background: var(--color-surface);
 }

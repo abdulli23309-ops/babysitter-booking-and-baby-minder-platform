@@ -7,6 +7,7 @@ import {
   createPairingCode,
   deviceHeartbeat,
   deviceMedia,
+  deviceSession,
   deviceStore,
   getIndependentCry,
   getIndependentMedia,
@@ -31,6 +32,7 @@ export default function PhonePairingConcept({ initialView = 'parent' }) {
   const [pin, setPin] = useState('');
   const [credential, setCredential] = useState(() => deviceStore.getCredential() || '');
   const [parentSession, setParentSession] = useState(null);
+  const [deviceSessionInfo, setDeviceSessionInfo] = useState(null);
   const [incidents, setIncidents] = useState([]);
   const [media, setMedia] = useState(null);
   const [message, setMessage] = useState('');
@@ -95,16 +97,21 @@ export default function PhonePairingConcept({ initialView = 'parent' }) {
     let alive = true;
     const refreshDevice = async () => {
       try {
+        const nextSession = await deviceSession();
+        if (!alive) return;
+        setDeviceSessionInfo(nextSession);
         await deviceHeartbeat();
+        if (!alive) return;
         const nextMedia = await deviceMedia();
         if (alive) setMedia(nextMedia);
       } catch (error) {
         if (!alive) return;
         setMedia(null);
         setMessage(getErrorMessage(error, 'This monitor device is no longer authorized.'));
-        if (getStatus(error) === 403) {
+        if ([401, 403].includes(getStatus(error))) {
           deviceStore.clear();
           setCredential('');
+          setDeviceSessionInfo(null);
         }
       }
     };
@@ -127,7 +134,8 @@ export default function PhonePairingConcept({ initialView = 'parent' }) {
     event.preventDefault();
     setBusy(true); setMessage('');
     try {
-      await pairDevice(pin.trim().toUpperCase());
+      const normalizedCode = pin.replace(/\s+/g, '').trim().toUpperCase();
+      await pairDevice(normalizedCode);
       setCredential(deviceStore.getCredential());
       setPin('');
       setMessage('Device paired. Allow camera and microphone access when the browser asks.');
@@ -147,12 +155,26 @@ export default function PhonePairingConcept({ initialView = 'parent' }) {
     catch (error) { setMessage(getErrorMessage(error, 'The alert could not be resolved.')); }
   };
 
+  const disconnectDevice = () => {
+    deviceStore.clear();
+    setCredential('');
+    setDeviceSessionInfo(null);
+    setMedia(null);
+    setMessage('This phone is disconnected. Stop the monitoring session on Phone 1 to revoke the pairing.');
+  };
+
   return (
     <main className={styles.page}>
       <header className={styles.header}>
-        <p className={styles.eyebrow}>LITTLE CARE · DEVICE SETUP</p>
-        <h1>{view === 'parent' ? 'Independent baby monitoring' : 'Monitor device'}</h1>
-        <p>{view === 'parent' ? 'Pair a separate phone to watch over your child without a babysitter booking.' : 'This phone can monitor one child after the parent pairs it.'}</p>
+        {/* PHASE 8.6 - UX copy pass. The header is the first thing seen on both
+            pairing routes, so it is reduced to three short lines: an eyebrow, a
+            two-word title, and one sentence of support. Longer phrasing pushed
+            the tabs and the video below the fold on a phone. The "LITTLE CARE"
+            wordmark was also dropped here because the app shell already carries
+            the brand, so repeating it in an eyebrow was redundant. */}
+        <p className={styles.eyebrow}>DEVICE SETUP</p>
+        <h1>{view === 'parent' ? 'Pair Monitor' : 'Camera Mode'}</h1>
+        <p>{view === 'parent' ? 'Connect a secondary device to watch over your child.' : 'Position this device securely. It acts as a one-way camera.'}</p>
       </header>
 
       {initialView !== 'monitor' && (
@@ -164,12 +186,25 @@ export default function PhonePairingConcept({ initialView = 'parent' }) {
 
       {view === 'parent' ? (
         <section className={styles.parentPanel}>
-          <span className={styles.step}>PARENT PHONE</span>
-          <h2>{parentSession?.Status === 'Active' ? 'Monitoring session' : 'Pair a monitor phone'}</h2>
+          {/* PHASE 8.5 - the step label, heading and child summary were loose
+              siblings inheriting the panel's line-height, which visually
+              collapsed them together. A single flex column with a real gap gives
+              each element its own rhythm. */}
+          <div className={styles.panelHeader}>
+            <span className={styles.step}>PARENT PHONE</span>
+            <h2>{parentSession?.Status === 'Active' ? 'Baby monitor' : 'Pair a monitor phone'}</h2>
+          </div>
           {parentSession?.Status === 'Active' ? (
             <>
-              <p>{parentSession.DeviceConnected ? 'Monitor phone connected' : 'Waiting for the monitor phone to reconnect'}</p>
-              <MonitoringMediaPanel status={media?.Configured ? 'ready' : media ? 'unavailable' : 'loading'} media={media?.Configured ? media : null} canPublish={false} reason={media?.Reason} childName={children.find((child) => Number(child.Child_ID) === Number(parentSession.ChildId))?.ChildName} />
+              <div className={styles.activeSummary}>
+                <strong>{parentSession.ChildName ? `Baby ${parentSession.ChildName}` : 'Monitoring session'}</strong>
+                <span className={styles.activeStatus}><span aria-hidden="true" />Monitoring active</span>
+                <span className={styles.deviceStatus} data-connected={Boolean(parentSession.DeviceConnected)}>
+                  <span aria-hidden="true" />
+                  {parentSession.DeviceConnected ? 'Monitor phone connected' : 'Waiting for the monitor phone'}
+                </span>
+              </div>
+              <MonitoringMediaPanel status={media?.Configured ? 'ready' : media ? 'unavailable' : 'loading'} media={media?.Configured ? media : null} canPublish={false} reason={media?.Reason} childName={parentSession.ChildName} variant="card" />
               <div className={styles.incidents} aria-live="polite">
                 {incidents.filter((incident) => incident.IsOpen ?? !incident.ResolvedAtUtc).map((incident) => (
                   <div className={styles.incident} key={incident.IncidentId}>
@@ -187,7 +222,7 @@ export default function PhonePairingConcept({ initialView = 'parent' }) {
               <select id="monitor-child" value={childId} onChange={(event) => setChildId(event.target.value)} disabled={!children.length}>
                 {children.map((child) => <option key={child.Child_ID || child.ChildId} value={child.Child_ID || child.ChildId}>{child.ChildName || child.Name || 'Child'}</option>)}
               </select>
-              {pairingCode && <output className={styles.code} aria-label="Pairing code">{pairingCode.split('').map((character, index) => <span key={`${index}-${character}`}>{character}</span>)}</output>}
+              {pairingCode && <output className={styles.code} aria-label="Pairing code">{pairingCode}</output>}
               <button className={styles.primaryButton} type="button" onClick={generateCode} disabled={busy || !childId}>{busy ? 'Creating…' : pairingCode ? 'Generate a new code' : 'Generate pairing code'}</button>
               {pairingCode && <p className={styles.footnote}>Enter this code on Phone 2 within five minutes. Creating another code invalidates this one.</p>}
             </>
@@ -195,12 +230,20 @@ export default function PhonePairingConcept({ initialView = 'parent' }) {
         </section>
       ) : (
         <section className={styles.monitorPanel}>
-          <span className={styles.monitorMark} aria-hidden="true">LC</span>
+          {/* PHASE 8.5 - the "LC" mark is removed entirely. It was our own
+              element, not Jitsi's, and sat directly above the video reading as
+              leftover pre-join branding. */}
           <span className={styles.step}>PHONE 2</span>
           <h2>{credential ? 'Monitor device paired' : 'Connect this phone'}</h2>
           {credential ? (
             <>
-              <MonitoringMediaPanel status={media?.Configured ? 'ready' : media ? 'unavailable' : 'loading'} media={media?.Configured ? media : null} canPublish={Boolean(media?.CanPublish)} reason={media?.Reason} />
+              <p className={styles.deviceActiveStatus} role="status">
+                {deviceSessionInfo?.status === 'Active' ? 'Monitoring active on this device' : 'Checking monitor session'}
+              </p>
+              <MonitoringMediaPanel status={media?.Configured ? 'ready' : media ? 'unavailable' : 'loading'} media={media?.Configured ? media : null} canPublish={Boolean(media?.CanPublish)} reason={media?.Reason} variant="card" />
+              <button className={styles.disconnectButton} type="button" onClick={disconnectDevice}>
+                Stop monitoring on this phone
+              </button>
               <CryDetector independent embedded />
             </>
           ) : (
@@ -208,7 +251,7 @@ export default function PhonePairingConcept({ initialView = 'parent' }) {
               <p>Enter the one-time code shown in the parent app.</p>
               <form className={styles.pinForm} onSubmit={submitPin}>
                 <label htmlFor="pairing-pin">Pairing code</label>
-                <input id="pairing-pin" inputMode="text" autoComplete="one-time-code" maxLength={10} minLength={10} value={pin} onChange={(event) => { setPin(event.target.value.replace(/[^a-z0-9]/gi, '').slice(0, 10)); setMessage(''); }} placeholder="10 characters" />
+                <input id="pairing-pin" inputMode="text" autoComplete="one-time-code" maxLength={10} minLength={10} value={pin} onChange={(event) => { setPin(event.target.value.replace(/[^a-z0-9]/gi, '').slice(0, 10).toUpperCase()); setMessage(''); }} placeholder="10 characters" />
                 <button className={styles.monitorButton} type="submit" disabled={pin.length !== 10 || busy}>{busy ? 'Pairing…' : 'Pair this phone'}</button>
               </form>
             </>

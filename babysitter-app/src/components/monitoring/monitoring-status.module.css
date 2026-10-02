@@ -18,6 +18,16 @@
   align-items: center;
 }
 
+.compactList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-flow: row wrap;
+  gap: 6px;
+  align-items: center;
+}
+
 .row {
   display: flex;
   align-items: center;
@@ -30,6 +40,22 @@
   box-shadow: var(--shadow-sm, 0 1px 2px rgba(0, 0, 0, 0.04));
   /* Long status text wraps instead of overflowing horizontally on a 360px phone. */
   overflow-wrap: anywhere;
+}
+
+.compactRow {
+  min-height: 28px;
+  gap: 5px;
+  padding: 4px 8px;
+  box-shadow: none;
+}
+
+.compactRow .label {
+  font-size: 0.62rem;
+}
+
+.compactRow .value {
+  font-size: 0.72rem;
+  line-height: 1.25;
 }
 
 .label {

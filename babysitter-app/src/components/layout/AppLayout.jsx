@@ -3,7 +3,6 @@ import MobileMenu from './MobileMenu';
 import ScrollProgressBar from './ScrollProgressBar';
 import StickyHeader from './StickyHeader';
 import FloatingContactButton from './FloatingContactButton';
-import ScrollToTop from './ScrollToTop';
 import CookieBanner from './CookieBanner';
 import styles from './app-layout.module.css';
 
@@ -39,7 +38,6 @@ export default function AppLayout({ children }) {
       <MobileMenu open={menuOpen} onClose={closeMenu} />
       <FloatingContactButton />
       <CookieBanner />
-      <ScrollToTop />
 
       <main id="main-content" tabIndex={-1} className={styles.content}>
         {children}

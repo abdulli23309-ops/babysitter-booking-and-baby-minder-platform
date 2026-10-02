@@ -94,6 +94,7 @@ export default function MonitoringStatusBar({
   offline = false,
   currentUserId = null,
   className = '',
+  compact = false,
   // Some screens (e.g. the parent's active-session screen) read ONLY the
   // monitoring session and never the Phase 7 pause/DND surface. They pass false
   // here, because rendering "Not paused" without ever having asked the server
@@ -114,15 +115,15 @@ export default function MonitoringStatusBar({
 
   return (
     <div className={[styles.bar, className].filter(Boolean).join(' ')} aria-label="Child monitoring status">
-      <ul className={styles.list}>
-        <li className={styles.row} data-tone={sessionState.tone}>
+      <ul className={compact ? styles.compactList : styles.list}>
+        <li className={`${styles.row} ${compact ? styles.compactRow : ''}`} data-tone={sessionState.tone}>
           <span className={styles.dot} aria-hidden="true" />
           <span className={styles.label}>Status</span>
           <span className={styles.value}>{sessionState.text}</span>
         </li>
 
         {connectionState ? (
-          <li className={styles.row} data-tone={connectionState.tone}>
+          <li className={`${styles.row} ${compact ? styles.compactRow : ''}`} data-tone={connectionState.tone}>
             <span className={styles.dot} aria-hidden="true" />
             <span className={styles.label}>Connection</span>
             <span className={styles.value}>{connectionState.text}</span>
@@ -131,14 +132,16 @@ export default function MonitoringStatusBar({
 
         {showPauseAndDnd ? (
           <li
-            className={styles.row}
+            className={`${styles.row} ${compact ? styles.compactRow : ''}`}
             data-tone={pauseActive || pausePending ? 'warn' : 'muted'}
           >
             <span className={styles.dot} aria-hidden="true" />
             <span className={styles.label}>Pause</span>
             <span className={styles.value}>
               {pauseActive
-                ? `Monitoring temporarily paused by parent — ${formatPause(
+                ? compact
+                  ? `Paused · ${formatPause(session.PauseSecondsRemaining)}`
+                  : `Monitoring temporarily paused by parent — ${formatPause(
                     session.PauseSecondsRemaining,
                   )} remaining`
                 : pausePending
@@ -148,14 +151,14 @@ export default function MonitoringStatusBar({
           </li>
         ) : null}
 
-        <li className={styles.row} data-tone={incidentState.tone} aria-live="polite">
+        <li className={`${styles.row} ${compact ? styles.compactRow : ''}`} data-tone={incidentState.tone} aria-live="polite">
           <span className={styles.dot} aria-hidden="true" />
           <span className={styles.label}>Alert</span>
           <span className={styles.value}>{incidentState.text}</span>
         </li>
 
         {showPauseAndDnd && dndStates.length ? (
-          <li className={styles.row} data-tone={myDnd ? 'muted' : 'ok'}>
+          <li className={`${styles.row} ${compact ? styles.compactRow : ''}`} data-tone={myDnd ? 'muted' : 'ok'}>
             <span className={styles.dot} aria-hidden="true" />
             <span className={styles.label}>Do not disturb</span>
             <span className={styles.value}>
