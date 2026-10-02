@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import BackButton from '../../components/ui/BackButton';
@@ -10,7 +10,7 @@ import { deviceReportCry } from '../../services/independentMonitoringApi';
 import styles from './cry-detector.module.css';
 
 /* ================================================================
-   CryDetector â€” Phase F5 Modernized UI with Preserved ML Engine
+   CryDetector -- Phase F5 Modernized UI with Preserved ML Engine
    TensorFlow.js (YAMNet) & Web Audio Frequency Fallback
 ================================================================ */
 
@@ -441,14 +441,14 @@ export default function CryDetector({ independent = false, embedded = false }) {
       silenceCountRef.current = 0;
       if (!cryStartRef.current) {
         cryStartRef.current = Date.now();
-        setStatusText('âš ï¸ Infant crying detected â€” validating durationâ€¦');
+        setStatusText('\u{1F476} Infant crying detected -- validating duration...');
         addLog('Infant cry pattern recognized');
       } else {
         const elapsed = (Date.now() - cryStartRef.current) / 1000;
         const required = fastModeRef.current ? FAST_SECONDS : INITIAL_SECONDS;
         setTimer({ elapsed, required, active: true, fastMode: fastModeRef.current });
         setStatusText(
-          `Crying sustained for ${elapsed.toFixed(0)}s${fastModeRef.current ? ' (Fast Mode âš¡)' : ''}`
+          `Crying sustained for ${elapsed.toFixed(0)}s${fastModeRef.current ? ' (Fast Mode \u{1F6A8})' : ''}`
         );
         if (elapsed >= required) {
           sendAlert();
@@ -463,10 +463,10 @@ export default function CryDetector({ independent = false, embedded = false }) {
         fastModeRef.current = false;
         silenceCountRef.current = 0;
         setTimer({ elapsed: 0, required: INITIAL_SECONDS, active: false, fastMode: false });
-        setStatusText('Acoustic environment calm Â· Listening for infant soundsâ€¦');
+        setStatusText('Acoustic environment calm - Listening for infant sounds...');
       } else if (cryStartRef.current) {
         const elapsed = (Date.now() - cryStartRef.current) / 1000;
-        setStatusText(`Pause detected (${silenceCountRef.current}/${SILENCE_CHECKS}) Â· ${elapsed.toFixed(0)}s elapsed`);
+        setStatusText(`Pause detected (${silenceCountRef.current}/${SILENCE_CHECKS}) - ${elapsed.toFixed(0)}s elapsed`);
       }
     }
     tickTimerRef.current = setTimeout(() => {
@@ -482,7 +482,7 @@ export default function CryDetector({ independent = false, embedded = false }) {
     setMicPermissionDenied(false);
     setMode('loading');
     modeRef.current = 'loading';
-    setStatusText('Initializing microphone hardwareâ€¦');
+    setStatusText('Initializing microphone hardware...');
 
     try {
       let str;
@@ -511,13 +511,13 @@ export default function CryDetector({ independent = false, embedded = false }) {
         await loadYAMNet();
         setMode('ml');
         modeRef.current = 'ml';
-        setStatusText('Neural YAMNet model listening for infant criesâ€¦');
+        setStatusText('Neural YAMNet model listening for infant cries...');
         addLog('YAMNet neural model activated');
       } catch (e) {
         console.warn('YAMNet fallback mode:', e.message);
         setMode('fallback');
         modeRef.current = 'fallback';
-        setStatusText('Acoustic frequency fallback listeningâ€¦');
+        setStatusText('Acoustic frequency fallback listening...');
         addLog('Frequency spectral analyzer activated');
       }
 
@@ -622,7 +622,7 @@ export default function CryDetector({ independent = false, embedded = false }) {
             </span>
           ) : isListening ? (
             <span className={`${styles.statusBadge} ${styles.statusListening}`}>
-              â— {mode === 'ml' ? 'Neural YAMNet Active' : 'Frequency Fallback Active'}
+              {mode === 'ml' ? 'Neural YAMNet Active' : 'Frequency Fallback Active'}
             </span>
           ) : (
             <span className={`${styles.statusBadge} ${styles.statusCalm}`}>
@@ -643,7 +643,7 @@ export default function CryDetector({ independent = false, embedded = false }) {
       {timer.active && (
         <section className={styles.timerCard}>
           <div className={styles.timerHeader}>
-            <span>{timer.fastMode ? 'âš¡ Sustained Cry (Fast Alert Mode)' : 'Infant Cry Duration'}</span>
+            <span>{timer.fastMode ? '\u{1F6A8} Sustained Cry (Fast Alert Mode)' : 'Infant Cry Duration'}</span>
             <span style={{ color: 'var(--color-primary)' }}>
               {timer.elapsed.toFixed(0)}s / {timer.required}s
             </span>
@@ -662,7 +662,7 @@ export default function CryDetector({ independent = false, embedded = false }) {
         <div className={styles.metricCard}>
           <span className={styles.metricLabel}>Sound Level</span>
           <p className={styles.metricVal}>
-            {metrics.db != null ? `${metrics.db} dB` : 'â€”'}
+            {metrics.db != null ? `${metrics.db} dB` : '--'}
           </p>
           <span className={styles.metricSub}>Ambient volume</span>
         </div>
@@ -670,15 +670,15 @@ export default function CryDetector({ independent = false, embedded = false }) {
         <div className={styles.metricCard}>
           <span className={styles.metricLabel}>Cry Ratio</span>
           <p className={styles.metricVal}>
-            {metrics.intensity != null ? `${metrics.intensity}%` : 'â€”'}
+            {metrics.intensity != null ? `${metrics.intensity}%` : '--'}
           </p>
-          <span className={styles.metricSub}>300â€“600 Hz band</span>
+          <span className={styles.metricSub}>300-600 Hz band</span>
         </div>
 
         <div className={styles.metricCard}>
           <span className={styles.metricLabel}>ML Confidence</span>
           <p className={styles.metricVal}>
-            {metrics.conf != null ? `${metrics.conf}%` : 'â€”'}
+            {metrics.conf != null ? `${metrics.conf}%` : '--'}
           </p>
           <span className={styles.metricSub}>YAMNet threshold</span>
         </div>

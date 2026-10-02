@@ -25,7 +25,12 @@ const getStatus = (error) => error?.response?.status ?? error?.status;
 
 export default function PhonePairingConcept({ initialView = 'parent' }) {
   const { userId } = useAuth();
-  const [view, setView] = useState(initialView);
+  // PHASE 8.9 - `view` was state only so the removed Parent/Monitor tabs could
+  // flip it. Which side of the screen this is now comes from the ROUTE
+  // (`initialView`), which is the only thing that ever selected it, so it is
+  // derived rather than stored. That also removes a state variable that could
+  // disagree with the URL.
+  const view = initialView;
   const [children, setChildren] = useState([]);
   const [childId, setChildId] = useState('');
   const [pairingCode, setPairingCode] = useState('');
@@ -177,12 +182,13 @@ export default function PhonePairingConcept({ initialView = 'parent' }) {
         <p>{view === 'parent' ? 'Connect a secondary device to watch over your child.' : 'Position this device securely. It acts as a one-way camera.'}</p>
       </header>
 
-      {initialView !== 'monitor' && (
-        <div className={styles.viewSwitch} role="tablist" aria-label="Monitoring device setup">
-          <button type="button" role="tab" aria-selected={view === 'parent'} className={view === 'parent' ? styles.selectedTab : styles.tab} onClick={() => { setView('parent'); setMessage(''); }}>Parent phone</button>
-          <button type="button" role="tab" aria-selected={view === 'monitor'} className={view === 'monitor' ? styles.selectedTab : styles.tab} onClick={() => { setView('monitor'); setMessage(''); }}>Monitor device</button>
-        </div>
-      )}
+      {/* PHASE 8.9 - the "Parent phone" / "Monitor device" segmented control was
+          removed from the Parent's UI. This screen is reached by a ROUTE
+          (/independent-monitoring for the parent, /monitor-device for the
+          device), so the tabs were duplicate navigation: they offered a second
+          way into a screen the user had already chosen, and on a phone they
+          pushed the pairing code and the live view below the fold. The two
+          flows remain fully reachable by their own routes. */}
 
       {view === 'parent' ? (
         <section className={styles.parentPanel}>

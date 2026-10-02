@@ -88,21 +88,24 @@
   padding: 0 var(--space-1);
 }
 
+/* Premium secondary button, per the Phase 8.9 design direction. These are
+   ordinary Little Care buttons in the document flow below the frame, never
+   overlaid on the camera image, and never a copy of the SFU toolbar. */
 .mediaControl {
-  /* 44px is the minimum comfortable touch target for a phone held one-handed. */
-  min-height: 44px;
-  padding: 0 var(--space-4);
-  border-radius: var(--radius-md);
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
+  background: var(--color-surface-muted);
   color: var(--color-text);
+  border-radius: 12px;
+  padding: 12px;
+  font-weight: 600;
+  border: none;
+  /* 12px padding plus a 16px line gives a ~44px touch target, which is the
+     minimum comfortable size for a phone held one-handed. */
+  min-height: 44px;
   font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
   cursor: pointer;
 }
 
 .mediaControl[data-on='true'] {
-  border-color: var(--color-primary);
   color: var(--color-primary);
 }
 

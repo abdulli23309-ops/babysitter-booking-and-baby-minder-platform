@@ -529,3 +529,12 @@
   border-radius: 9999px;
   margin: 10px auto 2px;
 }
+
+/* PHASE 8.9 - wrapper for the babysitter's live camera view on the Active Job
+   screen. A plain block with breathing room so the media card sits in the same
+   rhythm as the rest of the monitoring section. */
+.monitoringBlock {
+  display: block;
+  width: 100%;
+  margin: 0 0 var(--space-4) 0;
+}

@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import MonitoringMediaPanel from '../../components/monitoring/MonitoringMediaPanel';
 import ParentBottomNav from '../../components/layout/ParentBottomNav';
@@ -279,7 +279,7 @@ export default function BabyMonitoringScreen() {
           independently), each derived from the server. */}
       {scopeLoading ? (
         <p role="status" className={styles.monitorNote}>
-          Loading your active monitoring sessionâ€¦
+          Loading your active monitoring session...
         </p>
       ) : !scope.jobId || !scope.childId ? (
         <p role="status" className={styles.monitorNote}>
@@ -315,7 +315,7 @@ export default function BabyMonitoringScreen() {
               disabled={starting}
               onClick={start}
             >
-              {starting ? 'Starting monitoringâ€¦' : 'Start monitoring this child'}
+              {starting ? 'Starting monitoring...' : 'Start monitoring this child'}
             </button>
           ) : null}
 

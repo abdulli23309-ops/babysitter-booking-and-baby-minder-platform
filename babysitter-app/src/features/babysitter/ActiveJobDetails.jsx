@@ -8,7 +8,9 @@ import LoadingSpinner from '../../components/ui/LoadingSpinner';
 
 import UserAvatar from '../../components/ui/UserAvatar';
 import SitterMonitoringPanel from '../../components/monitoring/SitterMonitoringPanel';
+import MonitoringMediaPanel from '../../components/monitoring/MonitoringMediaPanel';
 import useMonitoring from '../../hooks/useMonitoring';
+import useMonitoringMedia from '../../hooks/useMonitoringMedia';
 import { API } from '../../services/api';
 import { useToast } from '../../components/ui/ToastContext';
 import { formatLocalDate } from '../../utils/dateUtils';
@@ -101,6 +103,32 @@ export default function ActiveJobDetails() {
     role: 'sitter',
     autoStart: Boolean(numericJobId && monitoredChild?.Child_ID),
   });
+
+  // PHASE 8.9 - the babysitter's live view of the child, on their Active Job
+  // screen. The sitter is a VIEWER, exactly like the parent: the server issues
+  // the room with audio=0, video=0 and hide=1 for anyone who is not the
+  // publishing parent, so the sitter's browser is never even granted the
+  // camera or microphone. Nothing about that role is decided here - this hook
+  // only fetches what the server authorised, and the server re-runs
+  // MonitoringAccess (assigned sitter + job In Progress + child in
+  // JobChildren) on every request.
+  //
+  // LIFECYCLE GUARD: media is only ever requested, and only ever rendered,
+  // while the job is genuinely In Progress AND a child is selected. The moment
+  // the job ends or the child selection changes, `enabled` goes false, the hook
+  // stops fetching, and the panel below unmounts immediately - which also tears
+  // down the iframe and stops the media session.
+  const jobIsLive = job?.Status === 'In Progress';
+  const mediaChildId = monitoredChild?.Child_ID ?? null;
+  const sitterMedia = useMonitoringMedia(
+    numericJobId,
+    mediaChildId,
+    Boolean(numericJobId && mediaChildId && jobIsLive),
+    // Re-request as soon as the server-side session state changes, so the feed
+    // appears the moment Child Mode actually starts rather than sticking on the
+    // first "no active session" answer.
+    monitoring.session?.Status ?? null
+  );
 
   // A sitter response is a server action; the refreshed state comes back from
   // the server (the client never flips an incident status itself).
@@ -426,6 +454,30 @@ export default function ActiveJobDetails() {
                   ))}
                 </select>
               </label>
+            ) : null}
+
+            {/* PHASE 8.9 - the babysitter's live camera view.
+                Two independent guards must both hold before anything mounts:
+                  1. the job is In Progress (not Completed/Cancelled/upcoming), and
+                  2. a child is actually selected.
+                When either fails this whole block is absent from the DOM, so
+                the iframe is destroyed rather than merely hidden.
+                `canPublish` is hard-coded false: the sitter is a viewer and the
+                panel renders NO camera/microphone controls for them. The server
+                independently issues this participant a viewer room
+                (audio=0, video=0, hide=1), so the restriction does not rest on
+                this prop alone. */}
+            {jobIsLive && monitoredChild ? (
+              <section className={styles.monitoringBlock} aria-label="Live baby monitoring">
+                <MonitoringMediaPanel
+                  status={sitterMedia.status}
+                  media={sitterMedia.media}
+                  canPublish={false}
+                  reason={sitterMedia.reason}
+                  childName={monitoredChild.ChildName}
+                  variant="card"
+                />
+              </section>
             ) : null}
 
             <SitterMonitoringPanel
