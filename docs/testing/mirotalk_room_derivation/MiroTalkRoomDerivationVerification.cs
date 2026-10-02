@@ -92,10 +92,10 @@ internal static class MiroTalkRoomDerivationVerification
         Check("7c. unknown scope -> null (no guessed prefix)", Derive("somethingelse", 1042, saltA) == null);
 
         // 8. whitespace normalization
-        Check("8. leading/trailing whitespace trimmed", Norm("  http://192.168.1.19:3010  ") == "http://192.168.1.19:3010");
+        Check("8. leading/trailing whitespace trimmed", Norm("  http://192.168.1.2:3010  ") == "http://192.168.1.2:3010");
         // 9. trailing slash removal
-        Check("9. trailing slash removed", Norm("http://192.168.1.19:3010/") == "http://192.168.1.19:3010");
-        Check("9b. multiple trailing slashes removed", Norm("http://192.168.1.19:3010///") == "http://192.168.1.19:3010");
+        Check("9. trailing slash removed", Norm("http://192.168.1.2:3010/") == "http://192.168.1.2:3010");
+        Check("9b. multiple trailing slashes removed", Norm("http://192.168.1.2:3010///") == "http://192.168.1.2:3010");
         Check("9c. https scheme preserved", Norm("https://sfu.example.com/") == "https://sfu.example.com");
         Check("9d. empty / null -> empty, no throw", Norm("") == "" && Norm(null) == "");
 
@@ -136,7 +136,7 @@ internal static class MiroTalkRoomDerivationVerification
         var dto = new WebApplication2.DTOs.MonitoringMediaDto
         {
             Configured = true,
-            ServerUrl = "https://192.168.1.19:3010",
+            ServerUrl = "https://192.168.1.2:3010",
             RoomId = job,
             JoinPath = "/join/?room=" + job + "&name=Parent",
             Role = "publisher",

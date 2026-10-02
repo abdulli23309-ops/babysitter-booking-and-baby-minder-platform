@@ -33,7 +33,7 @@ namespace WebApplication2.DTOs
         public string Reason { get; set; }
 
         /// <summary>
-        /// Base address of the MiroTalk SFU, e.g. "https://192.168.1.19:3010".
+        /// Base address of the MiroTalk SFU, e.g. "https://192.168.1.2:3010".
         /// Browser-reachable and not a secret.
         /// </summary>
         public string ServerUrl { get; set; }
