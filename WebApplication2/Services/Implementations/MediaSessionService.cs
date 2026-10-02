@@ -161,7 +161,7 @@ namespace WebApplication2.Services.Implementations
             //     monitoring session so two jobs can never collide in one room.
             dto.Domain = domain.Trim();
             dto.RoomName = BuildRoomName(appId.Trim(), session.MonitorSession_ID);
-            dto.Token = BuildToken(dto.RoomName, dto.DisplayName, isParent, currentUserId, appId.Trim(), apiKeyId.Trim(), key);
+            dto.Token = BuildToken(GetLogicalRoomName(dto.RoomName), dto.DisplayName, isParent, currentUserId, appId.Trim(), apiKeyId.Trim(), key);
 
             if (string.IsNullOrEmpty(dto.Token))
             {
@@ -234,7 +234,7 @@ namespace WebApplication2.Services.Implementations
             }
             dto.Domain = domain.Trim();
             dto.RoomName = appId.Trim() + "/lc-independent-" + session.SessionId;
-            dto.Token = BuildToken(dto.RoomName, displayName, canPublish,
+            dto.Token = BuildToken(GetLogicalRoomName(dto.RoomName), displayName, canPublish,
                 int.Parse(userId.StartsWith("device-", StringComparison.Ordinal) ? userId.Substring(7) : userId,
                     System.Globalization.CultureInfo.InvariantCulture), appId.Trim(), apiKeyId.Trim(), key);
             if (string.IsNullOrEmpty(dto.Token))
@@ -255,6 +255,12 @@ namespace WebApplication2.Services.Implementations
             public int DeviceSessionId { get; set; }
         }
 
+        private static string GetLogicalRoomName(string namespacedRoomName)
+        {
+            // JaaS IFrame names retain the AppID prefix; JWT room matching uses only the logical room.
+            int separator = namespacedRoomName.IndexOf('/');
+            return separator < 0 ? namespacedRoomName : namespacedRoomName.Substring(separator + 1);
+        }
 
         /// <summary>
         /// Room name bound to the monitoring session, derived on the server so a

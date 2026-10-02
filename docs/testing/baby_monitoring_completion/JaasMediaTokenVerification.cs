@@ -82,9 +82,14 @@ internal static class JaasMediaTokenVerification
         Check(label + " PEM parses", parsed);
         if (!parsed) return;
 
+        var getLogicalRoom = typeof(MediaSessionService).GetMethod("GetLogicalRoomName", BindingFlags.NonPublic | BindingFlags.Static);
+        string logicalRoom = (string)getLogicalRoom.Invoke(null, new object[] { AppId + "/lc-monitor-42" });
+        Check(label + " logical room excludes AppID and remains single-level",
+            logicalRoom == "lc-monitor-42" && !logicalRoom.Contains("/"));
+
         var build = typeof(MediaSessionService).GetMethod("BuildToken", BindingFlags.NonPublic | BindingFlags.Static);
         string token = (string)build.Invoke(null, new object[] {
-            AppId + "/lc-monitor-42", "Parent \"One\"", true, 123, AppId, Kid, key });
+            logicalRoom, "Parent \"One\"", true, 123, AppId, Kid, key });
         Check(label + " produces a token", !String.IsNullOrWhiteSpace(token));
         if (String.IsNullOrWhiteSpace(token)) return;
 
@@ -100,9 +105,9 @@ internal static class JaasMediaTokenVerification
         }
         Check(label + " JaaS header alg/typ/kid", (string)header["alg"] == "RS256" &&
             (string)header["typ"] == "JWT" && (string)header["kid"] == Kid);
-        Check(label + " JaaS claims and namespaced room", (string)payload["aud"] == "jitsi" &&
+        Check(label + " JaaS claims and logical room", (string)payload["aud"] == "jitsi" &&
             (string)payload["iss"] == "chat" && (string)payload["sub"] == AppId &&
-            (string)payload["room"] == AppId + "/lc-monitor-42");
+            (string)payload["room"] == logicalRoom);
         Check(label + " stable identity, escaped display name, and moderator role",
             (string)payload["context"]["user"]["id"] == "123" &&
             (string)payload["context"]["user"]["name"] == "Parent \"One\"" &&
@@ -112,7 +117,7 @@ internal static class JaasMediaTokenVerification
             (long)payload["exp"] > now && (long)payload["exp"] - (long)payload["nbf"] == 3600);
 
         string viewerToken = (string)build.Invoke(null, new object[] {
-            AppId + "/lc-monitor-42", "Babysitter", false, 456, AppId, Kid, key });
+            logicalRoom, "Babysitter", false, 456, AppId, Kid, key });
         var viewerPayload = JObject.Parse(Encoding.UTF8.GetString(FromBase64Url(viewerToken.Split('.')[1])));
         Check(label + " sitter token has same room and moderator disabled",
             (string)viewerPayload["room"] == (string)payload["room"] &&
