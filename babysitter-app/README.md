@@ -89,8 +89,20 @@ Developed for Final Year Project (FYP) â€” All rights reserved.
 
 ## LAN HTTPS development
 
-The Vite development server binds to `0.0.0.0` and uses HTTPS with the LAN development certificate pair from `E:/MiroTalkPOC/app/ssl/cert.pem` and `key.pem`. Override the paths with `VITE_TLS_CERT` and `VITE_TLS_KEY`. Camera and microphone access on other devices requires a secure origin.
+**The LAN address is handled automatically. Do not edit an IP address by hand.**
 
-The MiroTalk server and the frontend must both use hostnames/IP addresses covered by certificates trusted on every demo phone and browser. For the existing LAN certificate, install its issuing CA certificate (`E:/MiroTalkPOC/app/ssl/ca.crt`) into each test device's trusted root certificate store, then open the frontend and MiroTalk HTTPS URLs and verify that neither shows a certificate warning. Do not bypass a warning or install the leaf server certificate as a root. The local IIS Express API certificate must also be trusted by the Node/Vite proxy because proxy TLS verification is enabled.
+From the repository root, run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\start-littlecare-dev.ps1
+```
+
+That script is the single source of truth for the development LAN/media address. It detects the machine's active LAN IPv4, regenerates the Vite/MiroTalk TLS leaf certificate for that address (signed by the existing, already-trusted local CA), writes `SFU_ANNOUNCED_IP` into the MiroTalk `.env`, writes `MonitoringMediaServerUrl` into `WebApplication2\Web.MonitoringMedia.config`, and starts the services. See `docs/development/LAN_DEVELOPMENT.md` for the full design.
+
+The Vite development server binds to `0.0.0.0` and uses HTTPS with the LAN certificate pair from `E:/MiroTalkPOC/app/ssl/cert.pem` and `key.pem` (the path the script keeps current). Override the paths with `VITE_TLS_CERT` and `VITE_TLS_KEY`. Camera and microphone access on other devices requires a secure origin.
+
+Each demo phone must trust the issuing CA **once**: install `E:/MiroTalkPOC/app/ssl/ca.crt` into the device's trusted root certificate store, then open the frontend and MiroTalk HTTPS URLs and verify that neither shows a certificate warning. Do not bypass a warning or install the leaf certificate as a root - the CA is stable, so a device never needs re-trusting after an IP change.
+
+The local IIS Express API certificate stays on `localhost:44368`; the Node/Vite proxy disables verification for that loopback hop only (`secure: false` in `vite.config.js`), so a trusted API certificate is not required for the proxy.
 
 This repository does not contain certificates or private keys. Certificate trust and the physical two-phone media flow still require verification on the actual demo devices.
