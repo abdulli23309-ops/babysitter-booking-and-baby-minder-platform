@@ -616,7 +616,11 @@ if (-not $ConfigureOnly) {
         Write-Skip "MiroTalk already listening on port $MediaPort."
     }
 
-    Restart-Backend
+    if ($NoRestart) {
+        Write-Skip 'NoRestart: leaving the backend running as it is.'
+    } else {
+        Restart-Backend
+    }
 
     if (-not (Test-PortListening -Port $FrontendPort)) {
         Start-Frontend
