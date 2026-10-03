@@ -334,20 +334,15 @@
   font-size: 11px;
 }
 
-.monitorSelect {
-  display: block;
-  width: 100%;
-  min-height: 46px;
-  margin-top: 7px;
-  padding: 10px 13px;
-  border: 1px solid var(--color-border-subtle);
-  border-radius: 14px;
-  background: var(--color-surface);
-  color: var(--color-text);
-  font: inherit;
-  box-shadow: var(--shadow-sm);
-}
+/* PHASE 9.1 - REMOVED: `.monitorSelect`.
+   This styled the "Which child is the monitoring phone watching?" <select>.
+   That control is gone because it implied the user could choose a monitoring
+   scope, which they cannot - the server re-runs MonitoringAccess on every
+   request regardless of what the dropdown said. LiveMediaStage now renders
+   the resolved child as a static header instead. */
 
+/* PHASE 9.1 - the stage now owns its own vertical rhythm (margin and the
+   24px card shadow), so this section is a plain flow container. */
 .monitoringSection { margin: 16px 0; }
 .monitoringSummary { margin: 10px 0 16px; }
 .monitorError {
@@ -530,11 +525,7 @@
   margin: 10px auto 2px;
 }
 
-/* PHASE 8.9 - wrapper for the babysitter's live camera view on the Active Job
-   screen. A plain block with breathing room so the media card sits in the same
-   rhythm as the rest of the monitoring section. */
-.monitoringBlock {
-  display: block;
-  width: 100%;
-  margin: 0 0 var(--space-4) 0;
-}
+/* PHASE 9.1 - REMOVED: .monitoringBlock.
+   This wrapped the old variant="card" panel on this screen. The media now sits
+   inside LiveMediaStage, which supplies its own margin, navy background and 24px
+   shadow, so a second wrapper would only have added a stray edge. */

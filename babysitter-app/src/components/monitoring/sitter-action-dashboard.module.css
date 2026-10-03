@@ -1,0 +1,220 @@
+/* ========================================================================
+   SitterActionDashboard - Phase 9.1 Premium Active Session.
+
+   Design intent: the Babysitter's action grid should feel like a control
+   surface, not a form. Large touch-friendly cards, muted navy fills, white
+   type, and a hairline white border - so the grid reads as one dark block
+   beneath the video rather than a stack of mismatched buttons.
+
+   The primary "Log Feeding" card is emerald, tying it to the "Live" status
+   dot above it: both mean "this is the good, working path".
+   ======================================================================== */
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  width: 100%;
+  margin: 0 0 var(--space-5);
+}
+
+.panelHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.panelTitle {
+  margin: 0;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: -0.01em;
+  color: var(--color-text);
+}
+
+.panelSubtitle {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+/* --- The grid --------------------------------------------------------------
+   A two-column grid where the primary action spans both columns. On a 320px
+   phone the two secondary cards still clear the 44px minimum touch target
+   with room to spare. */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.action {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: var(--space-2);
+  /* Generous padding + a two-line label comfortably clears 44px. */
+  min-height: 108px;
+  padding: var(--space-4);
+  text-align: left;
+  cursor: pointer;
+  border-radius: 20px;
+  /* Muted navy card on the dark shell. */
+  background: #141B2D;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #FFFFFF;
+  font-family: inherit;
+  /* A deliberate, restrained tap scale - the card acknowledges the touch
+     without feeling like a toy. */
+  transition: transform 140ms ease, border-color 140ms ease, background 140ms ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.action[data-primary='true'] {
+  /* The primary action spans the full width, because a feed is the thing a
+     sitter reports most and it must be impossible to miss. */
+  grid-column: 1 / -1;
+  min-height: 96px;
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-4);
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.22) 0%, rgba(16, 185, 129, 0.08) 100%);
+  border-color: rgba(16, 185, 129, 0.4);
+}
+
+.actionIcon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.action[data-primary='true'] .actionIcon {
+  background: rgba(16, 185, 129, 0.18);
+  border-color: rgba(16, 185, 129, 0.34);
+  /* Emerald on a translucent emerald tile - the icon is the focal point. */
+  color: #34D399;
+}
+
+.actionLabel {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  line-height: 1.25;
+  color: #FFFFFF;
+}
+
+.action[data-primary='true'] .actionLabel {
+  font-size: var(--font-size-md);
+}
+
+.action:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.action[data-primary='true']:hover {
+  border-color: rgba(16, 185, 129, 0.62);
+}
+
+.action:active {
+  transform: scale(0.97);
+}
+
+.action:focus-visible {
+  outline: 2px solid #06B6D4;
+  outline-offset: 2px;
+}
+
+.action:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.disabledNote {
+  margin: 0;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+
+/* --- The session log ------------------------------------------------------- */
+.log {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 0;
+  padding: var(--space-2);
+  list-style: none;
+  border-radius: 16px;
+  background: #141B2D;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.logRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-2);
+}
+
+.logDot {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 50%;
+  background: #10B981;
+}
+
+.logLabel {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: #FFFFFF;
+}
+
+.logTime {
+  flex: none;
+  font-size: var(--font-size-xs);
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.emptyLog {
+  margin: 0;
+  padding: var(--space-3);
+  border-radius: 16px;
+  background: #141B2D;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  text-align: center;
+}
+
+/* The honesty note about persistence. Deliberately quieter than everything
+   above it - it is a caveat, not a call to action. */
+.persistenceNote {
+  margin: 0;
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-normal);
+  color: var(--color-text-muted);
+}
+
+/* Very short phones: the cards stay comfortably tappable, they just breathe
+   a little less. Touch targets are never reduced below 44px. */
+@media (max-width: 360px) {
+  .action { min-height: 96px; padding: var(--space-3); }
+  .action[data-primary='true'] { min-height: 88px; }
+  .actionIcon { width: 42px; height: 42px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Drop the tap scale rather than leaving a card that appears to ignore the
+     press entirely - the border highlight carries the feedback instead. */
+  .action { transition: none; }
+  .action:active { transform: none; }
+}

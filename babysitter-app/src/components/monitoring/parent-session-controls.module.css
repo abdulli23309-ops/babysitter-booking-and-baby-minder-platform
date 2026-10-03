@@ -1,0 +1,151 @@
+/* ========================================================================
+   ParentSessionControls - Phase 9.1 Premium Active Session.
+
+   Design intent: the parent's panel is a DECISION surface, so the three
+   actions are ordered by consequence and coloured accordingly - cyan for the
+   everyday action, muted for the neutral one, red for the destructive one.
+   A single accent colour for all three would make "End Session" look as
+   casual as "Call Babysitter".
+
+   Cyan (#06B6D4) is the parent's signature on this screen, deliberately
+   distinct from the emerald "Live" dot and the sitter's dark action cards.
+   ======================================================================== */
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  width: 100%;
+  margin: 0 0 var(--space-5);
+}
+
+.panelHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.panelTitle {
+  margin: 0;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: -0.01em;
+  color: var(--color-text);
+}
+
+.panelSubtitle {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.action {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  /* Clears the 44px minimum touch target comfortably. */
+  min-height: 56px;
+  padding: var(--space-3) var(--space-4);
+  text-align: left;
+  cursor: pointer;
+  border-radius: 18px;
+  font-family: inherit;
+  text-decoration: none;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: #141B2D;
+  color: #FFFFFF;
+  transition: transform 140ms ease, border-color 140ms ease, background 140ms ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.actionIcon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+}
+
+.actionLabel {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  color: #FFFFFF;
+}
+
+/* PRIMARY - cyan. The everyday action, and the one that appears on every
+   parent session, so it carries the accent. */
+.action[data-tone='primary'] {
+  background: linear-gradient(135deg, rgba(6, 182, 212, 0.2) 0%, rgba(6, 182, 212, 0.07) 100%);
+  border-color: rgba(6, 182, 212, 0.42);
+}
+
+.action[data-tone='primary'] .actionIcon {
+  background: rgba(6, 182, 212, 0.18);
+  border-color: rgba(6, 182, 212, 0.36);
+  color: #22D3EE;
+}
+
+/* SECONDARY - deliberately muted: it is a convenience, not a decision. */
+.action[data-tone='secondary'] .actionIcon {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+/* DESTRUCTIVE - red, and visually separated as the last row so it is never
+   hit by accident while reaching for the action above it. */
+.action[data-tone='danger'] {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.16) 0%, rgba(239, 68, 68, 0.05) 100%);
+  border-color: rgba(239, 68, 68, 0.34);
+}
+
+.action[data-tone='danger'] .actionIcon {
+  background: rgba(239, 68, 68, 0.16);
+  border-color: rgba(239, 68, 68, 0.32);
+  color: #F87171;
+}
+
+.action:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.action[data-tone='primary']:hover { border-color: rgba(6, 182, 212, 0.66); }
+.action[data-tone='danger']:hover { border-color: rgba(239, 68, 68, 0.56); }
+
+.action:active {
+  transform: scale(0.98);
+}
+
+.action:focus-visible {
+  outline: 2px solid #06B6D4;
+  outline-offset: 2px;
+}
+
+.action:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.note {
+  margin: 0;
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-normal);
+  color: var(--color-text-muted);
+}
+
+@media (max-width: 360px) {
+  .action { min-height: 52px; padding: var(--space-3); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .action { transition: none; }
+  .action:active { transform: none; }
+}

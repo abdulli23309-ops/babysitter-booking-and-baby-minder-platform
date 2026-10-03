@@ -1,0 +1,92 @@
+/* ========================================================================
+   LiveMediaStage - Phase 9.1 Premium Active Session.
+
+   Design intent: ONE calm, premium surface. The card is deep navy with a
+   24px radius and a deep drop shadow, because a camera image always looks
+   best against dark chrome and because a rounded, shadowed card is what
+   separates "live nursery feed" from "generic web page".
+
+   The header above the card is intentionally STATIC text rather than a
+   <select>. See LiveMediaStage.jsx for why the child is derived, not chosen.
+   ======================================================================== */
+
+.stage {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  width: 100%;
+  min-width: 0;
+  margin: 0 0 var(--space-5);
+}
+
+.stageHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+/* The avatar chip. A soft cyan-tinted disc keeps the header visually tied to
+   the parent-side cyan accent without competing with the emerald Live dot. */
+.stageHeaderIcon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(6, 182, 212, 0.14);
+  border: 1px solid rgba(6, 182, 212, 0.32);
+  color: #06B6D4;
+}
+
+.stageHeaderText {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  margin: 0;
+}
+
+.stageHeaderLabel {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.stageHeaderName {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: -0.02em;
+  color: var(--color-text);
+  /* A long name must never push the 480px shell sideways. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stageHeaderMore {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-muted);
+}
+
+/* The deep-navy video card. The frame inside keeps its own 24px radius, so
+   these two rules exist to guarantee the header-to-video rhythm and to hold
+   the shadow, not to add a second border. */
+.stageCard {
+  position: relative;
+  border-radius: 24px;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  background: #0B132B;
+}
+
+/* On a short phone the header chip and type shrink a little, but the media
+   card itself is untouched - the video is the point of the screen. */
+@media (max-width: 360px) {
+  .stageHeaderIcon { width: 36px; height: 36px; }
+  .stageHeaderName { font-size: var(--font-size-md); }
+}

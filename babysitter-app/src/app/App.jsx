@@ -39,11 +39,15 @@ import JobEndReviewScreen from '../features/reviews/JobEndReviewScreen';
 import JobAcceptedSuccess from '../features/babysitter/JobAcceptedSuccess';
 import BabysitterMyJobs from '../features/babysitter/BabysitterMyJobs';
 import UpcomingJobDetails from '../features/babysitter/UpcomingJobDetails';
-import CryDetector from '../features/cry/CryDetector';
+/* CryDetector is intentionally NOT imported here. The cry detector is reached
+   only through MonitorDeviceRoute (the monitor-device surface); importing it
+   into the account route table is what previously let a parent or sitter
+   navigate to it. */
 import BabyMonitoringScreen from '../features/parent/BabyMonitoringScreen';
 import ChildCryAlertScreen from '../features/parent/ChildCryAlertScreen';
 import SupportScreen from '../features/support/SupportScreen';
 import PhonePairingConcept from '../features/parent/PhonePairingConcept';
+import MonitorDeviceRoute from './MonitorDeviceRoute';
 
 function App() {
   return (
@@ -118,7 +122,12 @@ function App() {
               <Route path="/set-availability" element={<ProtectedRoute allowedRoles={['babysitter']}><SetAvailability /></ProtectedRoute>} />
               <Route path="/my-profile" element={<ProtectedRoute allowedRoles={['parent', 'babysitter']}><ProfileScreen /></ProtectedRoute>} />
               <Route path="/update-profile" element={<ProtectedRoute allowedRoles={['babysitter']}><UpdateProfile /></ProtectedRoute>} />
-              <Route path="/active-job-details" element={<ProtectedRoute allowedRoles={['babysitter']}><ActiveJobDetails /></ProtectedRoute>} />
+              {/* PHASE 9.1 - this screen is now ROLE-AWARE: it renders the
+                  parent's control panel or the sitter's action dashboard
+                  beneath the same media stage, branching on the role from the
+                  auth context. Route guarding only keeps signed-out users out;
+                  every real action is still authorised server-side. */}
+              <Route path="/active-job-details" element={<ProtectedRoute allowedRoles={['parent', 'babysitter']}><ActiveJobDetails /></ProtectedRoute>} />
               <Route path="/completed-job-details" element={<ProtectedRoute allowedRoles={['babysitter']}><CompletedJobDetails /></ProtectedRoute>} />
               <Route path="/completed-job-details/:jobId" element={<ProtectedRoute allowedRoles={['babysitter']}><CompletedJobDetails /></ProtectedRoute>} />
               <Route path="/job-details" element={<ProtectedRoute allowedRoles={['babysitter']}><JobDetails /></ProtectedRoute>} />
@@ -133,7 +142,16 @@ function App() {
               <Route path="/child-cry-alert" element={<ProtectedRoute allowedRoles={['parent']}><ChildCryAlertScreen /></ProtectedRoute>} />
 
               {/* ---- Shared / ambiguous routes (both roles may access) ---- */}
-              <Route path="/cry-detector" element={<ProtectedRoute><CryDetector /></ProtectedRoute>} />
+              {/* /cry-detector is the PHONE 2 detector surface and is therefore
+                  reachable ONLY by the monitor device itself. It is a device
+                  surface, not an account surface: the backend refuses a cry
+                  report from any ordinary account bearer (POST /monitoring/cry
+                  requires a monitoring-device credential), so exposing this
+                  route to a parent or sitter would only ever show a detector
+                  that can no longer report anything. Restricting it here keeps
+                  the UI honest about the server rule; the server is what
+                  actually enforces it. */}
+              <Route path="/cry-detector" element={<MonitorDeviceRoute />} />
               <Route path="/support" element={<ProtectedRoute><SupportScreen /></ProtectedRoute>} />
 
               {/* ---- Dead Route Aliases / Redirects (FE-011) ---- */}

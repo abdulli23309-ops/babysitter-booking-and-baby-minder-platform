@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import BabysitterBottomNav from '../../components/layout/BabysitterBottomNav';
 import EmptyState from '../../components/ui/EmptyState';
@@ -9,10 +9,14 @@ import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import UserAvatar from '../../components/ui/UserAvatar';
 import SitterMonitoringPanel from '../../components/monitoring/SitterMonitoringPanel';
 import MonitoringMediaPanel from '../../components/monitoring/MonitoringMediaPanel';
+import LiveMediaStage from '../../components/monitoring/LiveMediaStage';
+import SitterActionDashboard from '../../components/monitoring/SitterActionDashboard';
+import ParentSessionControls from '../../components/monitoring/ParentSessionControls';
 import useMonitoring from '../../hooks/useMonitoring';
 import useMonitoringMedia from '../../hooks/useMonitoringMedia';
 import { API } from '../../services/api';
 import { useToast } from '../../components/ui/ToastContext';
+import { useAuth } from '../auth/AuthContext';
 import { formatLocalDate } from '../../utils/dateUtils';
 import styles from '../parent/live-session.module.css';
 
@@ -71,12 +75,40 @@ export default function ActiveJobDetails() {
   const [job, setJob] = useState(passedJob ?? null);
   const [loading, setLoading] = useState(() => !passedJob && Boolean(numericJobId));
 
-  // Which child the sitter is monitoring. Monitoring state is per child
-  // (Phase 2 architecture), so a multi-child sitting needs an explicit choice.
-  // This is a display selection only — it grants nothing; the backend decides
-  // whether this sitter may monitor the chosen child.
-  const [monitorChildIndex, setMonitorChildIndex] = useState(0);
+  /* PHASE 9.1 - ROLE-AWARE SCREEN.
+     One Active Session screen now serves BOTH roles. The role comes from the
+     auth context (the SERVER's own login verdict), never from a route name or
+     a prop, and it decides which control panel renders beneath the video.
+     `role` is stored lower-case by AuthContext ('parent' | 'babysitter'), so it
+     is normalised once here into the two shapes the JSX branches on. */
+  const { role } = useAuth();
+  const isParent = String(role || '').toLowerCase() === 'parent';
+
+  /* PHASE 9.1 - THE MONITORED CHILD IS RESOLVED, NOT CHOSEN.
+     The old screen asked "Which child is the monitoring phone watching?" in a
+     <select> and kept the answer in local state. That implied an authority the
+     user does not have: choosing a child grants nothing, because the SERVER
+     re-runs MonitoringAccess on every single request and will refuse a scope
+     the caller is not entitled to.
+
+     So the selection is now derived from server-issued state:
+       1. `?childId=` in the URL, when another screen linked here directly
+          (this is a LOCATOR only - still re-authorised server-side);
+       2. otherwise the first child on the booking, which is the only child in
+          the single-child case that used to need the dropdown at all.
+     The header states the resolved child; there is nothing to tap. */
+  const childParam = Number(location.search?.includes('childId=')
+    ? new URLSearchParams(location.search).get('childId')
+    : null) || Number(location.state?.childId) || null;
+
   const [responding, setResponding] = useState(false);
+
+  /* Parent-side action busy flags. Separate from `responding` (which is the
+     sitter's cry-response flag) so the two panels can never show each other's
+     spinner. */
+  const [pausing, setPausing] = useState(false);
+  const [pauseRequested, setPauseRequested] = useState(false);
+  const [ending, setEnding] = useState(false);
 
   // ==================================================================
   // PHASE 8 - child monitoring for the assigned sitter
@@ -89,13 +121,31 @@ export default function ActiveJobDetails() {
   //
   // These hooks MUST stay above every early return below, otherwise the hook
   // order changes between renders (react-hooks/rules-of-hooks).
-  const children = job.Children ?? job.children ?? [];
-  const monitoredChild = children[monitorChildIndex] ?? null;
+  /* The booking's children. Memoised because it feeds the useMemo below: an
+     inline `?? []` would allocate a new array every render and defeat the
+     memo entirely. */
+  const children = useMemo(
+    () => job?.Children ?? job?.children ?? [],
+    [job]
+  );
+
+  /* PHASE 9.1 - the resolved monitored child (see the note above). A `childId`
+     from the URL wins when it matches a child on THIS booking; otherwise we
+     fall back to the first child. A stale or foreign childId therefore can
+     never produce a blank header - it just falls back, and the server would
+     refuse it anyway. */
+  const monitoredChild = useMemo(() => {
+    if (children.length === 0) return null;
+    if (childParam) {
+      const match = children.find((c) => Number(c.Child_ID ?? c.ChildId) === childParam);
+      if (match) return match;
+    }
+    return children[0];
+  }, [children, childParam]);
 
   // The children are fixed by the BOOKING (JobChildren) and are only ever
-  // REPORTED by this screen. Which child the monitoring phone watches is a
-  // monitoring decision, so that choice lives inside the "Child monitoring"
-  // block below - not in the general session area.
+  // REPORTED by this screen. Which child the monitoring phone watches is now
+  // RESOLVED server-side (see above), not picked from a dropdown.
 
   const monitoring = useMonitoring({
     jobId: numericJobId,
@@ -139,6 +189,46 @@ export default function ActiveJobDetails() {
       toast.success(ok ? label : 'That action is no longer available.');
     } finally {
       setResponding(false);
+    }
+  };
+
+  /* ==================================================================
+     PHASE 9.1 - PARENT ACTIONS
+
+     Each of these calls a REAL endpoint and reports whatever the server
+     actually said. None of them optimistically flips local state to look
+     like it worked: `pauseRequested` is only set after the server accepted
+     the pause request, because requesting a pause does NOT pause anything
+     on its own - a second guardian has to approve it.
+     ================================================================== */
+  const requestPause = async () => {
+    if (!numericJobId || !mediaChildId) return;
+    setPausing(true);
+    try {
+      await API.requestPause(numericJobId, mediaChildId);
+      setPauseRequested(true);
+      toast.success('Pause requested. Another guardian must approve it before alerts pause.');
+    } catch (err) {
+      toast.error(err?.message || 'We could not request that pause.');
+    } finally {
+      setPausing(false);
+    }
+  };
+
+  const endSession = async () => {
+    if (!numericJobId || !mediaChildId) return;
+    setEnding(true);
+    try {
+      /* Ending the monitoring session is the honest way to stop the feed.
+         The server also cancels any still-open cry incident as part of this
+         call, so this is not merely a client-side teardown. */
+      await API.endMonitoringSession(numericJobId, mediaChildId);
+      toast.success('Monitoring session ended.');
+      navigate('/babysitter-my-jobs');
+    } catch (err) {
+      toast.error(err?.message || 'We could not end the session. Please try again.');
+    } finally {
+      setEnding(false);
     }
   };
 
@@ -421,101 +511,118 @@ export default function ActiveJobDetails() {
         ) : null}
 
         {/* ==================================================================
-            PHASE 8 - child monitoring, reachable from the normal sitter flow.
-            Shows: the parent-approved pause banner, connection-loss warning, and
-            the cry alert with the three sitter responses. The sitter has NO
-            pause/guardian/DND controls here by design - a pause is a parent
-            action, and the sitter only ever sees its effect.
+            PHASE 9.1 - THE UNIFIED MONITORING STAGE + ROLE PANELS.
 
-            The monitoring-scope chooser lives INSIDE this block, not in the
-            general session area above: monitoring is scoped PER CHILD
-            (Phase 2), so which child the monitoring phone watches is a
-            monitoring setting rather than a property of the booking. Choosing
-            here grants nothing - MonitoringAccess still decides on the server
-            whether this sitter may monitor that child. */}
+            Structure of this block, top to bottom:
+              1. LiveMediaStage  - the deep-navy glassmorphic video card with a
+                                   STATIC "Monitoring {child}" header and the
+                                   single consolidated status pill.
+              2. The role panel   - ParentSessionControls for a parent,
+                                   SitterActionDashboard for a sitter. Never
+                                   both, and never neither.
+
+            The old "Which child is the monitoring phone watching?" <select> is
+            GONE. It implied the user could choose a monitoring scope, which
+            they cannot: the child is resolved from the session, and the server
+            re-runs MonitoringAccess on every request regardless. */}
         {childCount > 0 ? (
           <section className={styles.monitoringSection}>
-            <h3 className={styles.sectionHeading}>
-              Child monitoring
-            </h3>
-            {childCount > 1 ? (
-              <label htmlFor="monitor-child-select">
-                Which child is the monitoring phone watching?
-                <select
-                  id="monitor-child-select"
-                  value={String(monitorChildIndex)}
-                  onChange={(e) => setMonitorChildIndex(Number(e.target.value))}
-                  className={styles.monitorSelect}
-                >
-                  {children.map((c, i) => (
-                    <option key={c.Child_ID} value={String(i)}>
-                      {c.ChildName ?? `Child ${c.Child_ID}`}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            ) : null}
-
-            {/* PHASE 8.9 - the babysitter's live camera view.
-                Two independent guards must both hold before anything mounts:
-                  1. the job is In Progress (not Completed/Cancelled/upcoming), and
-                  2. a child is actually selected.
-                When either fails this whole block is absent from the DOM, so
-                the iframe is destroyed rather than merely hidden.
-                `canPublish` is hard-coded false: the sitter is a viewer and the
-                panel renders NO camera/microphone controls for them. The server
-                independently issues this participant a viewer room
-                (audio=0, video=0, hide=1), so the restriction does not rest on
-                this prop alone. */}
             {jobIsLive && monitoredChild ? (
-              <section className={styles.monitoringBlock} aria-label="Live baby monitoring">
+              <LiveMediaStage
+                childName={monitoredChild.ChildName}
+                childCount={childCount}
+              >
                 <MonitoringMediaPanel
                   status={sitterMedia.status}
                   media={sitterMedia.media}
-                  canPublish={false}
+                  /* PHASE 9.1 - canPublish is the SERVER's answer, not a role
+                     guess. A sitter is always a viewer, and a parent on the
+                     monitoring phone is only a publisher if the server issued
+                     it a publishing room. */
+                  canPublish={isParent && sitterMedia.canPublish}
                   reason={sitterMedia.reason}
                   childName={monitoredChild.ChildName}
-                  variant="card"
+                  variant="stage"
                 />
-              </section>
+              </LiveMediaStage>
             ) : null}
 
-            <SitterMonitoringPanel
-              session={monitoring.session}
-              incident={monitoring.incident}
-              offline={monitoring.offline}
-              busy={responding}
-              // A paused monitoring session has had its incident cancelled by
-              // the backend, so there is normally nothing to respond to; the
-              // guard is presentation only and the server refuses regardless.
-              canRespond={!monitoring.session?.IsPaused}
-              onGoingToChild={() => respond('Marked as going to the child', monitoring.goingToChild)}
-              onViewChild={() => {
-                // PHASE 12 CORRECTION - this was a dead action.
-                // "View Child" only fired toast.info('Opening the child camera
-                // view.') and changed nothing on screen, so the sitter was told a
-                // camera view was opening when it never did. It is now a real
-                // navigation to the monitoring screen.
-                //
-                // Carry the selected job/child so a sitter with more than one
-                // active scope lands on the child whose alert they opened. Route
-                // state is only a locator: media and every monitoring action are
-                // still authorized again by MonitoringAccess on the server.
-                navigate('/baby-monitoring', {
-                  state: {
-                    jobId: numericJobId,
-                    childId: monitoredChild?.Child_ID,
-                    childName: monitoredChild?.ChildName ?? null,
-                  },
-                });
-              }}
-              onWithChild={() => respond('Marked as with the child', monitoring.withChild)}
-            />
+            {/* ---- ROLE PANEL -------------------------------------------------
+                Strict role branching. The parent gets security/decision
+                controls; the sitter gets the care-action dashboard and no
+                media controls at all, because a sitter is a strict viewer and
+                offering them a camera button would invite exactly the
+                publishing path the server forbids. */}
+            {isParent ? (
+              <ParentSessionControls
+                onPause={requestPause}
+                onEndSession={endSession}
+                sitterPhone={job.SitterPhone ?? null}
+                pausing={pausing}
+                ending={ending}
+                pauseRequested={pauseRequested}
+              />
+            ) : (
+              <SitterActionDashboard
+                onLog={(label) => toast.success(`${label} logged.`)}
+                /* Actions only mean something while a session is genuinely
+                   running, and the panel says why rather than going dead
+                   silently. */
+                disabled={!jobIsLive}
+                disabledReason={
+                  jobIsLive
+                    ? ''
+                    : 'Care actions become available once this session is in progress.'
+                }
+              />
+            )}
 
-            {monitoring.error ? (
-              <p role="alert" className={styles.monitorError}>
-                {monitoring.error}
-              </p>
+            {/* ---- SITTER-ONLY MONITORING STATE ------------------------------
+                The pause banner and the cry alert belong to the sitter only:
+                the parent is not the recipient of a cry response, and a parent
+                reading "I'm going to the child" options would be confusing at
+                best. The parent sees the effects of those states on their own
+                monitoring screen instead. */}
+            {!isParent ? (
+              <>
+                <SitterMonitoringPanel
+                  session={monitoring.session}
+                  incident={monitoring.incident}
+                  offline={monitoring.offline}
+                  busy={responding}
+                  // A paused monitoring session has had its incident cancelled by
+                  // the backend, so there is normally nothing to respond to; the
+                  // guard is presentation only and the server refuses regardless.
+                  canRespond={!monitoring.session?.IsPaused}
+                  onGoingToChild={() => respond('Marked as going to the child', monitoring.goingToChild)}
+                  onViewChild={() => {
+                    // PHASE 12 CORRECTION - this was a dead action.
+                    // "View Child" only fired toast.info('Opening the child camera
+                    // view.') and changed nothing on screen, so the sitter was told a
+                    // camera view was opening when it never did. It is now a real
+                    // navigation to the monitoring screen.
+                    //
+                    // Carry the selected job/child so a sitter with more than one
+                    // active scope lands on the child whose alert they opened. Route
+                    // state is only a locator: media and every monitoring action are
+                    // still authorized again by MonitoringAccess on the server.
+                    navigate('/baby-monitoring', {
+                      state: {
+                        jobId: numericJobId,
+                        childId: monitoredChild?.Child_ID,
+                        childName: monitoredChild?.ChildName ?? null,
+                      },
+                    });
+                  }}
+                  onWithChild={() => respond('Marked as with the child', monitoring.withChild)}
+                />
+
+                {monitoring.error ? (
+                  <p role="alert" className={styles.monitorError}>
+                    {monitoring.error}
+                  </p>
+                ) : null}
+              </>
             ) : null}
           </section>
         ) : null}

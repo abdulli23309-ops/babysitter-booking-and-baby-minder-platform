@@ -32,6 +32,160 @@
   box-shadow: var(--shadow-sm);
 }
 
+/* ========================================================================
+   PHASE 9.1 - "stage" variant: the Active Session media hero.
+
+   The container is one deep-navy card with a 24px radius and a deep drop
+   shadow, so the video reads as a single premium surface rather than a
+   black box wedged between two competing status strings. Everything in
+   this block is presentation only - it never changes what the panel
+   believes about the connection, which is still derived from the server.
+   ======================================================================== */
+.stageSurface {
+  display: grid;
+  min-width: 0;
+  gap: var(--space-3);
+  width: 100%;
+}
+
+.stageFrame {
+  /* All four corners round, so the frame matches the card that wraps it. */
+  border-radius: 24px;
+  background: #0B132B;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  isolation: isolate;
+}
+
+.stageFrame[data-state='error'] {
+  background: #0B132B;
+}
+
+/* --- The ONE consolidated status pill ------------------------------------- */
+/* Positioned absolutely over the top-left of the video. It replaces the
+   three stacked error texts the screen used to render ("CONNECTION LOST",
+   "Connection problem. Retrying.", "Preparing live video") with a single
+   word that is derived from exactly the same state as everything else. */
+.statusPill {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 13px;
+  border-radius: var(--radius-full);
+  /* Glassmorphic: a translucent light film with a light hairline, which stays
+     legible over both a bright nursery and a dark night-time room. */
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.28);
+  color: #FFFFFF;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.05em;
+  line-height: 1;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.statusDot {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: 50%;
+  /* Default (connecting / lost) is amber, per the design direction. */
+  background: #F59E0B;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.22);
+  animation: statusPulse 1.6s ease-in-out infinite;
+}
+
+/* Active: emerald green, and the pulse stops so "Live" reads as steady. */
+.statusPill[data-live='true'] .statusDot {
+  background: #10B981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.22);
+  animation: none;
+}
+
+.statusText {
+  text-transform: uppercase;
+}
+
+@keyframes statusPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+/* --- Fallback / broken-iframe surface ------------------------------------- */
+/* Covers the iframe whenever the surface failed, hung past its timeout, or
+   was never prepared. It paints over the browser's own broken-document glyph
+   so the user sees a deliberate Little Care state instead of a browser bug. */
+.fallbackOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  background: #0B132B;
+  padding: var(--space-4);
+}
+
+.fallback {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  text-align: center;
+  color: rgba(255, 255, 255, 0.86);
+}
+
+/* The pulsing Little Care mark. A slow, gentle breath - this is a waiting
+   state on a screen someone glances at while holding a baby, so it must not
+   nag. */
+.fallbackMark {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 60px;
+  height: 60px;
+  margin-bottom: var(--space-1);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #EAF0FF;
+}
+
+.fallbackMarkHalo {
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  animation: fallbackHalo 2.4s ease-out infinite;
+}
+
+@keyframes fallbackHalo {
+  0% { transform: scale(0.9); opacity: 0.85; }
+  100% { transform: scale(1.35); opacity: 0; }
+}
+
+.fallbackTitle {
+  margin: 0;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-bold);
+  color: #FFFFFF;
+}
+
+.fallbackBody {
+  margin: 0;
+  max-width: 32ch;
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-normal);
+  color: rgba(255, 255, 255, 0.66);
+}
+
 /* The status line sits BELOW the video in normal document flow. It used to be
    absolutely positioned over the top of the feed with a dark gradient, which
    put Little Care chrome on top of the camera image. A baby monitor should not
@@ -296,4 +450,57 @@
 @media (max-width: 360px) {
   .frame { aspect-ratio: 16 / 9; }
   .empty { padding: var(--space-4) var(--space-3); }
+}
+
+/* --- PHASE 9.1 stage overrides -------------------------------------------- */
+/* The empty-state `data-tone` backgrounds above are deliberately LIGHT, because
+   they are meant to look unlike a video. On the stage the container is always
+   deep navy - that contrast is the whole point of the redesign - so the tone
+   background is replaced and only the icon colour is kept to carry meaning. */
+.stageFrame[data-tone='neutral'],
+.stageFrame[data-tone='pending'],
+.stageFrame[data-tone='blocked'] {
+  background: #0B132B;
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+/* The stage's own copy is light-on-navy, so the light-theme empty text tokens
+   have to be inverted here or the explanation becomes unreadable. */
+.stageFrame .empty { color: #FFFFFF; }
+
+.stageFrame .emptyTitle { color: #FFFFFF; }
+
+.stageFrame .emptyBody,
+.stageFrame .emptyNote {
+  color: rgba(255, 255, 255, 0.66);
+}
+
+/* Keep the per-state signal without dragging a red or amber wash across the
+   navy card: a coloured dot on the icon does the job. */
+.stageFrame .emptyIcon {
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: none;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.stageFrame[data-tone='pending'] .emptyIcon { color: #FBBF24; }
+.stageFrame[data-tone='blocked'] .emptyIcon { color: #F87171; }
+
+.stageFrame .player,
+.stageFrame .frameElement {
+  background: #0B132B;
+}
+
+@media (max-width: 360px) {
+  /* Keep the pill legible without letting it crowd a 16:9 frame. */
+  .statusPill { top: 10px; left: 10px; padding: 6px 10px; }
+  .statusPill .statusText { font-size: 10px; }
+}
+
+/* Respect a user's reduced-motion preference: both the status dot and the
+   fallback halo stop animating, and the states stay fully readable. */
+@media (prefers-reduced-motion: reduce) {
+  .statusDot,
+  .fallbackMarkHalo { animation: none; }
 }

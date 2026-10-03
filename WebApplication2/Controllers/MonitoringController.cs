@@ -8,6 +8,7 @@ using System.Text;
 using System.Web.Http;
 using WebApplication2.DTOs;
 using WebApplication2.Infrastructure;
+using WebApplication2.Models;
 using WebApplication2.Services.Implementations;
 using WebApplication2.Services.Interfaces;
 
@@ -230,6 +231,31 @@ namespace WebApplication2.Controllers
         // Every endpoint below runs the same centralized MonitoringAccess chain,
         // takes the caller identity from the bearer token and passes ONLY job +
         // child from the body.
+        //
+        // SECURITY BOUNDARY — CRY *DETECTION* IS A MONITOR-DEVICE-ONLY ACTION.
+        // MonitoringAccess deliberately admits BOTH the guardian and the assigned
+        // sitter as legitimate monitoring participants, so on its own it can NOT
+        // distinguish "may watch this child" from "may report that this child is
+        // crying". Reporting a cry creates a CryAlert incident that pages the
+        // sitter and escalates to the parent, so a forged report is a safety-
+        // relevant action, not a read. CreateCryIncident therefore refuses every
+        // ordinary account bearer token outright and accepts only the dedicated
+        // monitoring-device credential (X-Monitor-Device), which is issued at
+        // pairing time and validated by the same rules as the independent flow:
+        // hashed credential, not revoked, not expired, session Active, and the
+        // device's child must match the requested child.
+        //
+        // The job-scoped device credential is PHASE-BOUNDARY-DEFERRED: the
+        // existing MonitoringDeviceSession table is bound by a NOT NULL foreign
+        // key to IndependentMonitoringSession, and that table has no Job_ID, so
+        // reusing it here would require new tables/columns (forbidden by the
+        // "no schema change" rule). Until that phase lands, the correct and
+        // secure behaviour is to fail closed for everyone on this endpoint.
+        //
+        // NOTE - CryAlert *viewing* and the sitter *response* endpoints below
+        // are deliberately NOT restricted. Receiving an alert, and answering
+        // "I'm going to the child" / "With child", are the sitter's actual job.
+        // Only the act of DETECTING and creating the incident is restricted.
         // =================================================================
 
         // POST api/monitoring/cry   body: { "jobId": 171, "childId": 27 }
@@ -246,10 +272,104 @@ namespace WebApplication2.Controllers
             if (request.JobId <= 0 || request.ChildId <= 0)
                 return BadRequest("JobId and ChildId must be positive integers.");
 
+            // Fail closed for ordinary accounts. MonitoringAccess cannot express
+            // "may detect" (it answers "may observe"), so this check deliberately
+            // runs BEFORE it: a caller must present a valid, unrevoked, unexpired
+            // monitoring-device credential whose child matches the requested
+            // child. A parent or sitter bearer token - or any other authenticated
+            // user - is refused here, so hiding the detector in the UI is a
+            // convenience rather than the security control.
+            //
+            // The job-scoped device credential is deferred (see the note above);
+            // until it exists this endpoint admits no one, which is the intended
+            // secure state rather than a temporary loophole.
+            if (!TryAuthorizeMonitorDeviceCry(request.ChildId, out string cryDenial))
+                return Content(HttpStatusCode.Forbidden, cryDenial);
+
             return CryAction(
                 () => _cryIncidentService.CreateIncident(
                     request.JobId, request.ChildId, ClaimsPrincipalHelper.GetUserId(), ClaimsPrincipalHelper.GetRole()),
                 "create failed for job " + request.JobId + ", child " + request.ChildId);
+        }
+
+        /// <summary>
+        /// Validates the dedicated monitoring-device credential for a cry report.
+        ///
+        /// A normal account bearer must never double as a Phone-2 credential, so
+        /// the presence of an Authorization header is an immediate refusal - the
+        /// same identity separation IndependentMonitoringController.AuthorizeDevice
+        /// enforces. The credential itself is compared by SHA-256 hash, and the
+        /// session must still be Active, the device unrevoked and unexpired, and
+        /// bound to the same child being reported. The job/child relationship is
+        /// then re-checked by the normal MonitoringAccess chain inside CryAction,
+        /// so a device credential still cannot be used to reach another family.
+        /// </summary>
+        private bool TryAuthorizeMonitorDeviceCry(int childId, out string denial)
+        {
+            denial = null;
+
+            if (Request == null)
+            {
+                denial = "Cry detection is only available to an authorised monitoring device.";
+                return false;
+            }
+
+            // An ordinary account session is never a device credential.
+            if (Request.Headers.Authorization != null)
+            {
+                denial = "Cry detection is only available to an authorised monitoring device.";
+                return false;
+            }
+
+            IEnumerable<string> values;
+            if (!Request.Headers.TryGetValues("X-Monitor-Device", out values))
+            {
+                denial = "Cry detection is only available to an authorised monitoring device.";
+                return false;
+            }
+
+            string token = values.FirstOrDefault();
+            if (string.IsNullOrWhiteSpace(token) || token.Length != 64)
+            {
+                denial = "Cry detection is only available to an authorised monitoring device.";
+                return false;
+            }
+
+            string hash;
+            using (var sha = System.Security.Cryptography.SHA256.Create())
+            {
+                hash = BitConverter.ToString(
+                    sha.ComputeHash(Encoding.UTF8.GetBytes(token)))
+                    .Replace("-", string.Empty).ToLowerInvariant();
+            }
+
+            int matching;
+            using (var db = new BabySitterBooking_and_BabyMinderEntities())
+            {
+                // Same validity rules as the independent device flow, plus the
+                // explicit child match so one device cannot report another child.
+                matching = db.Database.SqlQuery<int>(
+                    @"SELECT COUNT(*) FROM dbo.MonitoringDeviceSession d
+                      JOIN dbo.IndependentMonitoringSession s
+                        ON s.IndependentMonitoringSession_ID = d.IndependentMonitoringSession_ID
+                      JOIN dbo.Child c ON c.Child_ID = s.Child_ID AND c.IsDeleted = 0
+                      WHERE d.CredentialHash = @p0
+                        AND d.RevokedAtUtc IS NULL
+                        AND d.ExpiresAtUtc > GETUTCDATE()
+                        AND s.Status = 'Active'
+                        AND s.IsDeleted = 0
+                        AND s.Child_ID = @p1", hash, childId).Single();
+            }
+
+            if (matching == 0)
+            {
+                // One message for every failure so the endpoint cannot be used to
+                // probe whether a credential exists or which child it belongs to.
+                denial = "Cry detection is only available to an authorised monitoring device.";
+                return false;
+            }
+
+            return true;
         }
 
         // GET api/monitoring/cry?jobId=171&childId=27

@@ -58,6 +58,40 @@ const IconSpinner = () => (
   </svg>
 );
 
+/* PHASE 9.1 - the Little Care mark used by the "Awaiting video feed..." fallback.
+   It is drawn here (rather than shipped as an asset) so the fallback can never
+   404 and render as a broken image next to a broken iframe. */
+const LittleCareMark = () => (
+  <span className={styles.fallbackMark} aria-hidden="true">
+    <span className={styles.fallbackMarkHalo} />
+    <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 20.5s-7.5-4.6-7.5-9.6A4.4 4.4 0 0 1 12 7.6a4.4 4.4 0 0 1 7.5 3.3c0 5-7.5 9.6-7.5 9.6z" />
+      <path d="M12 4.2c.9-1.1 2.3-1.4 3.2-.7" />
+    </svg>
+  </span>
+);
+
+/* PHASE 9.1 - ONE consolidated status pill, floated over the video container.
+   This replaces the three competing error strings the screen used to stack
+   ("CONNECTION LOST", "Connection problem. Retrying.", "Preparing live video").
+   Exactly two words are ever shown, and the colour is derived from the same
+   `conferenceStatus` the rest of the panel uses, so the pill cannot disagree
+   with the surface it sits on. */
+function StatusPill({ live }) {
+  return (
+    <div
+      className={styles.statusPill}
+      data-live={live ? 'true' : 'false'}
+      role="status"
+      aria-live="polite"
+    >
+      <span className={styles.statusDot} aria-hidden="true" />
+      <span className={styles.statusText}>{live ? 'Live' : 'Reconnecting...'}</span>
+    </div>
+  );
+}
+
 /* One row of copy per state. Keeping the wording here, rather than inline at
    each call site, is what stops a later edit quietly re-introducing a claim. */
 function copyFor({ status, childName, reason }) {
@@ -182,7 +216,17 @@ export default function MonitoringMediaPanel({ status, media, canPublish, reason
         : 'connecting';
   // --- REAL live state: the server issued an authorised media session -------
   if (status === 'ready' && media) {
-    const frameClass = variant === 'card' ? `${styles.frame} ${styles.cardFrame}` : styles.frame;
+    /* PHASE 9.1 - three presentations, chosen by `variant`:
+         'hero'  - the original standalone panel (parent monitoring screen)
+         'card'  - the same, with the subtle card border (unchanged)
+         'stage' - the Active Session hero: ONE status pill floated over the
+                   video, and no second caption bar underneath it.           */
+    const isStage = variant === 'stage';
+    const frameClass = isStage
+      ? `${styles.frame} ${styles.stageFrame}`
+      : variant === 'card'
+        ? `${styles.frame} ${styles.cardFrame}`
+        : styles.frame;
     /* These states are OURS. They deliberately describe the monitoring
        session, not the SFU: the user should never see two competing
        "connecting / unavailable" messages, and must never see raw provider
@@ -194,9 +238,13 @@ export default function MonitoringMediaPanel({ status, media, canPublish, reason
         : frameLoaded
           ? 'Monitoring active'
           : 'Opening monitoring room';
+    /* The pill is LIVE only when the surface actually loaded. A frame we gave
+       up on, or never had, is exactly the "Reconnecting..." case. */
+    const pillLive = Boolean(frameSrc) && conferenceStatus === 'loaded';
     return (
-      <section className={styles.mediaSurface} aria-label="Live monitoring media">
+      <section className={isStage ? styles.stageSurface : styles.mediaSurface} aria-label="Live monitoring media">
         <div className={frameClass} data-state={conferenceStatus}>
+          {isStage ? <StatusPill live={pillLive} /> : null}
           {frameSrc ? (
             /* The media surface. The SFU is a separate origin on purpose: it
                can neither read our DOM nor our session. The join URL carries
@@ -215,17 +263,52 @@ export default function MonitoringMediaPanel({ status, media, canPublish, reason
               allowFullScreen
               referrerPolicy="no-referrer"
               onLoad={() => setLoadedScopeKey(scopeKey)}
+              /* PHASE 9.1 - a cross-origin surface that dies leaves the browser's
+                 own broken-document glyph showing, which is indistinguishable
+                 from a real fault. `onError` lets us paint the premium fallback
+                 instead; the load timeout below still covers a silent hang. */
+              onError={() => setLoadedScopeKey(`error:${scopeKey}`)}
             />
           ) : (
             /* Server said Configured but gave us no address/room. Say so rather
-               than render an empty black box that looks like a dead camera. */
+               than render an empty black box that looks like a dead camera -
+               and on the stage, never leave the browser's broken-document icon
+               as the only thing on screen. */
             <div className={styles.player} data-state="error" role="status">
-              <p className={styles.emptyBody}>Live video could not be prepared. Please try again.</p>
+              {isStage ? (
+                <div className={styles.fallback}>
+                  <LittleCareMark />
+                  <p className={styles.fallbackTitle}>Awaiting video feed...</p>
+                  <p className={styles.fallbackBody}>
+                    Live video could not be prepared. Please try again.
+                  </p>
+                </div>
+              ) : (
+                <p className={styles.emptyBody}>Live video could not be prepared. Please try again.</p>
+              )}
             </div>
           )}
+
+          {/* PHASE 9.1 - on the stage the frame itself carries a dedicated
+              fallback overlay when the surface failed or timed out, so the user
+              never sees an empty dark rectangle or a broken iframe icon. */}
+          {isStage && frameSrc && conferenceStatus === 'error' ? (
+            <div className={styles.fallbackOverlay} role="status">
+              <div className={styles.fallback}>
+                <LittleCareMark />
+                <p className={styles.fallbackTitle}>Awaiting video feed...</p>
+                <p className={styles.fallbackBody}>
+                  We lost the connection to the nursery camera. Retrying automatically.
+                </p>
+              </div>
+            </div>
+          ) : null}
         </div>
 
-        {/* ONE honest status line, owned by Little Care. */}
+        {/* ONE honest status line, owned by Little Care. The stage hides it
+            because its floating pill already says the same thing - showing
+            both is exactly the duplicated-error problem this pass removes. */}
+        {isStage ? null : (
         <div className={styles.liveBar} role="status">
           <span
             className={styles.liveDot}
@@ -238,6 +321,7 @@ export default function MonitoringMediaPanel({ status, media, canPublish, reason
             {canPublish ? `${childName || 'Baby'}’s camera` : 'Listening in'}
           </span>
         </div>
+        )}
 
         {/* Native Little Care controls, in the document flow BELOW the video.
             Only the publisher gets them: a viewer has no camera or microphone
@@ -276,9 +360,21 @@ export default function MonitoringMediaPanel({ status, media, canPublish, reason
 
   // --- Honest empty state ---------------------------------------------------
   const { title, body, tone } = copyFor({ status, childName, reason });
+
+  /* PHASE 9.1 - in stage mode the empty state adopts the same deep-navy frame
+     and floats the SAME pill over it, so a connecting screen and a live screen
+     are visibly the same surface. The pill is only shown for states where
+     waiting is genuinely the right word: a refused or unconfigured deployment
+     is not going to reconnect, and pretending otherwise would be a lie. */
+  const isStage = variant === 'stage';
+  const waitingForFeed = status === 'loading' || status === 'no-session' || status === 'idle';
+  const emptyFrameClass = isStage ? `${styles.frame} ${styles.stageFrame}` : styles.frame;
+
   return (
-    <div className={styles.frame} data-tone={tone}>
+    <div className={emptyFrameClass} data-tone={tone}>
+      {isStage && waitingForFeed ? <StatusPill live={false} /> : null}
       <div className={styles.empty} role="status" aria-live="polite">
+        {isStage ? <LittleCareMark /> : null}
         <div className={styles.emptyIcon} aria-hidden="true">
           {status === 'loading' ? <IconSpinner /> : status === 'denied' ? <IconLock /> : <IconCameraOff />}
         </div>

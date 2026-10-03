@@ -327,6 +327,30 @@ export default function BabyMonitoringScreen() {
         </>
       )}
 
+      {/* ---- SITTER ACTIONS (feeding) ---------------------------------------
+          "Feeding Baby" is a FORWARD-LOOKING entry point. The recording
+          pipeline (capture, upload, storage, schema) is deliberately NOT built
+          yet, so this button is present and honest about that: it is disabled
+          and says "Coming soon". It must NOT be wired to a fake recorder or
+          imply a clip was saved.
+
+          It is sitter-only. The feed itself is already viewer-only - the server
+          issues this participant a viewer room and MonitoringMediaPanel renders
+          no camera/microphone controls unless the SERVER granted publishing -
+          so nothing here can become a publishing path. */}
+      {role === 'babysitter' && scope.childName ? (
+        <div className={styles.childHeader}>
+          <button
+            type="button"
+            className={styles.startMonitorBtn}
+            disabled
+            aria-disabled="true"
+          >
+            Feeding Baby &mdash; Coming soon
+          </button>
+        </div>
+      ) : null}
+
       <div className={styles.childHeader}>
         <span className={styles.childAvatar} aria-hidden="true">
           {(scope.childName || '').trim().charAt(0).toUpperCase()}

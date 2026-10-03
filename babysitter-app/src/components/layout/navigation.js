@@ -90,7 +90,10 @@ const PARENT_ITEMS = [
   { id: 'child-profile', icon: 'child', label: 'Children Profiles', route: '/child-profile' },
   { id: 'baby-monitoring', icon: 'camera', label: 'Baby Monitor', route: '/baby-monitoring' },
   { id: 'independent-monitoring', icon: 'camera', label: 'Monitor Device Setup', route: '/independent-monitoring' },
-  { id: 'cry-detector', icon: 'wave', label: 'Cry Detector', route: '/cry-detector' },
+  /* The 'Cry Detector' entry was REMOVED from the parent menu. Cry detection
+     runs on the monitor device (Phone 2) and the server rejects a cry report
+     from any account bearer, so a menu link here would only ever open a screen
+     the parent cannot use. Viewing a resulting CryAlert is still available. */
   { id: 'parent-notifications', icon: 'bell', label: 'Notifications', route: '/parent-notifications' },
   { id: 'parent-profile', icon: 'user', label: 'My Profile', route: '/my-profile' },
   { id: 'support', icon: 'help', label: 'Help & Support', route: '/support' },
@@ -103,7 +106,10 @@ const BABYSITTER_ITEMS = [
   { id: 'set-availability', icon: 'calendar', label: 'Availability', route: '/set-availability' },
   { id: 'earnings', icon: 'wallet', label: 'Earnings', route: '/earnings' },
   { id: 'ratings', icon: 'star', label: 'Ratings & Feedback', route: '/ratings' },
-  { id: 'cry-detector', icon: 'wave', label: 'Cry Detector', route: '/cry-detector' },
+  /* The 'Cry Detector' entry was REMOVED from the sitter menu. Detection is a
+     monitor-device (Phone 2) capability and the server refuses a cry report from
+     an account bearer, so this link could only open a screen the sitter cannot
+     use. Receiving and answering a CryAlert is unchanged. */
   { id: 'babysitter-notifications', icon: 'bell', label: 'Notifications', route: '/babysitter-notifications' },
   { id: 'my-profile', icon: 'user', label: 'My Profile', route: '/my-profile' },
   { id: 'support', icon: 'help', label: 'Help & Support', route: '/support' },

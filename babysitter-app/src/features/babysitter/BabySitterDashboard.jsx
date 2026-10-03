@@ -265,31 +265,16 @@ export default function BabySitterDashboard() {
         </div>
 
         <div className={styles.toolsList}>
-          <div
-            className={styles.toolItem}
-            onClick={() => navigate('/cry-detector')}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => e.key === 'Enter' && navigate('/cry-detector')}
-          >
-            <div className={styles.toolItemLeft}>
-              <div className={styles.toolIcon} style={{ background: 'var(--badge-warning-bg)', color: 'var(--color-primary)' }}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
-                  <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-                  <line x1="12" y1="19" x2="12" y2="23" />
-                  <line x1="8" y1="23" x2="16" y2="23" />
-                </svg>
-              </div>
-              <div>
-                <h4 className={styles.toolTitle}>AI Baby Cry Detector</h4>
-                <p className={styles.toolDesc}>TensorFlow machine acoustic listener</p>
-              </div>
-            </div>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-muted)" strokeWidth="2.5">
-              <polyline points="9 18 15 12 9 6" />
-            </svg>
-          </div>
+          {/* The "AI Baby Cry Detector" tool was REMOVED for the sitter.
+              Cry DETECTION belongs to the monitor device (Phone 2) alone: the
+              server refuses a cry report from any ordinary account bearer, so
+              this entry could only ever have opened a screen that cannot report
+              anything. Offering it was a false capability.
+
+              This is a UI removal, not the security control - the backend
+              restriction on POST /monitoring/cry is what actually enforces it.
+              Receiving a CryAlert, and answering it, remain available to the
+              sitter through the active-job monitoring screen. */}
 
           <div
             className={styles.toolItem}
