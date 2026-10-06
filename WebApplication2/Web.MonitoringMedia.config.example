@@ -1,0 +1,6 @@
+<appSettings>
+  <add key="MonitoringMediaEnabled" value="true" />
+  <add key="MonitoringMediaServerUrl" value="https://127.0.0.1:3010" />
+  <!-- Generated locally by start-littlecare-dev.ps1. Never replace with a committed secret. -->
+  <add key="MonitoringMediaRoomSalt" value="__GENERATE_LOCAL_RANDOM_SALT__" />
+</appSettings>

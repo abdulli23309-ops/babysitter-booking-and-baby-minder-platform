@@ -28,6 +28,12 @@ namespace WebApplication2.DTOs
         public string AvailabilityType { get; set; }     // 'One Day' | 'Repeat Days'
         public string EndDate { get; set; }              // 'YYYY-MM-DD' (only for series)
         public List<string> SelectedDays { get; set; }   // ['Mon','Tue',...]
+
+        // Phase 10.0 — "Today's Required Tasks": stable ids chosen by the parent
+        // at booking time (e.g. ["bottle-feeding","diaper-change"]). Validated
+        // server-side against AssignedTaskCatalog before persistence. Optional:
+        // absent/null/empty means the booking requests zero tasks.
+        public List<string> AssignedTasks { get; set; }
     }
 
     public class CreateJobResult

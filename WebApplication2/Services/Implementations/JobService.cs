@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
@@ -113,6 +113,24 @@ namespace WebApplication2.Services.Implementations
                 .FirstOrDefault() ?? 0m;
         }
 
+        /// <summary>
+        /// Phase 10.0 — persists the parent's task allocation onto a job row.
+        /// AssignedTasks lives on Job but outside the frozen EDMX, so it is
+        /// written via raw SQL (same audited pattern as Latitude/Longitude).
+        /// An empty allocation stores NULL so legacy and zero-task bookings
+        /// share the same "no tasks" representation.
+        /// </summary>
+        private void PersistAssignedTasks(int jobId, List<string> assignedTasks)
+        {
+            object storedValue = (assignedTasks != null && assignedTasks.Count > 0)
+                ? (object)Newtonsoft.Json.JsonConvert.SerializeObject(assignedTasks)
+                : DBNull.Value;
+
+            _db.Database.ExecuteSqlCommand(
+                "UPDATE Job SET AssignedTasks = @p0 WHERE Job_ID = @p1",
+                storedValue, jobId);
+        }
+
         public CreateJobResult CreateJobForSitter(CreateJobDto dto)
         {
             if (dto == null)
@@ -120,6 +138,11 @@ namespace WebApplication2.Services.Implementations
 
             if (dto.ParentId <= 0 || dto.SitterId <= 0)
                 throw new ArgumentException("Parent ID and Sitter ID must be positive integers.");
+
+            // Phase 10.0 — validate the requested "Today's Required Tasks" BEFORE any
+            // mutation (pre-mutation validation ordering). Throws on unknown ids,
+            // dedupes, and treats null/empty as a valid zero-task booking.
+            var assignedTasks = AssignedTaskCatalog.Normalize(dto.AssignedTasks);
 
             // When NOT booking for all children, ChildId must be positive
             if (!dto.IsForAllChildren && dto.ChildId <= 0)
@@ -258,6 +281,9 @@ namespace WebApplication2.Services.Implementations
                         dto.Latitude.Value, dto.Longitude.Value, job.Job_ID);
                 }
 
+                // Phase 10.0 — carry the booking's task allocation onto the job.
+                PersistAssignedTasks(job.Job_ID, assignedTasks);
+
                 var message = childIdsToBook.Count > 1
                     ? $"Booking request sent for {childIdsToBook.Count} children. The sitter can now accept it."
                     : "Job created successfully. The sitter can now accept it.";
@@ -333,6 +359,10 @@ namespace WebApplication2.Services.Implementations
                     dto.Latitude.Value, dto.Longitude.Value, firstJob.Job_ID);
             }
 
+            // Phase 10.0 — the series head carries the same task allocation the
+            // parent selected for this booking.
+            PersistAssignedTasks(firstJob.Job_ID, assignedTasks);
+
             for (int i = 1; i < seriesDates.Count; i++)
             {
                 var j = new Job
@@ -375,6 +405,10 @@ namespace WebApplication2.Services.Implementations
                         "UPDATE Job SET Latitude = @p0, Longitude = @p1 WHERE Job_ID = @p2",
                         dto.Latitude.Value, dto.Longitude.Value, j.Job_ID);
                 }
+
+                // Phase 10.0 — every occurrence of a series repeats the same
+                // booking contract, including the assigned tasks.
+                PersistAssignedTasks(j.Job_ID, assignedTasks);
             }
 
             return new CreateJobResult
@@ -693,6 +727,14 @@ namespace WebApplication2.Services.Implementations
                 "SELECT Latitude FROM Job WHERE Job_ID = @p0", jobId).FirstOrDefault();
             dto.Longitude = _db.Database.SqlQuery<double?>(
                 "SELECT Longitude FROM Job WHERE Job_ID = @p0", jobId).FirstOrDefault();
+
+            // Phase 10.0 — read the task allocation persisted at booking time.
+            // The column lives outside the frozen EDMX, so it is read via raw
+            // SQL (same pattern as Latitude/Longitude above). Historical jobs
+            // with NULL degrade to an empty list, never null.
+            var assignedTasksRaw = _db.Database.SqlQuery<string>(
+                "SELECT AssignedTasks FROM Job WHERE Job_ID = @p0", jobId).FirstOrDefault();
+            dto.AssignedTasks = AssignedTaskCatalog.Deserialize(assignedTasksRaw);
 
             // Phase 8c: "Earned so far" across completed days of this series.
             // Uses the injected _db (this method has no local context).

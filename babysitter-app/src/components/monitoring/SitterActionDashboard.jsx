@@ -48,31 +48,18 @@ const BottleIcon = () => (
   </svg>
 );
 
-const NapIcon = () => (
-  <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-       strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="M2.8 16.4h17a1.6 1.6 0 0 1 0 3.2H2.8a1.6 1.6 0 0 1 0-3.2z" />
-    <path d="M6.4 16.4v-3.1a1.6 1.6 0 0 1 1.6-1.6h9" />
-    <path d="M15.6 8.2h3.1l1.7 3.1-1.7 3.1h-3.1z" />
-  </svg>
-);
+/* PHASE 9.3 - THE CARE LOG HAS EXACTLY ONE ACTION.
+   "Log Feeding" is the single CTA: one press enters the care note AND (via
+   `onRequestRecording`) joins the proven server-side feeding-video workflow
+   for the same validated Job+Child scope. The babysitter never sees or
+   operates the recording subsystem separately - request semantics, 409
+   duplicate protection and server-confirmed completion all stay in
+   ActiveJobDetails exactly as before.
 
-const DiaperIcon = () => (
-  <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-       strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="M3.6 8.2h16.8l-1.3 9.6a2.4 2.4 0 0 1-2.36 2.02H8.26A2.4 2.4 0 0 1 5.9 17.8z" />
-    <path d="M3.6 8.2 5 5.4a1.4 1.4 0 0 1 1.3-.9h11.4a1.4 1.4 0 0 1 1.3.9l1.4 2.8" />
-    <path d="M9.6 12.4h4.8" />
-  </svg>
-);
-
-/* The action catalogue. `primary` marks the one action the panel is built
-   around; it is rendered first, full-width, with an emerald treatment that
-   matches the "Live" status dot above it. */
+   The former standalone "Record Feeding", "Log Nap" and "Diaper Change"
+   actions are gone: two feeding-related buttons was always one too many. */
 const ACTIONS = [
   { id: 'feeding', label: 'Log Feeding', Icon: BottleIcon, primary: true },
-  { id: 'nap', label: 'Log Nap', Icon: NapIcon },
-  { id: 'diaper', label: 'Diaper Change', Icon: DiaperIcon },
 ];
 
 const timeLabel = (at) =>
@@ -85,7 +72,25 @@ const timeLabel = (at) =>
    timestamp genuinely event-time while leaving render pure. */
 const stampNow = () => Date.now();
 
-export default function SitterActionDashboard({ onLog, disabled = false, disabledReason = '' }) {
+export default function SitterActionDashboard({
+  onRequestRecording,
+  /* PHASE 3 - the recording action is now a FIVE-STATE machine supplied by
+     ActiveJobDetails (the owner of the HTTP call and its completion poll):
+       idle       - nothing in flight
+       requesting - the POST /feeding/request round-trip is in the air
+       requested  - the server ACCEPTED; the monitor device has the work.
+                    NOT a success claim - a video exists only after the
+                    server confirms Completion.
+       completed  - completion CONFIRMED via the history endpoint
+       conflict   - 409: another recording is already in flight
+       failed     - the request itself failed
+     `recordingDetail` carries the honest copy for conflict/failed, and for
+     completed it carries the REAL duration reported by the server. */
+  recordingState = 'idle',
+  recordingDetail = null,
+  disabled = false,
+  disabledReason = '',
+}) {
   /* The session log. Held in component state ONLY - see the header note on
      why nothing here is presented as persisted. Newest first, because the
      thing a sitter just logged is the thing they want to see. */
@@ -96,14 +101,24 @@ export default function SitterActionDashboard({ onLog, disabled = false, disable
      legitimate place to read the clock. */
   const nextId = useRef(0);
 
-  /* logAction is the single place a care event enters the panel, so wiring it
-     to a real endpoint later is a one-function change rather than an edit to
-     three onClick handlers. */
+  /* PHASE 3 - the ONLY derivation needed here: the POST is in flight. The
+     other recording states are presentation, driven by `recordingState`. */
+  const recordingBusy = recordingState === 'requesting';
+  const recordingActive = recordingState === 'requested';
+
+  /* PHASE 9.3 - ONE CARE ACTION. The single "Log Feeding" press performs the
+     first two steps of the unified workflow: the care note enters the
+     session log, then `onRequestRecording` fires the existing feeding-video
+     request for the same validated Job+Child scope. The note is NEVER rolled
+     back if that request fails or returns 409 - the status cards below carry
+     the server's honest verdict alongside the note that remains logged.
+     Nothing here claims recording success; only `recordingState` (driven by
+     the server via ActiveJobDetails) ever does that. */
   const logAction = (action) => {
     nextId.current += 1;
     const entry = { id: `${action.id}-${nextId.current}`, label: action.label, at: stampNow() };
     setEntries((prev) => [entry, ...prev]);
-    if (onLog) onLog(action.label);
+    if (onRequestRecording) onRequestRecording();
   };
 
   return (
@@ -115,8 +130,12 @@ export default function SitterActionDashboard({ onLog, disabled = false, disable
         </p>
       </header>
 
-      {/* The action grid. The primary "Log Feeding" card spans the full width
-          so it is unmissable; the rest share a row beneath it. */}
+      {/* PHASE 9.3 - THE SINGLE CARE LOG CTA. It fills the container width,
+          and it carries the recording pipeline's busy/pending states because
+          it is the pipeline's only trigger. The button is disabled only for
+          the brief POST round-trip (recordingBusy) - never for the device's
+          asynchronous record/upload - so the sitter is never blocked while
+          the video is being made. */}
       <div className={styles.grid}>
         {ACTIONS.map(({ id, label, Icon, primary }) => (
           <button
@@ -124,17 +143,78 @@ export default function SitterActionDashboard({ onLog, disabled = false, disable
             type="button"
             className={styles.action}
             data-primary={primary ? 'true' : 'false'}
+            data-recording-active={recordingActive ? 'true' : 'false'}
             onClick={() => logAction({ id, label })}
-            disabled={disabled}
-            aria-disabled={disabled}
+            /* The request is a real server round-trip, so the button only
+               disables itself while that POST is in flight. The recording
+               itself stays asynchronous and never blocks this panel. */
+            disabled={disabled || recordingBusy}
+            aria-disabled={disabled || recordingBusy}
+            aria-busy={recordingBusy ? 'true' : 'false'}
           >
             <span className={styles.actionIcon}>
               <Icon />
             </span>
-            <span className={styles.actionLabel}>{label}</span>
+            <span className={styles.actionLabel}>
+              {/* Honest, state-aware label: the transient "Requesting…" shows
+                  only while the POST is in the air; afterwards the label
+                  returns to the care action and the status cards below carry
+                  the server's verdict. */}
+              {recordingBusy ? 'Requesting…' : label}
+            </span>
           </button>
         ))}
       </div>
+
+      {/* ---- PHASE 3 - THE RECORDING STATUS CARD --------------------------
+          Every claim here is server-derived; none of it is inferred from a
+          local click. "Requested" says exactly that. "Recorded successfully"
+          appears ONLY after the history endpoint confirmed Completion for
+          this request's own PublicId, and it quotes the REAL server duration.
+          The 409 path shows the server's own semantic copy in amber - never
+          a green tick, never a generic red shrug. */}
+      {recordingState === 'requested' ? (
+        <div className={styles.recordingCard} data-tone="active" role="status" aria-live="polite">
+          <span className={styles.recordingDot} aria-hidden="true" />
+          <div>
+            <p className={styles.recordingTitle}>Feeding recording requested.</p>
+            <p className={styles.recordingBody}>
+              The monitor device is handling the recording.
+            </p>
+          </div>
+        </div>
+      ) : recordingState === 'completed' ? (
+        <div className={styles.recordingCard} data-tone="success" role="status" aria-live="polite">
+          <div>
+            <p className={styles.recordingTitle}>✓ Feeding video recorded successfully</p>
+            <p className={styles.recordingMeta}>
+              {recordingDetail?.durationSeconds != null
+                ? `${recordingDetail.durationSeconds} sec · Recorded just now`
+                : 'Recorded just now'}
+            </p>
+          </div>
+        </div>
+      ) : recordingState === 'conflict' ? (
+        <div className={styles.recordingCard} data-tone="conflict" role="status" aria-live="polite">
+          <div>
+            <p className={styles.recordingTitle}>
+              {recordingDetail?.message || 'A feeding video is already being recorded for this child.'}
+            </p>
+            <p className={styles.recordingBody}>
+              It will appear under Feeding Recordings when it finishes.
+            </p>
+          </div>
+        </div>
+      ) : recordingState === 'failed' ? (
+        <div className={styles.recordingCard} data-tone="error" role="alert">
+          <div>
+            <p className={styles.recordingTitle}>
+              {recordingDetail?.message || 'The feeding video could not be requested.'}
+            </p>
+            <p className={styles.recordingBody}>Nothing was recorded. Please try again.</p>
+          </div>
+        </div>
+      ) : null}
 
       {disabled && disabledReason ? (
         <p className={styles.disabledNote}>{disabledReason}</p>

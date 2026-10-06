@@ -134,41 +134,52 @@ $ErrorActionPreference = 'Stop'
 # from a stored value.
 # ---------------------------------------------------------------------------
 function Get-LittleCareLanIPv4 {
-    $found = New-Object System.Collections.Generic.List[object]
+    # Only physical, up Ethernet/Wi-Fi adapters are eligible. VPN/tunnel and
+    # virtual adapters are excluded even when they install a default route.
+    $physical = @(Get-NetAdapter -Physical -ErrorAction SilentlyContinue |
+        Where-Object { $_.Status -eq 'Up' })
+    $physicalByIndex = @{}
+    foreach ($adapter in $physical) { $physicalByIndex[[int]$adapter.ifIndex] = $adapter }
 
-    # (1) Preferred: the interface that owns the IPv4 default route.
-    $routes = Get-NetRoute -DestinationPrefix '0.0.0.0/0' -ErrorAction SilentlyContinue |
-        Where-Object { $_.NextHop -and $_.NextHop -ne '0.0.0.0' }
-    foreach ($r in $routes) {
-        $addrs = Get-NetIPAddress -InterfaceIndex $r.ifIndex -AddressFamily IPv4 -ErrorAction SilentlyContinue |
-            Where-Object {
-                $_.AddressState -eq 'Preferred' -and
-                $_.IPAddress -ne '127.0.0.1' -and
-                $_.IPAddress -notlike '169.254.*'
-            }
-        foreach ($a in $addrs) {
-            $found.Add([pscustomobject]@{ IP = $a.IPAddress; Interface = $r.InterfaceAlias; Reason = 'default-route' })
+    $candidates = New-Object System.Collections.Generic.List[object]
+    $routes = @(Get-NetRoute -DestinationPrefix '0.0.0.0/0' -ErrorAction SilentlyContinue |
+        Where-Object { $_.NextHop -and $_.NextHop -ne '0.0.0.0' -and $physicalByIndex.ContainsKey([int]$_.ifIndex) })
+    foreach ($route in $routes) {
+        $interface = Get-NetIPInterface -InterfaceIndex $route.ifIndex -AddressFamily IPv4 -ErrorAction SilentlyContinue |
+            Select-Object -First 1
+        foreach ($address in (Get-NetIPAddress -InterfaceIndex $route.ifIndex -AddressFamily IPv4 -ErrorAction SilentlyContinue |
+                Where-Object { $_.AddressState -eq 'Preferred' -and (Test-PrivateLanIPv4 $_.IPAddress) })) {
+            $candidates.Add([pscustomobject]@{
+                IP = $address.IPAddress
+                Interface = $physicalByIndex[[int]$route.ifIndex].Name
+                RouteMetric = [int]$route.RouteMetric
+                InterfaceMetric = if ($interface) { [int]$interface.InterfaceMetric } else { [int]::MaxValue }
+                InterfaceIndex = [int]$route.ifIndex
+                Reason = 'physical-default-route'
+            })
         }
     }
 
-    # (2) Fallback: any preferred IPv4 on a physical adapter that is up.
-    if ($found.Count -eq 0) {
-        $upIndexes = @((Get-NetAdapter -Physical -ErrorAction SilentlyContinue |
-            Where-Object { $_.Status -eq 'Up' }).ifIndex)
-        foreach ($a in (Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue |
-                Where-Object { $_.AddressState -eq 'Preferred' -and $_.IPAddress -ne '127.0.0.1' -and $_.IPAddress -notlike '169.254.*' })) {
-            if ($upIndexes -contains $a.InterfaceIndex) {
-                $found.Add([pscustomobject]@{ IP = $a.IPAddress; Interface = $a.InterfaceAlias; Reason = 'adapter-up' })
+    # If no physical default route exists, use a physical private address only
+    # when there is exactly one candidate. Ambiguity must fail closed.
+    if ($candidates.Count -eq 0) {
+        foreach ($adapter in $physical) {
+            foreach ($address in (Get-NetIPAddress -InterfaceIndex $adapter.ifIndex -AddressFamily IPv4 -ErrorAction SilentlyContinue |
+                    Where-Object { $_.AddressState -eq 'Preferred' -and (Test-PrivateLanIPv4 $_.IPAddress) })) {
+                $candidates.Add([pscustomobject]@{ IP = $address.IPAddress; Interface = $adapter.Name; RouteMetric = [int]::MaxValue; InterfaceMetric = [int]::MaxValue; InterfaceIndex = [int]$adapter.ifIndex; Reason = 'single-physical-adapter-fallback' })
             }
         }
     }
 
-    $private = $found | Where-Object { Test-PrivateLanIPv4 $_.IP } | Select-Object -First 1
-    if ($null -eq $private) {
-        throw ("Could not determine a private LAN IPv4 address. Candidates: " +
-               (($found | ForEach-Object { "$($_.IP) [$($_.Interface)]" }) -join ', '))
+    $ordered = @($candidates | Sort-Object RouteMetric, InterfaceMetric, InterfaceIndex, IP -Unique)
+    if ($ordered.Count -eq 0) {
+        throw 'Could not determine a private IPv4 address on an up physical adapter. Connect Wi-Fi or Ethernet and retry.'
     }
-    return $private
+    if ($ordered[0].Reason -eq 'single-physical-adapter-fallback' -and $ordered.Count -ne 1) {
+        throw ("No physical adapter owns the default route and multiple private addresses are available: " +
+               (($ordered | ForEach-Object { "$($_.IP) [$($_.Interface)]" }) -join ', ') + '. Refusing to guess.')
+    }
+    return $ordered[0]
 }
 
 
@@ -367,13 +378,21 @@ function Set-LittleCareDevCertificate {
 function Set-MiroTalkAnnouncedIp {
     param([string]$Address)
     if (-not (Test-Path $script:MiroTalkEnv)) {
-        Write-Warn2 "MiroTalk .env not found at $($script:MiroTalkEnv) - skipping SFU_ANNOUNCED_IP."
-        return $false
+        throw "Required MiroTalk .env is missing: $($script:MiroTalkEnv). The launcher will not start with an unconfigured SFU address."
     }
     $content = Get-Content $script:MiroTalkEnv -Raw
     $pattern = '(?m)^(\s*SFU_ANNOUNCED_IP\s*=\s*)(\S*)(.*)$'
-    if ($content -match $pattern) {
-        $current = $Matches[2]
+    # NOTE: the variable must NOT be called $matches - PowerShell treats that
+    # as the automatic $Matches variable, and indexing a MatchCollection with
+    # the group number (e.g. $Matches[2]) then throws
+    # "Specified argument was out of the range of valid values. Parameter name: i".
+    # Always take group values from the Match object's own Groups collection.
+    $entries = @([regex]::Matches($content, $pattern))
+    if ($entries.Count -gt 1) {
+        throw 'MiroTalk .env contains duplicate SFU_ANNOUNCED_IP entries; refusing ambiguous configuration.'
+    }
+    if ($entries.Count -eq 1) {
+        $current = $entries[0].Groups[2].Value
         if ($current -eq $Address) {
             Write-Skip "SFU_ANNOUNCED_IP already $Address."
             return $false
@@ -399,13 +418,28 @@ function Set-BackendMediaEndpoint {
     param([string]$Address, [int]$Port)
     $url = "https://{0}:{1}" -f $Address, $Port
     if (-not (Test-Path $script:MediaConfig)) {
-        Write-Warn2 "Backend media config not found at $($script:MediaConfig) - skipping."
-        return $false
+        $template = "$($script:MediaConfig).example"
+        if (-not (Test-Path $template)) {
+            throw "Backend media config and template are missing: $($script:MediaConfig), $template."
+        }
+        $bytes = New-Object byte[] 48
+        $rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+        try { $rng.GetBytes($bytes) } finally { $rng.Dispose() }
+        $salt = [Convert]::ToBase64String($bytes)
+        [Array]::Clear($bytes, 0, $bytes.Length)
+        $seed = Get-Content $template -Raw
+        $seed = $seed.Replace('__GENERATE_LOCAL_RANDOM_SALT__', $salt)
+        $seed = [regex]::Replace($seed, '(<add\s+key="MonitoringMediaServerUrl"\s+value=")[^"]*(")', ('$1' + $url + '$2'))
+        Write-TextNoBom -Path $script:MediaConfig -Text $seed
+        Write-Ok "Created backend media config from the tracked template with a fresh local room salt and $url."
     }
     $content = Get-Content $script:MediaConfig -Raw
     $pattern = '(<add\s+key="MonitoringMediaServerUrl"\s+value=")([^"]*)(")'
-    if ($content -match $pattern) {
-        $current = [regex]::Match($content, $pattern).Groups[2].Value
+    # See the note in Set-MiroTalkAnnouncedIp: never name this $matches.
+    $entries = @([regex]::Matches($content, $pattern))
+    if ($entries.Count -gt 1) { throw 'Backend media config contains duplicate MonitoringMediaServerUrl entries; refusing ambiguous configuration.' }
+    if ($entries.Count -eq 1) {
+        $current = $entries[0].Groups[2].Value
         if ($current -eq $url) {
             Write-Skip "MonitoringMediaServerUrl already $url."
             return $false
@@ -476,36 +510,163 @@ function Test-PortListening {
     return [bool]$c
 }
 
-function Stop-ListenerOnPort {
-    param([int]$Port)
-    $stopped = $false
+function Test-LanHttpsEndpoint {
+    param([string]$Address, [int]$Port)
+    $client = New-Object System.Net.Sockets.TcpClient
+    $ssl = $null
+    try {
+        $connect = $client.BeginConnect($Address, $Port, $null, $null)
+        if (-not $connect.AsyncWaitHandle.WaitOne(2000, $false)) { return $false }
+        $client.EndConnect($connect)
+        $expected = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2($script:LeafCert)
+        $callback = [System.Net.Security.RemoteCertificateValidationCallback] {
+            param($sender, $certificate, $chain, $errors)
+            if (-not $certificate) { return $false }
+            $actual = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2($certificate)
+            return ($actual.Thumbprint -eq $expected.Thumbprint -and
+                    $actual.NotBefore -le (Get-Date) -and $actual.NotAfter -gt (Get-Date))
+        }
+        $ssl = New-Object System.Net.Security.SslStream($client.GetStream(), $false, $callback)
+        $ssl.AuthenticateAsClient($Address)
+        return $true
+    } catch {
+        return $false
+    } finally {
+        if ($ssl) { $ssl.Dispose() }
+        $client.Close()
+    }
+}
+
+function Test-LeafSignedByLocalCa {
+    $openssl = Get-OpenSslPath
+    if (-not $openssl) { throw 'OpenSSL is required to verify the development leaf against the stable CA.' }
+    $prev = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        & $openssl verify -CAfile $script:CaCert $script:LeafCert 2>&1 | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw 'Current TLS leaf does not validate against the existing development CA.' }
+    } finally { $ErrorActionPreference = $prev }
+}
+
+function Stop-ExpectedListenerOnPort {
+    param([int]$Port, [string]$CommandLinePattern)
+    if (-not $CommandLinePattern) {
+        throw "A command-line match pattern is required for port $Port."
+    }
+
     $conns = Get-NetTCPConnection -State Listen -LocalPort $Port -ErrorAction SilentlyContinue
+    $processes = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue)
     foreach ($c in $conns) {
         if ($c.OwningProcess -and $c.OwningProcess -gt 0) {
+            $process = $processes | Where-Object { $_.ProcessId -eq $c.OwningProcess } | Select-Object -First 1
+            if (-not $process -or -not $process.CommandLine -or $process.CommandLine -notmatch $CommandLinePattern) {
+                throw "Port $Port is occupied by an unrelated process (PID $($c.OwningProcess)); refusing to terminate it."
+            }
             Stop-Process -Id $c.OwningProcess -Force -ErrorAction SilentlyContinue
-            $stopped = $true
         }
     }
-    return $stopped
 }
 
 # Kill the MiroTalk node process even if it is not currently bound (defensive).
 function Stop-MiroTalkNode {
     $procs = Get-CimInstance Win32_Process -Filter "Name='node.exe'" -ErrorAction SilentlyContinue |
-        Where-Object { $_.CommandLine -and ($_.CommandLine -match 'app[\\/]src[\\/]Server\.js') }
+        Where-Object { $_.CommandLine -and $_.CommandLine -match 'app[\\/]src[\\/]Server\.js' }
     foreach ($p in $procs) { Stop-Process -Id $p.ProcessId -Force -ErrorAction SilentlyContinue }
 }
 
 function Start-MiroTalk {
     if (-not (Test-Path (Join-Path $script:MiroTalkRoot 'package.json'))) {
-        Write-Warn2 "MiroTalk root not found ($($script:MiroTalkRoot)) - start the SFU manually."
-        return
+        throw "MiroTalk deployment not found at $($script:MiroTalkRoot); cannot start the LAN media stack."
     }
     Start-Process -FilePath 'npm.cmd' -ArgumentList 'start' -WorkingDirectory $script:MiroTalkRoot | Out-Null
 }
 
 function Start-Frontend {
+    if (-not (Test-Path (Join-Path $script:FrontendDir 'package.json'))) {
+        throw "Frontend project not found at $($script:FrontendDir)."
+    }
     Start-Process -FilePath 'npm.cmd' -ArgumentList 'run', 'dev' -WorkingDirectory $script:FrontendDir | Out-Null
+}
+
+# ---------------------------------------------------------------------------
+# Wait for a port to bind.
+#
+# Why this exists: mediasoup spin-up means MiroTalk takes roughly 30-45 s to
+# bind 3010 on a cold start. The launcher used to sleep a fixed 6 s and then
+# print "MiroTalk listening: NO", which reads exactly like a failure and used to
+# be mistaken for a broken LAN/IP configuration. We now poll until the port is
+# bound (or the timeout expires) so the banner reflects reality.
+#
+# It returns $true as soon as the port is listening. Idempotent: a port that is
+# already up returns immediately.
+# ---------------------------------------------------------------------------
+function Wait-PortListening {
+    param(
+        [int]$Port,
+        [int]$TimeoutSeconds = 90,
+        [int]$PollSeconds = 2
+    )
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    while ((Get-Date) -lt $deadline) {
+        if (Test-PortListening -Port $Port) { return $true }
+        Start-Sleep -Seconds $PollSeconds
+    }
+    return (Test-PortListening -Port $Port)
+}
+
+# ---------------------------------------------------------------------------
+# Wait until the BACKEND actually answers HTTP, not merely until the socket is
+# bound.
+#
+# WHY THIS EXISTS: IIS Express binds 44368 before the ASP.NET pipeline, the
+# routes and the database are ready. A client that calls /api/... in that window
+# gets 502 Bad Gateway (the Vite proxy reached a half-started app) or
+# ERR_CONNECTION_REFUSED (it had not bound yet). On the two-phone test that
+# produced a session whose room id could never be fetched.
+#
+# ANY HTTP status counts as "up" - in particular 401, which is the correct
+# answer for an unauthenticated call to a protected route and proves the full
+# request pipeline executed. Only a transport-level failure keeps us waiting.
+#
+# Idempotent: an already-healthy backend returns on the first attempt.
+# ---------------------------------------------------------------------------
+function Wait-BackendHttpReady {
+    param(
+        [string]$Url = "https://localhost:$BackendHttpsPort/api/Auth/me",
+        [int]$TimeoutSeconds = 90,
+        [int]$PollSeconds = 2
+    )
+
+    # Relax local certificate validation for THIS localhost hop only. The dev
+    # backend uses its own self-signed certificate, so a strict client would
+    # report "not ready" forever. This never leaves the machine.
+    Add-Type -TypeDefinition @'
+using System.Net;
+using System.Security.Cryptography.X509Certificates;
+public class LittleCareLocalCertPolicy : ICertificatePolicy {
+    public bool CheckValidationResult(ServicePoint sp, X509Certificate c, WebRequest r, int p) { return true; }
+}
+'@ -ErrorAction SilentlyContinue
+    [System.Net.ServicePointManager]::CertificatePolicy = New-Object LittleCareLocalCertPolicy
+
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    while ((Get-Date) -lt $deadline) {
+        try {
+            Invoke-WebRequest -Uri $Url -UseBasicParsing -TimeoutSec 10 | Out-Null
+            return $true   # 2xx
+        } catch {
+            $status = $null
+            try { $status = [int]$_.Exception.Response.StatusCode } catch { }
+            if ($status -and $status -ge 200) {
+                # 401/403 is the CORRECT reply for an unauthenticated call and
+                # proves routes + auth are live. The backend is ready.
+                return $true
+            }
+            # No response at all (connection refused / socket not up yet) - wait.
+        }
+        Start-Sleep -Seconds $PollSeconds
+    }
+    return $false
 }
 
 # ---------------------------------------------------------------------------
@@ -514,50 +675,59 @@ function Start-Frontend {
 # ---------------------------------------------------------------------------
 function New-LittleCareBackendAppHost {
     param([int]$HttpsPort)
-
-    $possible = @(
-        (Join-Path $env:TEMP 'lc_apphost.config'),
-        (Join-Path $script:BackendDir '.vs\WebApplication2.slnx\config\applicationhost.config')
-    )
-    foreach ($p in $possible) {
-        if ((Test-Path $p) -and ((Get-Content $p -Raw) -match '<site\s+name="WebApplication2"')) {
-            return $p
-        }
-    }
-
     $global = Join-Path $env:USERPROFILE 'Documents\IISExpress\config\applicationhost.config'
     if (-not (Test-Path $global)) { return $null }
-    $content = Get-Content $global -Raw
-    if ($content -notmatch '<site\s+name="WebApplication2"') {
-        $site = @"
-            <site name="WebApplication2" id="99" serverAutoStart="true">
-                <application path="/">
-                    <virtualDirectory path="/" physicalPath="$($script:BackendDir)" />
-                </application>
-                <bindings>
-                    <binding protocol="https" bindingInformation="*:$HttpsPort:localhost" />
-                </bindings>
-            </site>
-"@
-        $content = $content.Replace('<sites>', "<sites>`r`n$site")
+    $xml = New-Object System.Xml.XmlDocument
+    $xml.PreserveWhitespace = $true
+    $xml.Load($global)
+    $site = $xml.SelectSingleNode('/configuration/system.applicationHost/sites/site[@name="WebApplication2"]')
+    if (-not $site) {
+        $sites = $xml.SelectSingleNode('/configuration/system.applicationHost/sites')
+        if (-not $sites) { throw 'IIS Express applicationhost.config has no system.applicationHost/sites section.' }
+        $ids = @($sites.SelectNodes('site') | ForEach-Object { [int]$_.GetAttribute('id') })
+        $siteId = if ($ids.Count -gt 0) { (($ids | Measure-Object -Maximum).Maximum + 1) } else { 99 }
+        $site = $xml.CreateElement('site')
+        $site.SetAttribute('name', 'WebApplication2')
+        $site.SetAttribute('id', [string]$siteId)
+        $site.SetAttribute('serverAutoStart', 'true')
+        $application = $xml.CreateElement('application')
+        $application.SetAttribute('path', '/')
+        $virtualDirectory = $xml.CreateElement('virtualDirectory')
+        $virtualDirectory.SetAttribute('path', '/')
+        $virtualDirectory.SetAttribute('physicalPath', $script:BackendDir)
+        [void]$application.AppendChild($virtualDirectory)
+        [void]$site.AppendChild($application)
+        [void]$sites.AppendChild($site)
     }
+    $bindings = $site.SelectSingleNode('bindings')
+    if (-not $bindings) {
+        $bindings = $xml.CreateElement('bindings')
+        [void]$site.AppendChild($bindings)
+    }
+    foreach ($binding in @($bindings.SelectNodes('binding[@protocol="https"]'))) {
+        [void]$bindings.RemoveChild($binding)
+    }
+    $binding = $xml.CreateElement('binding')
+    $binding.SetAttribute('protocol', 'https')
+    $binding.SetAttribute('bindingInformation', "*:$HttpsPort:localhost")
+    [void]$bindings.AppendChild($binding)
     $out = Join-Path $env:TEMP 'lc_apphost.config'
-    Write-TextNoBom -Path $out -Text $content
+    $xml.Save($out)
     return $out
 }
 
 function Restart-Backend {
     $iis = 'C:\Program Files\IIS Express\iisexpress.exe'
     if (-not (Test-Path $iis)) {
-        Write-Warn2 "IIS Express not found - start the backend from Visual Studio (https://localhost:$BackendHttpsPort)."
-        return
+        throw "IIS Express not found at $iis; cannot start the backend."
     }
     $appHost = New-LittleCareBackendAppHost -HttpsPort $BackendHttpsPort
     if (-not $appHost) {
-        Write-Warn2 "Could not locate/generate an IIS Express apphost config - start the backend from Visual Studio."
-        return
+        throw 'Could not locate the Little Care IIS Express site in the user applicationhost.config.'
     }
-    Get-Process iisexpress -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+    $owned = Get-CimInstance Win32_Process -Filter "Name='iisexpress.exe'" -ErrorAction SilentlyContinue |
+        Where-Object { $_.CommandLine -and $_.CommandLine -match 'WebApplication2' }
+    foreach ($process in $owned) { Stop-Process -Id $process.ProcessId -Force -ErrorAction SilentlyContinue }
     Start-Sleep -Milliseconds 900
     Start-Process -FilePath $iis -ArgumentList @("/config:`"$appHost`"", '/site:WebApplication2') -WindowStyle Minimized | Out-Null
     Write-Ok "Backend (IIS Express) restarted from $appHost on https://localhost:$BackendHttpsPort."
@@ -585,6 +755,7 @@ if ($LanIp) {
 # 2. Certificate (leaf only, signed by the existing trusted CA).
 Write-Step 'Configuring development TLS certificate...'
 $certChanged = Set-LittleCareDevCertificate -Address $addr.IP
+Test-LeafSignedByLocalCa
 
 # 3. MiroTalk announced IP.
 Write-Step 'Configuring MiroTalk announced IP...'
@@ -602,16 +773,28 @@ if (-not $SkipFirewall) {
 
 # 6. Services.
 if (-not $ConfigureOnly) {
+        if ($NoRestart -and ($certChanged -or $envChanged -or $cfgChanged)) {
+            throw 'Runtime configuration changed but -NoRestart was requested. Run without -NoRestart so MiroTalk, backend and Vite reload the current address and certificate.'
+        }
+        $leafInfo = Get-LeafCertificateInfo -Path $script:LeafCert
+        if (-not $leafInfo -or $leafInfo.SanIps -notcontains $addr.IP -or $leafInfo.SanIps -notcontains '127.0.0.1') {
+            throw "TLS leaf does not contain the current LAN address $($addr.IP) and loopback SANs."
+        }
     Write-Step 'Starting development services...'
     if (-not $NoRestart) {
-        if (Stop-ListenerOnPort -Port $MediaPort) { Write-Skip "Stopped process on port $MediaPort." }
         Stop-MiroTalkNode
-        if (Stop-ListenerOnPort -Port $FrontendPort) { Write-Skip "Stopped process on port $FrontendPort." }
+        Stop-ExpectedListenerOnPort -Port $MediaPort -CommandLinePattern 'app[\\/]src[\\/]Server\.js'
+        Stop-ExpectedListenerOnPort -Port $FrontendPort -CommandLinePattern 'vite'
     }
 
     if (-not (Test-PortListening -Port $MediaPort)) {
         Start-MiroTalk
-        Write-Ok "MiroTalk starting on https://$($addr.IP):$MediaPort ..."
+        Write-Step "MiroTalk starting on https://$($addr.IP):$MediaPort (mediasoup spin-up can take ~30-45 s)..."
+        if (Wait-PortListening -Port $MediaPort -TimeoutSeconds 120) {
+            Write-Ok "MiroTalk is listening on port $MediaPort."
+        } else {
+            Write-Warn2 "MiroTalk did not bind port $MediaPort within 120 s - check the MiroTalk console output."
+        }
     } else {
         Write-Skip "MiroTalk already listening on port $MediaPort."
     }
@@ -622,15 +805,36 @@ if (-not $ConfigureOnly) {
         Restart-Backend
     }
 
+    # The backend must answer HTTP before the frontend is allowed to start.
+    # Otherwise the app boots, polls /api/... and records a 502/refused session.
+    if (Wait-BackendHttpReady) {
+        Write-Ok "Backend answered HTTP on https://localhost:$BackendHttpsPort (pipeline ready)."
+    } else {
+        Write-Warn2 "Backend did not answer HTTP on port $BackendHttpsPort within 90 s - starting the frontend anyway."
+    }
+
     if (-not (Test-PortListening -Port $FrontendPort)) {
         Start-Frontend
-        Write-Ok "Frontend starting on https://$($addr.IP):$FrontendPort ..."
+        Write-Step "Frontend starting on https://$($addr.IP):$FrontendPort ..."
+        if (Wait-PortListening -Port $FrontendPort -TimeoutSeconds 60) {
+            Write-Ok "Frontend is listening on port $FrontendPort."
+        } else {
+            Write-Warn2 "Frontend did not bind port $FrontendPort within 60 s - check the Vite console output."
+        }
     } else {
         Write-Skip "Frontend already listening on port $FrontendPort."
     }
 
-    # Give the Node services a moment so the readiness check is meaningful.
-    Start-Sleep -Seconds 6
+    # Brief settle time so the final readiness check below is meaningful for
+    # the backend, which IIS Express binds a little after the process starts.
+    Start-Sleep -Seconds 3
+    $mediaTlsUp = $false
+    $frontTlsUp = $false
+    for ($attempt = 0; $attempt -lt 15 -and (-not $mediaTlsUp -or -not $frontTlsUp); $attempt++) {
+        $mediaTlsUp = Test-LanHttpsEndpoint -Address $addr.IP -Port $MediaPort
+        $frontTlsUp = Test-LanHttpsEndpoint -Address $addr.IP -Port $FrontendPort
+        if (-not $mediaTlsUp -or -not $frontTlsUp) { Start-Sleep -Seconds 2 }
+    }
 } else {
     Write-Skip 'ConfigureOnly: services were not started or stopped.'
 }
@@ -638,6 +842,7 @@ if (-not $ConfigureOnly) {
 # 7. Report.
 $mediaUp   = Test-PortListening -Port $MediaPort
 $frontUp   = Test-PortListening -Port $FrontendPort
+if ($ConfigureOnly) { $mediaTlsUp = $false; $frontTlsUp = $false }
 
 Write-Host ''
 Write-Host 'Little Care Development Environment' -ForegroundColor White
@@ -649,16 +854,18 @@ Write-Host ("Frontend:            https://{0}:{1}" -f $addr.IP, $FrontendPort)
 Write-Host ''
 Write-Host ("MiroTalk listening:  {0}" -f $(if ($mediaUp) { 'YES' } else { 'NO' }))
 Write-Host ("Frontend listening:  {0}" -f $(if ($frontUp) { 'YES' } else { 'NO' }))
+Write-Host ("MiroTalk TLS at LAN IP: {0}" -f $(if ($mediaTlsUp) { 'YES' } else { 'NO' }))
+Write-Host ("Frontend TLS at LAN IP: {0}" -f $(if ($frontTlsUp) { 'YES' } else { 'NO' }))
 Write-Host ("Certificate SAN IP:  {0}" -f ((Get-LeafCertificateInfo -Path $script:LeafCert).SanIps -join ', '))
 Write-Host ''
 Write-Host 'Opening on the babysitter phone (must first trust ca.crt):' -ForegroundColor White
 Write-Host ("  Frontend:  https://{0}:{1}" -f $addr.IP, $FrontendPort)
 Write-Host ("  MiroTalk:  https://{0}:{1}" -f $addr.IP, $MediaPort)
 Write-Host ''
-if ($mediaUp -and $frontUp) {
-    Write-Host 'Babysitter Monitoring: READY' -ForegroundColor Green
+if ($mediaTlsUp -and $frontTlsUp) {
+    Write-Host 'LAN HTTPS endpoints: READY (monitoring still needs end-to-end verification)' -ForegroundColor Green
 } else {
-    Write-Host 'Babysitter Monitoring: services still starting (re-run or wait a few seconds)' -ForegroundColor Yellow
+    Write-Host 'LAN HTTPS endpoints: NOT READY (current-IP TLS handshake failed or services were not started)' -ForegroundColor Yellow
 }
 Write-Host ''
 

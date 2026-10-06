@@ -170,6 +170,7 @@
     <!-- PHASE 11: legacy CryAlertDto removed; monitoring uses MonitoringDtos. -->
     <!-- Phase 11: media session + guardian-aware discovery DTOs -->
     <Compile Include="DTOs\MediaDtos.cs" />
+  <Compile Include="DTOs\FeedingDtos.cs" />
     <Compile Include="DTOs\AccessibleScopeDtos.cs" />
     <Compile Include="DTOs\FilterSittersDTO.cs" />
     <Compile Include="DTOs\ImageDtos.cs" />
@@ -195,8 +196,10 @@
     <Compile Include="Infrastructure\PasswordHasher.cs" />
     <Compile Include="Infrastructure\SessionAuthorizeAttribute.cs" />
     <Compile Include="Infrastructure\SessionSettings.cs" />
+  <Compile Include="Infrastructure\FeedingVideoSettings.cs" />
     <Compile Include="Infrastructure\SimpleDependencyResolver.cs" />
         <Compile Include="Infrastructure\GeoHelper.cs" />
+    <Compile Include="Infrastructure\AssignedTaskCatalog.cs" />
     <Compile Include="Infrastructure\ValidationHelper.cs" />
     <Compile Include="Infrastructure\MonitoringAccess.cs" />
     <Compile Include="Infrastructure\MonitoringScopeGate.cs" />
@@ -230,7 +233,9 @@
     <Compile Include="Services\Interfaces\IGuardianConnectionService.cs" />
     <Compile Include="Services\Implementations\GuardianConnectionService.cs" />
     <Compile Include="Services\Interfaces\IImageService.cs" />
+  <Compile Include="Services\Interfaces\IFeedingRecordingService.cs" />
     <Compile Include="Services\Implementations\ImageService.cs" />
+  <Compile Include="Services\Implementations\FeedingRecordingService.cs" />
     <Compile Include="Services\Interfaces\IRecurringAvailabilityService.cs" />
     <Compile Include="Services\Implementations\RecurringAvailabilityService.cs" />
     <Compile Include="Models\Babysitter.cs">

@@ -2,8 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Net;
+using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;
 using System.Web.Http;
@@ -399,6 +402,277 @@ namespace WebApplication2.Controllers
                 tx.Commit();
             }
             return Ok(new { stopped = true, affected = changed });
+        }
+
+        // =====================================================================
+        // PHASE 14 — FEED BABY (30-second video recording)
+        // -----------------------------------------------------------------
+        // Two IDENTITY DOMAINS in one controller, because they describe ONE
+        // feature with two participants:
+        //   ACCOUNT (Bearer)            the sitter/parent who asks
+        //   DEVICE  (X-Monitor-Device)  Phone 2, which owns the camera
+        //
+        // Every route is thin: validate shape, run the authorization chain,
+        // delegate to FeedingRecordingService, map to a status. No business
+        // rules and no SQL live here.
+        //
+        // THE SITTER'S PHONE IS NEVER USED AS A CAMERA. There is no getUserMedia
+        // on any account-facing route, and the device routes refuse an
+        // Authorization header outright, so a sitter cannot be talked into
+        // activating their own camera by this feature.
+        // =====================================================================
+
+        /// <summary>
+        /// POST feeding/request  (bearer)
+        /// Asks Phone 2 to record a 30-second feeding video for this Job+Child.
+        /// The standard monitoring chain runs first, so an authorized sitter OR a
+        /// guardian may call it and nobody else. The "still in progress" job gate
+        /// is applied inside the service so a future call site cannot forget it.
+        /// </summary>
+        [HttpPost, Route("feeding/request"), SessionAuthorize]
+        public IHttpActionResult RequestFeedingVideo([FromBody] FeedingRecordingRequest request)
+        {
+            if (request == null || request.JobId <= 0 || request.ChildId <= 0)
+                return BadRequest("A job and a child are required.");
+
+            try
+            {
+                var denial = MonitoringAccess.Check(
+                    _db, ClaimsPrincipalHelper.GetUserId(), ClaimsPrincipalHelper.GetRole(),
+                    request.JobId, request.ChildId);
+                if (denial != MonitoringDenial.Allowed) return MonitoringContent(denial);
+            }
+            catch (Exception ex)
+            {
+                Trace.TraceError("Feeding request authorization failed: {0}", ex);
+                return Content(HttpStatusCode.InternalServerError, "The feeding video could not be requested.");
+            }
+
+            using (var service = new FeedingRecordingService(_db, ownsContext: false))
+            {
+                var created = service.CreateRequest(
+                    request.JobId, request.ChildId,
+                    ClaimsPrincipalHelper.GetUserId(), ClaimsPrincipalHelper.GetRole());
+
+                if (created != null) return Ok(created);
+
+                // null is ambiguous by design (duplicate vs. job finished vs.
+                // storage unconfigured), so tell the user which without leaking
+                // anything an unauthorized caller could use.
+                var jobStatus = _db.Database.SqlQuery<string>(
+                    "SELECT Status FROM dbo.Job WHERE Job_ID = @p0 AND IsDeleted = 0", request.JobId).FirstOrDefault();
+
+                if (!MonitoringAccess.IsInProgressStatus(jobStatus))
+                    return Content(HttpStatusCode.Conflict, FeedingRecordingService.JobNotRunningMessage);
+
+                if (FeedingVideoSettings.GetStorageRoot() == null)
+                    return Content(HttpStatusCode.ServiceUnavailable, FeedingRecordingService.StorageUnavailableMessage);
+
+                // 409 is the honest answer for the case that matters: the sitter
+                // already asked (§13 double-click protection).
+                return Content(HttpStatusCode.Conflict, FeedingRecordingService.DuplicateRequestMessage);
+            }
+        }
+
+        /// <summary>
+        /// GET device/feeding/pending  (device)
+        /// Phone 2 asks whether it has work to do. The claim is atomic, so a
+        /// second poll never returns the same request and one request can never
+        /// produce two recordings.
+        /// </summary>
+        [HttpGet, Route("device/feeding/pending")]
+        public IHttpActionResult GetPendingFeedingVideo()
+        {
+            if (Request.Headers.Authorization != null)
+                return Content(HttpStatusCode.Forbidden, "Account sessions cannot use monitor-device endpoints.");
+
+            var device = AuthorizeDevice();
+            if (device == null) return Unauthorized();
+
+            using (var service = new FeedingRecordingService(_db, ownsContext: false))
+            {
+                // childId comes from the DEVICE CREDENTIAL, never the request.
+                // 200 with a null body means "nothing to do", which is the normal
+                // state between recordings and therefore NOT an error.
+                return Ok(service.ClaimPending(device.ChildId));
+            }
+        }
+
+                /// <summary>
+        /// GET feeding/history?jobId=&childId=  (bearer)
+        /// Completed feeding videos, newest first. NOT gated by job status, so
+        /// history outlives the sitting (§25).
+        /// </summary>
+        [HttpGet, Route("feeding/history"), SessionAuthorize]
+        public IHttpActionResult GetFeedingHistory(int jobId, int childId)
+        {
+            if (jobId <= 0 || childId <= 0) return BadRequest("A job and a child are required.");
+
+            var denial = MonitoringAccess.Check(
+                _db, ClaimsPrincipalHelper.GetUserId(), ClaimsPrincipalHelper.GetRole(), jobId, childId);
+            if (denial != MonitoringDenial.Allowed) return MonitoringContent(denial);
+
+            using (var service = new FeedingRecordingService(_db, ownsContext: false))
+            {
+                return Ok(service.GetHistory(jobId, childId));
+            }
+        }
+
+        /// <summary>
+        /// GET feeding/video/{publicId}  (bearer)
+        /// Streams one completed recording.
+        ///
+        /// The client supplies ONLY a GUID. The job, child and file location all
+        /// come from the database row, and entitlement is re-verified against
+        /// THAT row's scope — so supplying a different jobId, or guessing a GUID,
+        /// achieves nothing. The physical path is never returned, only streamed.
+        ///
+        /// Mirrors the ImageController pattern: FileStream + StreamContent +
+        /// explicit content type, so the file is never buffered into memory and
+        /// the storage folder is never exposed as a static directory.
+        /// </summary>
+        [HttpGet, Route("feeding/video/{publicId}"), SessionAuthorize]
+        public HttpResponseMessage GetFeedingVideo(string publicId)
+        {
+            Guid id;
+            if (!Guid.TryParseExact(publicId ?? string.Empty, "D", out id))
+                return new HttpResponseMessage(HttpStatusCode.NotFound);
+
+            using (var service = new FeedingRecordingService(_db, ownsContext: false))
+            {
+                string reason;
+                string path = service.ResolvePlayablePath(
+                    id, ClaimsPrincipalHelper.GetUserId(), ClaimsPrincipalHelper.GetRole(), out reason);
+
+                // One uniform answer for "unknown id", "not finished" and "not
+                // permitted", so the endpoint cannot be used to discover which
+                // recordings exist.
+                if (path == null) return new HttpResponseMessage(HttpStatusCode.NotFound);
+
+                try
+                {
+                    var response = new HttpResponseMessage(HttpStatusCode.OK);
+                    response.Content = new StreamContent(
+                        new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read));
+                    response.Content.Headers.ContentType = new MediaTypeHeaderValue("video/webm");
+
+                    // Only the filename: no path, no directory, nothing a client
+                    // could reuse as a filesystem hint.
+                    response.Content.Headers.ContentDisposition =
+                        new ContentDispositionHeaderValue("inline") { FileName = id.ToString("D") + ".webm" };
+                    return response;
+                }
+                catch (Exception ex)
+                {
+                    Trace.TraceError("Feeding video stream failed for {0}: {1}", id, ex);
+                    return new HttpResponseMessage(HttpStatusCode.NotFound);
+                }
+            }
+        }
+
+                /// <summary>
+        /// POST device/feeding/upload  (device)
+        /// Phone 2 sends the finished 30-second clip.
+        ///
+        /// multipart/form-data with `recordingId` and `durationSeconds` fields
+        /// plus the `file` part, mirroring the existing image-upload convention.
+        /// The filename on disk is generated SERVER-SIDE from the row's PublicId;
+        /// the client-declared name is only checked for its extension.
+        /// </summary>
+        [HttpPost, Route("device/feeding/upload")]
+        public IHttpActionResult UploadFeedingVideo()
+        {
+            if (Request.Headers.Authorization != null)
+                return Content(HttpStatusCode.Forbidden, "Account sessions cannot use monitor-device endpoints.");
+
+            var device = AuthorizeDevice();
+            if (device == null) return Unauthorized();
+
+            var files = System.Web.HttpContext.Current.Request.Files;
+            if (files == null || files.Count == 0) return BadRequest("No recording was received.");
+
+            var file = files[0];
+            var form = System.Web.HttpContext.Current.Request.Form;
+
+            Guid id;
+            if (!Guid.TryParseExact(form["recordingId"] ?? string.Empty, "D", out id))
+                return BadRequest("A valid recording id is required.");
+
+            int duration;
+            if (!int.TryParse(form["durationSeconds"], out duration) || duration <= 0)
+                return BadRequest("A valid recording duration is required.");
+
+            try
+            {
+                using (var service = new FeedingRecordingService(_db, ownsContext: false))
+                {
+                    // Mark 'Uploading' first so the sitter's status is accurate
+                    // while the bytes are in flight, rather than appearing stuck.
+                    service.MarkUploading(id, device.ChildId);
+
+                    using (var stream = file.InputStream)
+                    {
+                        var done = service.CompleteUpload(id, device.ChildId, stream, duration, file.FileName);
+                        if (done != null) return Ok(done);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Trace.TraceError("Feeding video upload failed for {0}: {1}", id, ex);
+            }
+
+            // Friendly copy only. The technical reason stays in the log and, for
+            // an in-flight request, in FeedingRecording.FailureReason.
+            return Content(HttpStatusCode.BadRequest, "The feeding video could not be saved.");
+        }
+
+        /// <summary>
+        /// POST device/feeding/fail  (device)
+        /// Phone 2 reports it could not record (permission denied, MediaRecorder
+        /// unsupported, camera busy, ...). Moves the request to Failed so the
+        /// sitter's wait ends with a clear message instead of spinning forever.
+        /// </summary>
+        [HttpPost, Route("device/feeding/fail")]
+        public IHttpActionResult FailFeedingVideo([FromBody] FeedingFailureRequest request)
+        {
+            if (Request.Headers.Authorization != null)
+                return Content(HttpStatusCode.Forbidden, "Account sessions cannot use monitor-device endpoints.");
+
+            var device = AuthorizeDevice();
+            if (device == null) return Unauthorized();
+
+            if (request == null) return BadRequest("A recording id is required.");
+            Guid id;
+            if (!Guid.TryParseExact(request.RecordingId ?? string.Empty, "D", out id))
+                return BadRequest("A valid recording id is required.");
+
+        using (var service = new FeedingRecordingService(_db, ownsContext: false))
+            {
+    // The reason is stored server-side and never echoed to a sitter,
+         // so technical detail cannot leak to an end user.
+      if (service.MarkFailed(id, device.ChildId, request.Reason))
+        {
+return Ok(new { failed = true });
+    }
+         return BadRequest("No recording is waiting to be failed.");
+          }
+        }
+
+        /// <summary>Maps a monitoring denial to its HTTP status (403/404).</summary>
+        private IHttpActionResult MonitoringContent(MonitoringDenial denial)
+        {
+            switch (denial)
+            {
+                case MonitoringDenial.JobNotFound:
+                case MonitoringDenial.ChildNotFound:
+                case MonitoringDenial.SessionNotFound:
+                case MonitoringDenial.IncidentNotFound:
+                    return NotFound();
+                default:
+                    return Content(HttpStatusCode.Forbidden,
+                        "You are not allowed to view feeding videos for this child.");
+            }
         }
 
         private DeviceRow AuthorizeDevice()

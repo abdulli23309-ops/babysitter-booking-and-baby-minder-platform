@@ -42,20 +42,12 @@ export default function LiveMediaStage({ childName, childCount = 1, children }) 
       {/* The static header. No dropdown, no chooser: the child is whatever the
           server authorised for this session, and that is what we say. */}
       <header className={styles.stageHeader}>
+        {/* PHASE 9.4 - the chip renders the first letter of the SAME
+            `childName` string printed beside it, so the initial can never
+            disagree with the name, in a perfect circle with a soft
+            background (40px, flex-centred). */}
         <span className={styles.stageHeaderIcon} aria-hidden="true">
-          <svg
-            width="20"
-            height="20"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.8"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <circle cx="12" cy="8" r="4" />
-            <path d="M4.5 20a7.5 7.5 0 0 1 15 0" />
-          </svg>
+          {(childName || 'your child').trim().charAt(0).toUpperCase()}
         </span>
         <h3 className={styles.stageHeaderText}>
           <span className={styles.stageHeaderLabel}>Monitoring</span>

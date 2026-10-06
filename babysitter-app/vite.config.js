@@ -17,6 +17,10 @@ export default defineConfig(({ command }) => {
     plugins: [react()],
     server: {
       host: '0.0.0.0',
+      port: 5173,
+      // Avoid Vite silently moving to 5174+ when the expected LAN port is busy;
+      // the launcher, firewall rule, and phone URL all use port 5173.
+      strictPort: true,
       https: httpsOptions,
       proxy: {
         '/api': {

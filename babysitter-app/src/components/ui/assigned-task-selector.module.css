@@ -1,0 +1,183 @@
+/* Phase 10.0 — Task Allocation selector.
+   Card surface intentionally mirrors the booking modal's Step 2/3 cards
+   (soft surface, primary-tinted hairline border, 16px radius, 14px padding)
+   so the section reads as part of the original flow. */
+
+.selectorCard {
+  background: rgb(var(--surface-rgb) / 0.7);
+  border: 1px solid rgb(var(--primary-rgb) / 0.15);
+  border-radius: 16px;
+  padding: 14px;
+  margin-bottom: 20px;
+}
+
+.headerRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.headerText {
+  min-width: 0;
+}
+
+.heading {
+  margin: 0 0 4px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.subtitle {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--color-text-secondary);
+}
+
+.optionalBadge {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  border-radius: var(--radius-full, 999px);
+  background: var(--color-success-soft);
+  color: var(--color-success);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+}
+
+.taskList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* ── One selectable task row ─────────────────────────────────────────── */
+.taskOption {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 14px;
+  min-height: 50px;
+  box-sizing: border-box;
+  border-radius: 14px;
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-surface);
+  cursor: pointer;
+  transition:
+    background-color var(--transition-base, 180ms ease),
+    border-color var(--transition-base, 180ms ease),
+    box-shadow var(--transition-base, 180ms ease),
+    transform var(--transition-base, 180ms ease);
+}
+
+.taskOption:hover:not(.disabledClass) {
+  box-shadow: var(--shadow-sm);
+  transform: translateY(-1px);
+}
+
+/* Visible keyboard focus: the semantic checkbox keeps focus, the ring is
+   drawn on the custom box so it stays legible on light/frosted surfaces. */
+.srOnly:focus-visible + .customBox {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.taskOption:has(input:focus-visible) {
+  box-shadow: var(--shadow-sm);
+}
+
+/* ── Selected state ──────────────────────────────────────────────────── */
+.taskOption.selected {
+  border-color: var(--color-success);
+  background: var(--color-success-soft);
+  transform: translateY(-1px);
+}
+
+.taskOption.selected:hover:not(.disabledClass) {
+  box-shadow: var(--shadow-sm);
+}
+
+.disabledClass {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* ── The real checkbox (accessible, visually hidden) ─────────────────── */
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ── Custom check box ────────────────────────────────────────────────── */
+.customBox {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: 8px;
+  border: 2px solid var(--color-border-strong);
+  background: var(--color-surface);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    background-color var(--transition-base, 180ms ease),
+    border-color var(--transition-base, 180ms ease);
+}
+
+.selected .customBox {
+  border-color: var(--color-success);
+  background: var(--color-success);
+}
+
+.checkIcon {
+  width: 14px;
+  height: 14px;
+  color: var(--color-text-inverse);
+  opacity: 0;
+  transform: scale(0.4);
+  transition:
+    opacity var(--transition-fast, 120ms ease),
+    transform var(--transition-fast, 120ms ease);
+}
+
+.selected .checkIcon {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.taskLabel {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--color-text);
+  overflow-wrap: break-word;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .taskOption,
+  .customBox,
+  .checkIcon {
+    transition: none;
+  }
+
+  .taskOption:hover:not(.disabledClass),
+  .taskOption.selected {
+    transform: none;
+  }
+}

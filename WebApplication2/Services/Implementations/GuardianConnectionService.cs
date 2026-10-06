@@ -659,7 +659,7 @@ namespace WebApplication2.Services.Implementations
             int? latest = _db.Database.SqlQuery<int?>(
                 "SELECT TOP (1) MonitoringPause_ID FROM MonitoringPause " +
                 "WHERE MonitorSession_ID = @p0 AND IsDeleted = 0 ORDER BY MonitoringPause_ID DESC",
-                session.MonitorSession_ID).Single();
+                session.MonitorSession_ID).SingleOrDefault();
             if (!latest.HasValue)
                 return null;
             return ReadPauseRow(latest.Value, currentUserId);

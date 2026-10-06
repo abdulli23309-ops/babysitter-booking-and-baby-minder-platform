@@ -1,0 +1,336 @@
+/* ============================================================
+   MonitorCameraScreen - Screen 1, the nursery camera.
+
+   DESIGN INTENT (Phase 9.3 revision)
+   This screen should feel like a device that has been placed in a room and
+   forgotten about - not like a dark-mode media player, and not a wireframe.
+   The app shell is light (white / soft peach), so this screen now sits INSIDE
+   that shell instead of punching a black hole through it.
+
+   WHAT CHANGED AND WHY
+   The previous revision painted the whole viewport #05070F on the argument that
+   "a nursery feed is dark, so the surround should be dark too". In isolation that
+   reads well; inside this app it reads as a broken video element, because it is
+   a hard black rectangle sitting in a white/peach layout with no edge, no radius
+   and no relationship to the header or the nav above and below it.
+
+   So the screen is now a normal light scroller:
+     - the FEED keeps a dark surface, because a video placeholder that is the same
+       value as the page cannot be distinguished from a failed video;
+     - everything AROUND it is the app's own warm off-white;
+     - the badge and the action float over the feed on frosted glass, so the
+       cinematic quality survives without a full-bleed black page.
+
+   Why the feed is still dark: `background: transparent` on a <video> container
+   means an unloaded frame is indistinguishable from a loaded one that happens to
+   be showing a white wall. A distinct mid-dark surface is the honest signal that
+   "no picture yet", and it is now a contained card rather than a void.
+   ============================================================ */
+
+.screen {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100dvh;
+  /* The app's own surface, so this screen flows continuously with the shell
+     rather than reading as a separate embedded player. */
+  background: transparent;
+  color: var(--color-text, #1A1D2E);
+
+  font-family: var(--font-family-base, 'Plus Jakarta Sans', system-ui, sans-serif);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* A soft top wash in the app's warm register. Gives the screen depth without
+   introducing a second colour scheme. */
+.screen::before {
+  content: none;
+}
+
+/* --- The feed card ------------------------------------------------------- */
+/* Centred, rounded and elevated so it reads as a floating glass panel rather
+   than a full-bleed window. */
+.stage {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 60dvh;
+  min-height: 320px;
+  max-height: 640px;
+  padding: 16px 14px 10px;
+}
+
+.stage > section {
+  width: 100%;
+  height: 100%;
+  align-content: stretch;
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+
+.stage > section > div:first-child {
+  height: 100%;
+  min-height: 0;
+  aspect-ratio: auto;
+}
+
+/* --- The LIVE badge ------------------------------------------------------ */
+.badge {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  z-index: 3;
+
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 16px 9px 13px;
+  border-radius: 999px;
+
+  /* Frosted GLASS over video. Light film + light hairline so it stays legible
+     over BOTH a bright daylit nursery and a dark night-time one - a fixed dark
+     badge vanished against a sunlit room, which is the same class of contrast
+     failure Phase 9.2 fixed for the status pill. */
+  background: rgba(255, 255, 255, 0.24);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  backdrop-filter: blur(18px) saturate(180%);
+  -webkit-backdrop-filter: blur(18px) saturate(180%);
+  box-shadow: 0 6px 20px rgba(26, 29, 46, 0.22);
+
+  color: #FFFFFF;
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.035em;
+  white-space: nowrap;
+
+  /* A soft dark scrim behind the text only, so white type is guaranteed
+     contrast against an arbitrary nursery image without darkening the video. */
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.55);
+
+  /* Reports; never intercepts. */
+  pointer-events: none;
+}
+
+.badgeDot {
+  width: 9px;
+  height: 9px;
+  flex: none;
+  border-radius: 50%;
+  background: #94A3B8;
+  transition: background 220ms ease, box-shadow 220ms ease;
+}
+
+.badge[data-live='true'] .badgeDot {
+  background: #10B981;
+
+  /* THE glow. A two-layer shadow: a tight saturated core plus a wide soft halo,
+     which is what makes it read as emissive rather than as a green circle. */
+  box-shadow:
+    0 0 0 3px rgba(16, 185, 129, 0.22),
+    0 0 14px 3px rgba(16, 185, 129, 0.65),
+    0 0 34px 8px rgba(16, 185, 129, 0.28);
+  animation: livePulse 2.4s ease-in-out infinite;
+}
+
+/* --- The floating action ------------------------------------------------- */
+/* Floats over the BOTTOM of the feed card, not the viewport. That keeps it in
+   thumb reach and keeps the cry detector below it reachable. */
+.fab {
+  width: 100%;
+  min-height: 56px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  padding: 14px 20px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--color-primary);
+  color: #FFFFFF;
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 24px rgba(232, 98, 42, 0.18);
+  transition: background 180ms ease, transform 180ms ease, box-shadow 180ms ease;
+}
+
+.fab:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+  box-shadow: 0 6px 24px rgba(232, 98, 42, 0.25);
+}
+
+.fab:active:not(:disabled) { transform: scale(0.98); }
+
+.fab:focus-visible {
+  outline: 2px solid var(--color-primary, #E8622A);
+  outline-offset: 3px;
+}
+
+.fab:disabled { opacity: 0.6; cursor: progress; }
+
+.fabIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  flex: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.18);
+  color: #FFFFFF;
+}
+
+.fabText {
+  white-space: nowrap;
+}
+
+/* --- Unpaired / error states -------------------------------------------- */
+/* Light, card-based. The previous radial navy wash was a full-bleed dark
+   surface for a state that is just "you have not entered a code yet". */
+.centeredNotice {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+
+  max-width: 420px;
+  margin: 24px auto 0;
+  padding: 32px 26px;
+
+  border: 1px solid var(--color-border-subtle, #E2E8F0);
+  border-radius: 24px;
+  background: var(--color-surface, #FFFFFF);
+  box-shadow: var(--shadow-md, 0 4px 12px rgba(26, 29, 46, 0.08));
+  text-align: center;
+}
+
+.noticeGlyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  background: var(--color-primary-tint, rgba(232, 98, 42, 0.08));
+  color: var(--color-primary, #E8622A);
+}
+
+.noticeTitle {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--color-text, #1A1D2E);
+}
+
+.noticeBody {
+  margin: 0;
+  max-width: 34ch;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: var(--color-text-secondary, #5B6478);
+}
+
+.noticeLink {
+  margin-top: 4px;
+  padding: 12px 22px;
+  border-radius: 999px;
+  background: var(--color-primary, #E8622A);
+  color: #FFFFFF;
+  font-size: 0.88rem;
+  font-weight: 600;
+  text-decoration: none;
+  box-shadow: var(--shadow-primary, 0 8px 24px rgba(232, 98, 42, 0.35));
+}
+
+/* --- The cry detector dock ---------------------------------------------- */
+/*
+   The restored CryDetector sits directly beneath the feed in the normal document
+   flow, on the app's own surface, so it inherits the light theme. No dark card
+   and no overlay: the radar, status and waveform need to be readable at a
+   glance while the operator is also watching the feed above.
+*/
+.cryDock {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  padding: 4px 14px 12px;
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow: 0 4px 24px rgba(232, 98, 42, 0.05);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.actionArea {
+  position: sticky;
+  bottom: 0;
+  z-index: 6;
+  width: 100%;
+  margin-top: auto;
+  padding: 10px 14px calc(12px + env(safe-area-inset-bottom, 0px));
+  background: transparent;
+}
+
+.errorToast {
+  position: absolute;
+  top: 58px;
+  left: 50%;
+  bottom: auto;
+  transform: translateX(-50%);
+  z-index: 5;
+  margin: 0;
+  padding: 10px 18px;
+  max-width: min(86vw, 44ch);
+
+  border: 1px solid rgba(229, 72, 77, 0.28);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.86);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  box-shadow: var(--shadow-md, 0 4px 12px rgba(26, 29, 46, 0.1));
+  color: #B42318;
+  font-size: 0.82rem;
+  text-align: center;
+}
+
+.deviceState { display: none; }
+
+.badgeText {
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .badge[data-live='true'] .badgeDot { animation: none; }
+  .fab { transition: none; }
+}
+
+@media (max-width: 360px) {
+  .badge {
+    top: calc(env(safe-area-inset-top, 0px) + 16px);
+    left: 14px;
+    padding: 8px 14px 8px 11px;
+  }
+  .fab {
+    padding: 12px 16px;
+  }
+}
+
+.badge[data-lost='true'] .badgeDot {
+  background: #F87171;
+  box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.22);
+  animation: none;
+}
+
+/* A slow breath, not a flash. Fast pulsing reads as an alarm; this reads as
+   "alive". */
+@keyframes livePulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}

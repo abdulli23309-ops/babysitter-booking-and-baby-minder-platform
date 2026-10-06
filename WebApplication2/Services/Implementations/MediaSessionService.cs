@@ -77,53 +77,135 @@ namespace WebApplication2.Services.Implementations
         /// </exception>
         public MonitoringMediaDto GetMediaSession(int jobId, int childId, int currentUserId, string currentRole)
         {
-            if (jobId <= 0 || childId <= 0)
-                throw new ArgumentException("jobId and childId must be positive integers.");
+            if (childId <= 0)
+                throw new ArgumentException("childId must be a positive integer.");
 
-            // (1) CENTRALIZED authorization - media adds no rules of its own.
-            var denial = MonitoringAccess.Check(_db, currentUserId, currentRole, jobId, childId);
-            if (denial != MonitoringDenial.Allowed)
-                throw new MonitoringAccessException(denial);
-
-            // (2) Anchor media to the existing ACTIVE monitoring session.
-            var session = _db.Database.SqlQuery<ActiveSessionRow>(
-                "SELECT TOP 1 MonitorSession_ID FROM MonitorSession " +
-                "WHERE Job_ID = @p0 AND Child_ID = @p1 AND Status = 'Active' AND IsDeleted = 0 " +
-                "ORDER BY MonitorSession_ID DESC", jobId, childId).FirstOrDefault();
-
-            if (session == null)
-                throw new KeyNotFoundException("No active monitoring session for this job and child.");
-
-            // (3) Role derived server-side. The monitoring phone (a parent acting
-            //     on the baby-side device) and the sitter are DIFFERENT people.
-            //     The server DTO and MiroTalk initial media settings are derived from this
-            //     authenticated role; the browser cannot request a different role.
             bool isParent = string.Equals(currentRole, UserRole.Parent.ToDisplayString(), StringComparison.OrdinalIgnoreCase);
-
-            var dto = new MonitoringMediaDto
+            if (jobId > 0)
             {
-                MonitorSessionId = session.MonitorSession_ID,
+                // Prefer the job scope whenever it is authorized and has an
+                // active MonitorSession. This keeps the sitter and parent in
+                // the existing canonical (job, child) room.
+                var jobDenial = MonitoringAccess.Check(_db, currentUserId, currentRole, jobId, childId);
+                if (jobDenial == MonitoringDenial.Allowed)
+                {
+                    var session = _db.Database.SqlQuery<ActiveSessionRow>(
+                        "SELECT TOP 1 MonitorSession_ID FROM MonitorSession " +
+                        "WHERE Job_ID = @p0 AND Child_ID = @p1 AND Status = 'Active' AND IsDeleted = 0 " +
+                        "ORDER BY MonitorSession_ID DESC", jobId, childId).FirstOrDefault();
+
+                    if (session != null)
+                    {
+                        var jobMedia = CreateMediaDto(session.MonitorSession_ID, isParent);
+                        PopulateMiroTalkMedia(jobMedia, ScopeCanonical, session.MonitorSession_ID, jobId, childId);
+                        return jobMedia;
+                    }
+
+                    if (!isParent)
+                    {
+                        // The assigned sitter remains a passive viewer when the
+                        // job is active but has not acquired a MonitorSession.
+                        // This is the same child-keyed room the parent fallback
+                        // uses; job authorization above remains mandatory.
+                        var sitterMedia = CreateMediaDto(0, isParent: false);
+                        PopulateMiroTalkMedia(sitterMedia, ScopeIndependent, 0, 0, childId);
+                        return sitterMedia;
+                    }
+                }
+                else if (!isParent)
+                {
+                    throw new MonitoringAccessException(jobDenial);
+                }
+            }
+            else if (!isParent)
+            {
+                throw new MonitoringAccessException(MonitoringDenial.JobNotFound);
+            }
+
+            // A parent may fall back only after proving the independent
+            // ChildGuardian relationship. This covers a missing/non-active job
+            // and a job that has no active MonitorSession without granting a
+            // sitter access to the independent scope.
+            var independentDenial = MonitoringAccess.CheckIndependentParent(
+                _db, currentUserId, currentRole, childId);
+            if (independentDenial != MonitoringDenial.Allowed)
+                throw new MonitoringAccessException(independentDenial);
+
+            var independentSession = GetOrCreateIndependentSession(currentUserId, childId);
+            var dto = CreateMediaDto(independentSession.SessionId, isParent);
+            PopulateMiroTalkMedia(dto, ScopeIndependent, independentSession.SessionId, 0, childId);
+            return dto;
+        }
+
+        private MonitoringMediaDto CreateMediaDto(int sessionId, bool isParent)
+        {
+            return new MonitoringMediaDto
+            {
+                MonitorSessionId = sessionId,
                 Role = isParent ? "publisher" : "viewer",
                 DisplayName = isParent ? "Parent" : "Babysitter",
                 CanPublish = isParent,
                 Configured = false
             };
-
-            PopulateMiroTalkMedia(dto, ScopeJob, session.MonitorSession_ID);
-            return dto;
         }
 
-        /// <summary>Issues a parent-only viewer join path for the active independent session.</summary>
+        private IndependentMediaRow GetOrCreateIndependentSession(int parentId, int childId)
+        {
+            using (var transaction = _db.Database.BeginTransaction(System.Data.IsolationLevel.Serializable))
+            {
+                var active = _db.Database.SqlQuery<IndependentMediaRow>(
+                    @"SELECT TOP 1 IndependentMonitoringSession_ID SessionId,Parent_ID ParentId,Child_ID ChildId,0 JobId
+                      FROM dbo.IndependentMonitoringSession WITH (UPDLOCK,HOLDLOCK)
+                      WHERE Parent_ID=@p0 AND Status='Active' AND IsDeleted=0
+                      ORDER BY IndependentMonitoringSession_ID DESC", parentId).FirstOrDefault();
+
+                if (active != null)
+                {
+                    if (active.ChildId != childId)
+                        throw new KeyNotFoundException("An independent monitoring session is already active for another child.");
+                    transaction.Commit();
+                    return active;
+                }
+
+                DateTime now = DateTime.UtcNow;
+                int sessionId = _db.Database.SqlQuery<int>(
+                    @"INSERT dbo.IndependentMonitoringSession(Parent_ID,Child_ID,RoomName,Status,StartedAtUtc)
+                      VALUES(@p0,@p1,@p2,'Active',@p3); SELECT CAST(SCOPE_IDENTITY() AS INT);",
+                    parentId, childId, "pending-independent-" + Guid.NewGuid().ToString("N").Substring(0, 12), now).Single();
+                transaction.Commit();
+                return new IndependentMediaRow { SessionId = sessionId, ParentId = parentId, ChildId = childId, JobId = 0 };
+            }
+        }
+
+        /// <summary>
+        /// Issues the independent PARENT's join path for the active session.
+        /// The parent joins as a PUBLISHER (CanPublish=true): on this flow the
+        /// parent phone is a full participant that both watches the child's room
+        /// and transmits its own camera/microphone back into it. The query below
+        /// has already proven the caller is a guardian of this child
+        /// (ChildGuardian EXISTS clause), so no further restriction applies.
+        /// Job_ID plays no part: when no job-linked MonitorSession exists the
+        /// room is derived from the standalone INDEPENDENT scope (childId).
+        /// </summary>
         public MonitoringMediaDto GetIndependentParentMedia(int parentId)
         {
             var session = _db.Database.SqlQuery<IndependentMediaRow>(
-                @"SELECT TOP 1 s.IndependentMonitoringSession_ID SessionId,s.Parent_ID ParentId,s.Child_ID ChildId
+                @"SELECT TOP 1 s.IndependentMonitoringSession_ID SessionId,s.Parent_ID ParentId,s.Child_ID ChildId,
+                    ISNULL((SELECT TOP 1 m.Job_ID FROM dbo.MonitorSession m
+                             WHERE m.Child_ID=s.Child_ID AND m.Status='Active' AND m.IsDeleted=0
+                             ORDER BY m.MonitorSession_ID DESC),0) JobId
                   FROM dbo.IndependentMonitoringSession s JOIN dbo.Child c ON c.Child_ID=s.Child_ID AND c.IsDeleted=0
                   WHERE s.Parent_ID=@p0 AND s.Status='Active' AND s.IsDeleted=0
                     AND EXISTS(SELECT 1 FROM dbo.ChildGuardian g WHERE g.Child_ID=s.Child_ID AND g.Parent_ID=s.Parent_ID AND g.IsDeleted=0)
                   ORDER BY s.IndependentMonitoringSession_ID DESC", parentId).FirstOrDefault();
             if (session == null) throw new KeyNotFoundException("No authorized active independent monitoring session.");
-            return BuildIndependentMedia(session, "Parent", canPublish: false);
+            // Publisher on BOTH independent nodes (Phase: independent stream
+            // routing). Node 3 (/independent-monitoring) must transmit its own
+            // video back into the same room it receives from Node 1, so the
+            // parent is issued a publisher session here. The JOINING device
+            // (Node 1) receives its publisher session from
+            // GetIndependentDeviceMedia; both land in the SAME room below.
+            return BuildIndependentMedia(session, "Parent", canPublish: true);
         }
 
         /// <summary>Issues a publisher join path only after validating the dedicated device credential.</summary>
@@ -136,7 +218,10 @@ namespace WebApplication2.Services.Implementations
                 hash = BitConverter.ToString(sha.ComputeHash(Encoding.UTF8.GetBytes(credential))).Replace("-", string.Empty).ToLowerInvariant();
             var session = _db.Database.SqlQuery<IndependentMediaRow>(
                 @"SELECT TOP 1 s.IndependentMonitoringSession_ID SessionId,s.Parent_ID ParentId,s.Child_ID ChildId,
-                    d.MonitoringDeviceSession_ID DeviceSessionId
+                    d.MonitoringDeviceSession_ID DeviceSessionId,
+                    ISNULL((SELECT TOP 1 m.Job_ID FROM dbo.MonitorSession m
+                             WHERE m.Child_ID=s.Child_ID AND m.Status='Active' AND m.IsDeleted=0
+                             ORDER BY m.MonitorSession_ID DESC),0) JobId
                   FROM dbo.MonitoringDeviceSession d JOIN dbo.IndependentMonitoringSession s ON s.IndependentMonitoringSession_ID=d.IndependentMonitoringSession_ID
                   JOIN dbo.Child c ON c.Child_ID=s.Child_ID AND c.IsDeleted=0 JOIN dbo.Parent p ON p.Parent_ID=s.Parent_ID AND p.IsDeleted=0
                   WHERE d.CredentialHash=@p0 AND d.RevokedAtUtc IS NULL AND d.ExpiresAtUtc>GETUTCDATE() AND s.Status='Active' AND s.IsDeleted=0
@@ -156,7 +241,21 @@ namespace WebApplication2.Services.Implementations
                 CanPublish = canPublish,
                 Configured = false
             };
-            PopulateMiroTalkMedia(dto, ScopeIndependent, session.SessionId);
+            // SINGLE ROOM, NO JOB REQUIRED. When the child has an ACTIVE
+            // job-linked MonitorSession, JobId > 0 and the room is the canonical
+            // (jobId, childId) room, so these participants still meet the
+            // Babysitter in the same place as before (room unification). When
+            // there is NO job - the normal standalone case for this flow - the
+            // caller passes JobId = 0 and the room falls back to the INDEPENDENT
+            // scope keyed on (childId), which parent and device derive
+            // identically without any MonitorSession row.
+            //
+            // WHY THIS USED TO FAIL CLOSED ("Configured: false"): the fallback
+            // used to receive ScopeCanonical ("scope"), which DeriveRoomId does
+            // not recognise, so it returned null and PopulateMiroTalkMedia
+            // reported "Live video is not configured on this deployment" purely
+            // because no Job existed. The independent scope never requires a job.
+            PopulateMiroTalkMedia(dto, ScopeIndependent, session.SessionId, session.JobId, session.ChildId);
             return dto;
         }
 
@@ -166,16 +265,68 @@ namespace WebApplication2.Services.Implementations
             public int ParentId { get; set; }
             public int ChildId { get; set; }
             public int DeviceSessionId { get; set; }
+
+            /// <summary>
+            /// The ACTIVE job-linked monitoring session for this child, used ONLY
+            /// to derive the canonical room id (single room). 0 when no active
+            /// MonitorSession exists - the normal standalone case - in which case
+            /// the room is derived from the INDEPENDENT scope keyed on Child_ID.
+            /// The independent flow never requires a Job_ID.
+            /// </summary>
+            public int JobId { get; set; }
         }
 
         private static bool PopulateMiroTalkMedia(MonitoringMediaDto dto, string scope, int sessionId)
         {
+            return PopulateMiroTalkMedia(dto, scope, sessionId, 0, 0);
+        }
+
+        /// <summary>
+        /// Issues the room/join path for one participant.
+        ///
+        /// SINGLE ROOM, ASYMMETRIC ROLES: three resolution steps, in order:
+        ///   1. (jobId, childId) both positive -> the CANONICAL scope room
+        ///      (lc-m-{jobId}-{childId}-{hex8}). Every participant of one job
+        ///      monitoring session shares it, so the Babysitter, Parent and the
+        ///      monitor device land in the SAME room.
+        ///   2. jobId == 0 with the INDEPENDENT scope -> the standalone
+        ///      independent room (lc-i-{childId}-{hex8}). No job and no
+        ///      MonitorSession row is required; parent and device both key on
+        ///      the child they share, so they still land in the SAME room.
+        ///   3. Otherwise -> the legacy session-scoped derivation. Unknown
+        ///      scopes fail closed (null) rather than inventing a room.
+        /// </summary>
+        private static bool PopulateMiroTalkMedia(MonitoringMediaDto dto, string scope, int sessionId, int jobId, int childId)
+        {
             string serverUrl = GetConfiguredMiroTalkServerUrl();
             string salt = ConfigurationManager.AppSettings[KeyRoomSalt];
             bool enabled = string.Equals(ConfigurationManager.AppSettings[KeyEnabled], "true", StringComparison.OrdinalIgnoreCase);
-            string roomId = enabled && serverUrl != null && !string.IsNullOrWhiteSpace(salt) && salt.Length >= 32
-                ? DeriveRoomId(scope, sessionId, salt)
-                : null;
+            string roomId = null;
+            if (enabled && serverUrl != null && !string.IsNullOrWhiteSpace(salt) && salt.Length >= 32)
+            {
+                if (jobId > 0 && childId > 0)
+                {
+                    // Unified canonical room: every participant of the same
+                    // (job, child) - Babysitter, Parent, paired device - meets here.
+                    roomId = DeriveCanonicalRoomId(jobId, childId, salt);
+                }
+                else if (string.Equals(scope, ScopeIndependent, StringComparison.Ordinal) && childId > 0)
+                {
+                    // STANDALONE INDEPENDENT SCOPE: no Job_ID exists, so key the
+                    // room on the child both participants share. The parent
+                    // (bearer) and the device (X-Monitor-Device credential)
+                    // authorize against the SAME IndependentMonitoringSession and
+                    // therefore resolve the SAME Child_ID, hence the SAME room -
+                    // with no MonitorSession row and no Job anywhere.
+                    roomId = DeriveIndependentRoomId(childId, salt);
+                }
+                else
+                {
+                    // Legacy session-scoped fallback. Unknown scopes still fail
+                    // closed here (DeriveRoomId returns null) rather than guess.
+                    roomId = DeriveRoomId(scope, sessionId, salt);
+                }
+            }
 
             if (roomId == null)
             {
@@ -222,6 +373,14 @@ namespace WebApplication2.Services.Implementations
             // only the monitor device's actual camera feed, while keeping the
             // publisher's local preview available on Phone 2.
             string hideSelf = canPublish ? "0" : "1";
+            // ASYMMETRIC ROLES - lock the viewer out of publishing.
+            // audio=0/video=0 only sets the INITIAL state; the viewer could still
+            // click their own mute/camera buttons and start publishing. These two
+            // MiroTalk parameters are enforced by the SFU for the whole session
+            // (verified present in this deployment's app/src/Server.js), so a
+            // Babysitter stays receive-only even if the UI offers the controls.
+            // Publishers are unaffected and keep full media rights.
+            string cantPublish = canPublish ? "0" : "1";
             // embed=1 opts this room into the Little Care embed bridge that
             // ships with our own self-hosted deployment (public/js/
             // littlecare-embed.js). It hides the SFU's conference chrome and
@@ -231,6 +390,8 @@ namespace WebApplication2.Services.Implementations
                 "&roomPassword=0&name=" + Uri.EscapeDataString(displayName ?? string.Empty) +
                 "&audio=" + audio + "&video=" + video +
                 "&screen=0&hide=" + hideSelf + "&notify=0&chat=0&duration=unlimited" +
+                "&audio_cant_unmute=" + cantPublish + "&video_cant_unhide=" + cantPublish +
+                "&isPresenter=" + (canPublish ? "1" : "0") +
                 "&embed=1";
         }
         // Room derivation helpers are shared by job-linked and independent
@@ -241,6 +402,32 @@ namespace WebApplication2.Services.Implementations
 
         /// <summary>Room scope for an independent MonitoringSession room.</summary>
         internal const string ScopeIndependent = "independent";
+
+        /// <summary>
+        /// Canonical room scope (SINGLE ROOM, ASYMMETRIC ROLES).
+        ///
+        /// PHASE - The job-linked Babysitter room (lc-m-) and the independent
+        /// monitor-device room (lc-i-) used to be DIFFERENT rooms, so the
+        /// Babysitter and the monitor device could never see each other even
+        /// though both were authorized for the same job and child.
+        ///
+        /// The monitoring scope (job + child) - NOT the credential - is now the
+        /// single room identity. Every authorized participant of one scope
+        /// resolves to the SAME canonical room, and the ASYMMETRIC permission
+        /// is carried by CanPublish/Role in the DTO and by the MiroTalk join
+        /// parameters, not by the room id.
+        ///
+        /// SECURITY - what is deliberately NOT changed:
+        ///   * IndependentMonitoringController.AuthorizeDevice and the SHA-256
+        ///     CredentialHash check are UNTOUCHED. A device still must present
+        ///     its own 64-character credential, and an account bearer is still
+        ///     refused on device routes. Only the ROOM IDENTIFIER is unified.
+        ///   * The room id is still an HMAC over server-only salt, so it is
+        ///     still unguessable and still carries no personal data.
+        ///   * The room id is NOT authorization. MonitoringAccess remains the
+        ///     only gate for who may request media at all.
+        /// </summary>
+        internal const string ScopeCanonical = "scope";
 
         /// <summary>
         /// True only when the self-hosted MiroTalk SFU is fully configured:
@@ -314,6 +501,110 @@ namespace WebApplication2.Services.Implementations
             var hex = new StringBuilder(8);
             for (int i = 0; i < 4; i++) hex.Append(digest[i].ToString("x2", System.Globalization.CultureInfo.InvariantCulture));
             return prefix + sessionId.ToString(System.Globalization.CultureInfo.InvariantCulture) + "-" + hex.ToString();
+        }
+
+        /// <summary>
+        /// Derives the ONE canonical room for a monitoring SCOPE (job + child).
+        ///
+        /// SINGLE ROOM, ASYMMETRIC ROLES. Every authorized participant of the
+        /// same (jobId, childId) - the Babysitter, the Parent and the paired
+        /// monitor device - resolves to the same room id here, so they meet.
+        ///
+        /// FORMAT  lc-m-{jobId}-{childId}-{hex8}
+        /// e.g.     lc-m-157-27-3f9a1c07
+        ///
+        /// WHY STILL HMAC'd (and not just the raw ids):
+        ///   jobId and childId are small sequential integers. Emitting them
+        ///   plainly would let anyone who can reach the SFU enumerate another
+        ///   family's room by counting. The keyed digest removes that, exactly
+        ///   as the previous session-scoped derivation did, and keeps the room
+        ///   free of anything personal.
+        ///
+        /// WHY THE SESSION ID IS GONE:
+        ///   The old derivation keyed on the session id, which is WHY the
+        ///   job-linked session (MonitorSession 485) and the independent session
+        ///   (IndependentMonitoringSession 38) produced lc-m-485-* and lc-i-38-*.
+        ///   The two participants therefore never shared a room. Both now key
+        ///   on the scope they genuinely share.
+        ///
+        /// DETERMINISM: a pure function of (jobId, childId, salt). No clock, no
+        /// randomness, no GUID and no database, so the Babysitter's browser and
+        /// the monitor device independently compute the SAME room with no extra
+        /// round trip. The salt must stay stable while a session is active.
+        ///
+        /// SECURITY: the salt is used only as an HMAC key - never returned,
+        /// never logged, never placed in a DTO or a URL. This is a room
+        /// IDENTIFIER, not a capability: MonitoringAccess still decides who may
+        /// ask for media at all, and the device SHA-256 credential check is
+        /// still required on the device route.
+        ///
+        /// Returns null when either id is invalid or the salt is absent - the
+        /// caller must then fail closed rather than fall back to a guessable room.
+        /// </summary>
+        internal static string DeriveCanonicalRoomId(int jobId, int childId, string salt)
+        {
+            if (jobId <= 0 || childId <= 0 || string.IsNullOrWhiteSpace(salt)) return null;
+
+            var inv = System.Globalization.CultureInfo.InvariantCulture;
+            string message = ScopeCanonical + ":" + jobId.ToString(inv) + ":" + childId.ToString(inv);
+            byte[] key = Encoding.UTF8.GetBytes(salt);
+            byte[] digest;
+            using (var hmac = new HMACSHA256(key))
+            {
+                digest = hmac.ComputeHash(Encoding.UTF8.GetBytes(message));
+            }
+
+            var hex = new StringBuilder(8);
+            for (int i = 0; i < 4; i++) hex.Append(digest[i].ToString("x2", inv));
+            return "lc-m-" + jobId.ToString(inv) + "-" + childId.ToString(inv) + "-" + hex.ToString();
+        }
+
+        /// <summary>
+        /// Derives the canonical room for the STANDALONE INDEPENDENT scope - the
+        /// case where no Job_ID exists at all.
+        ///
+        /// FORMAT  lc-i-{childId}-{hex8}
+        /// e.g.    lc-i-27-3f9a1c07
+        ///
+        /// WHY THE CHILD (AND NOT THE SESSION OR THE JOB):
+        /// The independent flow is defined by the absence of a job, so the room
+        /// must key on something both of its participants genuinely share: the
+        /// Child_ID. The Parent route (GET /independent-monitoring/media) and the
+        /// device route (GET /independent-monitoring/device/media) both resolve
+        /// the SAME Child_ID through the SAME IndependentMonitoringSession, so
+        /// they compute the SAME room with no extra round trip. Keying on the
+        /// session id would split the room the moment a session is restarted,
+        /// and keying on a job is exactly what this scope cannot do.
+        ///
+        /// WHY STILL HMAC'd: childId is a small sequential integer. Emitting it
+        /// plainly would let anyone who reaches the SFU enumerate another
+        /// family's room by counting; the keyed digest removes that, exactly as
+        /// DeriveCanonicalRoomId does, and keeps the room free of personal data.
+        ///
+        /// DETERMINISM: a pure function of (childId, salt) - no clock, no
+        /// randomness, no GUID and no database. The salt must stay stable while
+        /// a session is active. The salt is used only as an HMAC key: never
+        /// returned, never logged, never placed in a DTO or a URL.
+        ///
+        /// Returns null when childId is invalid or the salt is absent - the
+        /// caller must then fail closed rather than fall back to a guessable room.
+        /// </summary>
+        internal static string DeriveIndependentRoomId(int childId, string salt)
+        {
+            if (childId <= 0 || string.IsNullOrWhiteSpace(salt)) return null;
+
+            var inv = System.Globalization.CultureInfo.InvariantCulture;
+            string message = ScopeIndependent + ":" + childId.ToString(inv);
+            byte[] key = Encoding.UTF8.GetBytes(salt);
+            byte[] digest;
+            using (var hmac = new HMACSHA256(key))
+            {
+                digest = hmac.ComputeHash(Encoding.UTF8.GetBytes(message));
+            }
+
+            var hex = new StringBuilder(8);
+            for (int i = 0; i < 4; i++) hex.Append(digest[i].ToString("x2", inv));
+            return "lc-i-" + childId.ToString(inv) + "-" + hex.ToString();
         }
 
         /// <summary>

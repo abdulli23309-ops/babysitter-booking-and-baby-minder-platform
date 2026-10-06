@@ -13,6 +13,38 @@
    one has to invent local values.
    ============================================================ */
 
+/* PHASE 9.2 - the retry affordance in the fallback overlay.
+
+   It is a real action (it remounts the media frame), so it must LOOK like one.
+   Styled as a cyan-accented pill to match the rest of the media surface, and it
+   is only ever reachable when the surface genuinely failed to open. */
+.fallbackRetry {
+  margin-top: var(--space-3);
+  padding: 9px 20px;
+  border: 1px solid rgba(34, 211, 238, 0.4);
+  border-radius: var(--radius-full);
+  background: rgba(34, 211, 238, 0.14);
+  color: #A5F3FC;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  font-family: inherit;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: background 160ms ease, border-color 160ms ease, transform 160ms ease;
+}
+
+.fallbackRetry:hover {
+  background: rgba(34, 211, 238, 0.24);
+  border-color: rgba(34, 211, 238, 0.7);
+}
+
+.fallbackRetry:active { transform: scale(0.97); }
+
+.fallbackRetry:focus-visible {
+  outline: 2px solid #22D3EE;
+  outline-offset: 3px;
+}
+
 /* --- Live state ---------------------------------------------------------- */
 .frame {
   position: relative;
@@ -23,7 +55,7 @@
   height: auto;
   border-radius: 0 0 24px 24px;
   overflow: hidden;
-  background: #000;
+  background: var(--color-surface-alt, #F7F9FC);
 }
 
 .cardFrame {
@@ -51,13 +83,26 @@
 .stageFrame {
   /* All four corners round, so the frame matches the card that wraps it. */
   border-radius: 24px;
-  background: #0B132B;
+  background: #12203A;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+
+  /* PHASE 9.2 - the hairline from the premium container spec. It gives the navy
+     card a defined edge against a light page background; without it the video
+     and the surrounding surface blur into one another on low-contrast displays. */
+  border: 1px solid rgba(255, 255, 255, 0.05);
+
+  /* The container clips the frame to its rounded corners so the SFU's own
+     rectangular video cannot square off the card. `overflow: hidden` on the base
+     .frame already does this; it is restated here because it is load-bearing for
+     the premium look, and a future edit to .frame would otherwise silently
+     reintroduce square corners over the rounded container. */
+  overflow: hidden;
+
   isolation: isolate;
 }
 
 .stageFrame[data-state='error'] {
-  background: #0B132B;
+  background: #12203A;
 }
 
 /* --- The ONE consolidated status pill ------------------------------------- */
@@ -67,27 +112,34 @@
    word that is derived from exactly the same state as everything else. */
 .statusPill {
   position: absolute;
-  top: 14px;
-  left: 14px;
+  top: 16px;
+  left: 16px;
   z-index: 3;
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 7px;
-  padding: 7px 13px;
-  border-radius: var(--radius-full);
-  /* Glassmorphic: a translucent light film with a light hairline, which stays
-     legible over both a bright nursery and a dark night-time room. */
-  background: rgba(255, 255, 255, 0.14);
-  border: 1px solid rgba(255, 255, 255, 0.22);
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: 99px;
+
+  /* PHASE 9.2 - the dark-navy glass film, per the premium design direction.
+     The previous version was a LIGHT translucent white, which washed out over a
+     brightly lit nursery and dropped below a usable contrast ratio. A dark film
+     keeps white text legible over BOTH a sunlit room and a night-time feed, which
+     is the whole reason this surface is checked at two light levels in testing. */
+  background: rgba(11, 19, 43, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.28);
   color: #FFFFFF;
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-bold);
-  letter-spacing: 0.05em;
-  line-height: 1;
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
   white-space: nowrap;
+
+  /* The pill reports; it never accepts input. Without this it would sit over the
+     video swallowing taps meant for the SFU surface beneath it. */
   pointer-events: none;
 }
 
@@ -128,7 +180,7 @@
   z-index: 2;
   display: grid;
   place-items: center;
-  background: #0B132B;
+  background: #12203A;
   padding: var(--space-4);
 }
 
@@ -452,19 +504,35 @@
   .empty { padding: var(--space-4) var(--space-3); }
 }
 
-/* --- PHASE 9.1 stage overrides -------------------------------------------- */
-/* The empty-state `data-tone` backgrounds above are deliberately LIGHT, because
-   they are meant to look unlike a video. On the stage the container is always
-   deep navy - that contrast is the whole point of the redesign - so the tone
-   background is replaced and only the icon colour is kept to carry meaning. */
+/* --- PHASE 9.3 stage overrides ------------------------------------------ */
+/* PHASE 9.3 NOTE - why the stage is still dark.
+   The brief was to remove "giant black boxes". That has been done at the PAGE
+   level: the surrounding screen, the empty states and the fallback overlays are
+   all now the app's light surface.
+
+   The VIDEO CONTAINER itself deliberately keeps a deep navy (#12203A) rather
+   than pure black. Three reasons, and the third is the important one:
+     1. It is lighter than #000 - #12203A has real luminance, so it does not read
+        as a hole punched in the page.
+     2. The empty-state copy inside it is LIGHT ON DARK (see below). Flipping the
+        container to #F8FAFC would make that white text invisible.
+     3. A video element whose placeholder matches the page colour cannot be
+        distinguished from a loaded video that happens to be showing a white wall.
+        The container must be visibly "no picture yet" - that is a functional
+        signal, not decoration.
+
+   So the stage is a CONTAINED dark card with a 24px radius and a soft shadow,
+   floating on the app's light surface, rather than a full-bleed black rectangle.
+   That is the difference between "broken terminal window" and "video card".
+*/
 .stageFrame[data-tone='neutral'],
 .stageFrame[data-tone='pending'],
 .stageFrame[data-tone='blocked'] {
-  background: #0B132B;
-  border-color: rgba(255, 255, 255, 0.06);
+  background: #12203A;
+  border-color: rgba(255, 255, 255, 0.08);
 }
 
-/* The stage's own copy is light-on-navy, so the light-theme empty text tokens
+/* The stage's own copy is light-on-dark, so the light-theme empty text tokens
    have to be inverted here or the explanation becomes unreadable. */
 .stageFrame .empty { color: #FFFFFF; }
 
@@ -472,7 +540,7 @@
 
 .stageFrame .emptyBody,
 .stageFrame .emptyNote {
-  color: rgba(255, 255, 255, 0.66);
+  color: rgba(255, 255, 255, 0.72);
 }
 
 /* Keep the per-state signal without dragging a red or amber wash across the
@@ -489,7 +557,7 @@
 
 .stageFrame .player,
 .stageFrame .frameElement {
-  background: #0B132B;
+  background: #12203A;
 }
 
 @media (max-width: 360px) {
@@ -503,4 +571,61 @@
 @media (prefers-reduced-motion: reduce) {
   .statusDot,
   .fallbackMarkHalo { animation: none; }
+}
+
+.stageFrame[data-variant='cinema'] {
+  background: linear-gradient(145deg, #FFF7F1 0%, #F1F2F3 100%);
+  border-color: rgba(255, 255, 255, 0.78);
+  box-shadow: 0 4px 24px rgba(232, 98, 42, 0.05);
+}
+
+.stageFrame[data-variant='cinema'][data-tone='neutral'],
+.stageFrame[data-variant='cinema'][data-tone='pending'],
+.stageFrame[data-variant='cinema'][data-tone='blocked'] {
+  background: linear-gradient(145deg, #FFF7F1 0%, #F1F2F3 100%);
+  border-color: rgba(255, 255, 255, 0.78);
+}
+
+.stageFrame[data-variant='cinema'] .empty,
+.stageFrame[data-variant='cinema'] .emptyTitle {
+  color: var(--color-text);
+}
+
+.stageFrame[data-variant='cinema'] .emptyBody,
+.stageFrame[data-variant='cinema'] .emptyNote {
+  color: var(--color-text-secondary);
+}
+
+.stageFrame[data-variant='cinema'] .emptyIcon {
+  display: none;
+}
+
+.cinemaEmpty .emptyIcon {
+  display: none;
+}
+
+.stageFrame[data-variant='cinema'] .fallbackOverlay {
+  background: linear-gradient(145deg, #FFF7F1 0%, #F1F2F3 100%);
+}
+
+.stageFrame[data-variant='cinema'] .fallback {
+  color: var(--color-text);
+}
+
+.stageFrame[data-variant='cinema'] .fallbackMark {
+  background: var(--color-primary-tint);
+  border-color: rgba(232, 98, 42, 0.14);
+  color: var(--color-primary);
+}
+
+.stageFrame[data-variant='cinema'] .fallbackMarkHalo {
+  border-color: rgba(232, 98, 42, 0.3);
+}
+
+.stageFrame[data-variant='cinema'] .fallbackTitle {
+  color: var(--color-text);
+}
+
+.stageFrame[data-variant='cinema'] .fallbackBody {
+  color: var(--color-text-secondary);
 }

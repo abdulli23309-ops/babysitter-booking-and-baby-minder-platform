@@ -82,7 +82,23 @@ WHERE j.IsDeleted = 0
         (@p1 = 1 AND EXISTS (SELECT 1 FROM ChildGuardian cg
                             WHERE cg.Child_ID = jc.Child_ID AND cg.Parent_ID = @p0 AND cg.IsDeleted = 0))
      OR (@p1 = 0 AND j.AssignedSitter_ID = @p0)
-      )";
+    )
+UNION ALL
+SELECT 0 AS Job_ID, c.Child_ID, c.ChildName, CAST('Independent' AS NVARCHAR(50)) AS Status,
+     CASE WHEN EXISTS (
+         SELECT 1 FROM dbo.IndependentMonitoringSession ims
+         WHERE ims.Parent_ID = @p0 AND ims.Child_ID = c.Child_ID
+         AND ims.Status = 'Active' AND ims.IsDeleted = 0
+     ) THEN 1 ELSE 0 END AS MonitorSession_ID
+FROM Child c
+JOIN ChildGuardian cg ON cg.Child_ID = c.Child_ID AND cg.Parent_ID = @p0 AND cg.IsDeleted = 0
+WHERE @p1 = 1 AND c.IsDeleted = 0
+  AND NOT EXISTS (
+    SELECT 1 FROM Job j
+    JOIN JobChildren jc ON jc.Job_ID = j.Job_ID AND jc.Child_ID = c.Child_ID AND jc.IsDeleted = 0
+    WHERE j.IsDeleted = 0
+      AND LOWER(REPLACE(REPLACE(REPLACE(ISNULL(j.Status,''),' ',''),'-',''),'_','')) = 'inprogress'
+  )";
 
             // NOTE: ISNULL(ms.MonitorSession_ID, 0) in the SQL is REQUIRED, not
             // cosmetic. The LEFT JOIN yields NULL for a job that has no active

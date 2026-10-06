@@ -1,20 +1,28 @@
+/* PHASE 9.4 - the overlay now portals to <body>, so it must out-rank every
+   app-chrome layer on the token scale (header 1040, dropdown 1050). The old
+   hard-coded 1000 sat BELOW the sticky header, which let header/page text
+   paint over the dialog. 16px backdrop blur per the modal refinement mandate. */
 .overlay {
   position: fixed;
   inset: 0;
-  z-index: 1000;
+  z-index: var(--z-modal-overlay, 1100);
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 20px;
   box-sizing: border-box;
   background-color: rgba(0, 0, 0, 0.4);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   animation: fadeIn var(--transition-fast) ease;
 }
 
 .modal {
+  position: relative;
+  z-index: var(--z-modal, 1110);
   border-radius: 20px;
+  /* Strictly OPAQUE surface (token resolves to #FFFFFF light / #1A1E2C dark),
+     so nothing behind the dialog can ever bleed through its header text. */
   background: var(--color-surface);
   box-shadow: var(--shadow-lg, 0 16px 48px rgba(0, 0, 0, 0.18));
   width: 100%;
@@ -90,4 +98,24 @@
 @keyframes modalPop {
   0%   { opacity: 0; transform: scale(0.95); }
   100% { opacity: 1; transform: scale(1); }
+}
+
+/* ------------------------------------------------------------------
+   Video player dialog (opt-in via <Modal variant="player">)
+   PHASE 9.4 - feeding-video popup refinement.
+
+   Stacks on top of .modal (declared after it, so these win). The strict
+   24px interior padding and the wider max-width keep the <video> inside
+   its container instead of bleeding past the dialog edge; `position:
+   relative` gives the floating circular close button its anchor at the
+   modal's top-right corner. Scoped to this variant so the five other
+   consumers of .modal keep their current layout untouched.
+   ------------------------------------------------------------------ */
+
+.modalPlayer {
+  max-width: 640px;      /* room for the player; .modal keeps width:100% */
+  max-height: 86vh;
+  padding: 24px;         /* strict interior padding - nothing clips */
+  box-sizing: border-box;
+  position: relative;    /* anchor for the floating X button */
 }

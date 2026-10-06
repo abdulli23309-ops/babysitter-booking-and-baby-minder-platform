@@ -1,4 +1,4 @@
-import { apiGet, apiPost, apiPut, apiDelete } from './apiClient';
+import apiClient, { apiGet, apiPost, apiPut, apiDelete } from './apiClient';
 
 export const API = {
   // Get matching sitters for a job
@@ -260,14 +260,81 @@ export const API = {
   // Callers poll getCryIncident instead; this exists for the detector path.
   reportCry: (jobId, childId) => apiPost('/monitoring/cry', { jobId, childId }),
 
+  // ---- PHASE 14: feeding-video recording request ----
+  // Asks the backend to create ONE feeding-recording request for this
+  // Job+Child. The SERVER generates the PublicId and decides the request
+  // state; the client never invents either, and never names a file.
+  //
+  // Scope only, exactly like every other monitoring call here. There is no
+  // user id, role or ownership field: the caller is taken from the bearer
+  // token and permission is decided by MonitoringAccess.Check server-side.
+  //
+  // Failures:
+  //   403 - not authorized for this job/child, or the job is not in progress
+  //   409 - a recording is already in flight (duplicate press), or the job ended
+  //   503 - feeding-video storage is not configured on the server
+  //
+  // PHASE 3 CORRECTION - the 409 message used to be LOST.
+  //   apiClient's response interceptor runs normalizeApiError(), which flattens
+  //   the axios error to { message, status } and, for a 409 with a raw STRING
+  //   body (which is exactly what this endpoint returns), matches none of its
+  //   copy branches - so callers only ever saw axios's generic "Request failed
+  //   with status code 409". The server's semantic copy survives on
+  //   originalError.response.data, so it is recovered HERE and rethrown on an
+  //   enriched error with .status and .serverMessage. That is what lets the UI
+  //   show the real "already being recorded" line as an amber warning instead
+  //   of a generic red failure (or, worse, a green success).
+  requestFeedingVideo: async (jobId, childId) => {
+    try {
+      return await apiPost('/independent-monitoring/feeding/request', { jobId, childId });
+    } catch (err) {
+      const raw = err?.originalError?.response;
+      const status = err?.status ?? raw?.status ?? null;
+      const body = raw?.data;
+      const serverMessage = typeof body === 'string' && body.trim() ? body.trim() : null;
+      const failure = new Error(
+        serverMessage || err?.message || 'The feeding video could not be requested.'
+      );
+      failure.status = status;
+      failure.serverMessage = serverMessage;
+      throw failure;
+    }
+  },
+
+  // ENDPOINT  GET /api/independent-monitoring/feeding/history?jobId=&childId=
+  // PURPOSE   Feeding-video history for ONE authorized (job, child) scope,
+  //           newest first. Rows come back as FeedingVideoDto: { Id, JobId,
+  //           ChildId, Status, RequestedAtUtc, CompletedAtUtc, DurationSeconds,
+  //           FileSizeBytes, IsPlayable, PlaybackUrl }.
+  // STATE     None. Read-only.
+  // FAILURE   403 - includes the current backend rule that the JOB must still
+  //           be In Progress (MonitoringAccess Rule 3). Callers must treat that
+  //           as "history not available right now", never as an empty list and
+  //           never as an error to retry blindly. (Backend follow-up is
+  //           tracked separately; the Phase 3 UI does not weaken this rule.)
+  getFeedingHistory: (jobId, childId) =>
+    apiGet(`/independent-monitoring/feeding/history?jobId=${jobId}&childId=${childId}`),
+
+  // Playback of a COMPLETED feeding video.
+  //
+  // WHY NOT <video src>: the streaming endpoint requires
+  // Authorization: Bearer, and a media element can never send that header.
+  // The audited transport is therefore: authenticated fetch (arraybuffer) ->
+  // Blob -> object URL -> <video> -> revoke the object URL on close. The
+  // bytes never touch localStorage, and the URL dies with the player.
+  getFeedingVideoBlob: async (playbackUrl) => {
+    const res = await apiClient.get(playbackUrl, { responseType: 'arraybuffer' });
+    return res.data;
+  },
+
   // ---- PHASE 11: server-issued media + guardian-aware discovery ----
 
-  // ENDPOINT  GET /api/monitoring/media?jobId=&childId=
+  // ENDPOINT  GET /api/monitoring/media?jobId=&childId= (jobId optional for parents)
   // PURPOSE   Ask the server for a media session for this monitoring scope. The
   //           server runs MonitoringAccess first, then derives the SFU room from
   //           the active session. This is the ONLY sanctioned way to get a room -
   //           never derive one on the client.
-  // REQUEST   jobId, childId only. No actor, no role, no token from the client.
+  // REQUEST   childId and optional jobId. No actor, no role, no token from the client.
   // RESPONSE  { Configured, Reason, ServerUrl, RoomId, JoinPath, Role,
   //             DisplayName, CanPublish, MonitorSessionId } - a MiroTalk SFU join
   //             description. There is NO provider token and no room salt.
@@ -278,7 +345,7 @@ export const API = {
   //           404 may also mean no ACTIVE monitoring session exists.
   // STATE     None. Read-only; creates no session and writes nothing.
   getMonitoringMedia: (jobId, childId) =>
-    apiGet(`/monitoring/media?jobId=${jobId}&childId=${childId}`),
+    apiGet(`/monitoring/media?${jobId ? `jobId=${jobId}&` : ''}childId=${childId}`),
 
   // ENDPOINT  GET /api/monitoring/accessible-scopes
   // PURPOSE   Discover which (job, child) pairs THIS user may monitor now.

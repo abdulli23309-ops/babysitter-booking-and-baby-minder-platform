@@ -1,0 +1,109 @@
+/* ============================================================
+   MonitoringSettingsModal - PHASE 9.2.
+
+   The dialog shell that hosts the administrative monitoring cards. Its whole
+   job is to make the video the hero of the monitoring screen by giving these
+   panels a home that is one tap away and out of the main flow.
+
+   Visual language matches the media surface it sits beside: a deep-navy shell,
+   hairline borders and cyan accents, so moving a card in here feels like it
+   belongs to the same product rather than being a different, lesser screen.
+   ============================================================ */
+
+.shell {
+  display: flex;
+  flex-direction: column;
+  max-height: min(78vh, 640px);
+  min-height: 0;
+  margin: -1px; /* sit flush inside the shared Modal padding */
+}
+
+/* --- Header ------------------------------------------------------------- */
+.header {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-1) var(--space-1) var(--space-3);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.headerText { min-width: 0; }
+
+.title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: var(--font-weight-bold);
+  letter-spacing: -0.01em;
+  color: #FFFFFF;
+}
+
+.subtitle {
+  margin: 4px 0 0;
+  font-size: var(--font-size-xs);
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.closeBtn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  margin-left: auto;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.8);
+  cursor: pointer;
+  transition: background 160ms ease, border-color 160ms ease;
+}
+
+.closeBtn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(34, 211, 238, 0.45);
+}
+
+.closeBtn:focus-visible {
+  outline: 2px solid #22D3EE;
+  outline-offset: 2px;
+}
+
+/* --- Scrollable body ---------------------------------------------------- */
+/* The body scrolls so a long guardian list can never push the close button
+   off-screen on a short phone. */
+.body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--space-3) var(--space-1) var(--space-1);
+}
+
+/* --- Non-parent notice --------------------------------------------------- */
+.notice {
+  padding: var(--space-4);
+  border: 1px solid rgba(34, 211, 238, 0.18);
+  border-radius: var(--radius-md);
+  background: rgba(34, 211, 238, 0.06);
+}
+
+.noticeTitle {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: #A5F3FC;
+}
+
+.noticeBody {
+  margin: var(--space-1) 0 0;
+  font-size: var(--font-size-xs);
+  line-height: 1.55;
+  color: rgba(255, 255, 255, 0.68);
+}
+
+@media (max-width: 360px) {
+  .shell { max-height: 82vh; }
+  .title { font-size: 1rem; }
+}

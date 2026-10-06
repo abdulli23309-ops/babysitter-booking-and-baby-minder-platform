@@ -67,14 +67,14 @@ export default function useMonitoringMedia(jobId, childId, enabled = true, refre
   // `refreshKey` so a change to the monitoring session status invalidates any
   // previous answer and forces a fresh request (e.g. Child Mode just started).
   const scopeKey =
-    enabled && jobId && childId ? `${jobId}:${childId}:${refreshKey}` : null;
+    enabled && childId ? `${jobId || 0}:${childId}:${refreshKey}` : null;
   const current = result && result.scopeKey === scopeKey ? result : null;
 
   const load = useCallback(async () => {
     // Nothing to request yet: do not fetch, and do not write state.
     if (!scopeKey) return;
     try {
-      const data = await API.getMonitoringMedia(jobId, childId);
+      const data = await API.getMonitoringMedia(jobId || null, childId);
       // NOTE ON CASING: this API returns PASCAL-CASE JSON (Configured, Reason,
       // RoomId, JoinPath, CanPublish) because that is what the Web API serialiser emits
       // and what the rest of this app already reads (session.Status, d.MonitorSession_ID).
@@ -104,16 +104,15 @@ export default function useMonitoringMedia(jobId, childId, enabled = true, refre
           reason: 'You are not authorised to view this child.',
         });
       } else if (code === 404) {
-        // 404 means "no ACTIVE monitoring session for this job and child" - NOT
-        // an authorization failure. Before the monitoring phone presses Start, or
-        // after the sitting ends, this is the normal answer. Reporting it as
+        // 404 means no authorized job or independent session was available - NOT
+        // an authorization failure. Reporting it as
         // "not authorised" would tell an owner parent they are forbidden from
         // watching their own child, which is both wrong and alarming.
         setResult({
           scopeKey,
           status: 'no-session',
           media: null,
-          reason: 'Live video appears once Child Mode is started on the monitoring phone.',
+          reason: 'No monitoring session is available for this child yet.',
         });
       } else {
         setResult({

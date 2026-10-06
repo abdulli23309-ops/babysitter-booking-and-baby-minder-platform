@@ -1,9 +1,19 @@
 import { useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import styles from './modal.module.css';
 
 /**
  * Accessible Modal (Phase F2 — infrastructure only).
  * Not yet applied to existing pages (deferred to F3/F4).
+ *
+ * PHASE 9.4 — PORTAL TO <body>.
+ * The overlay used to render inline where the <Modal> was declared. Several
+ * consumers sit inside elements with `backdrop-filter` / `transform` (e.g. the
+ * Feeding Recordings glass panel), which makes those ancestors the containing
+ * block for `position: fixed` children - so the overlay only covered the
+ * panel's own box and the PAGE behind it (headings, eyebrow text) painted
+ * straight through around/over the dialog. Rendering through a portal puts the
+ * overlay directly under <body>, immune to any ancestor stacking context.
  *
  * Accessibility:
  *  - role="dialog" + aria-modal="true"
@@ -65,7 +75,15 @@ export default function Modal({ open, onClose, labelledBy, variant = 'default', 
 
   if (!open) return null;
 
-  return (
+  /* PHASE 9.4 - variant-aware shell class. 'player' stacks on top of the
+     default .modal (padding + wider max-width + anchor for the floating
+     close button) so shared styling is never duplicated. */
+  const shellClass = [
+    variant === 'compact' ? styles.modalCompact : styles.modal,
+    variant === 'player' ? styles.modalPlayer : '',
+  ].filter(Boolean).join(' ');
+
+  return createPortal(
     <div
       className={styles.overlay}
       onMouseDown={(e) => {
@@ -78,10 +96,11 @@ export default function Modal({ open, onClose, labelledBy, variant = 'default', 
         aria-modal="true"
         aria-labelledby={labelledBy}
         tabIndex={-1}
-        className={variant === 'compact' ? styles.modalCompact : styles.modal}
+        className={shellClass}
       >
         {children}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

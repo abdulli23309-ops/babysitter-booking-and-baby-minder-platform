@@ -8,6 +8,11 @@ import UserAvatar from '../../components/ui/UserAvatar';
 import { useAuth } from '../auth/AuthContext';
 import { useToast } from '../../components/ui/ToastContext';
 import { API } from '../../services/api';
+import AssignedTaskSelector from '../../components/ui/AssignedTaskSelector';
+import {
+  normalizeTaskIds,
+  resolveAssignedTasks,
+} from '../../utils/assignedTasks';
 import {
   todayISO,
   toDayKey,
@@ -70,6 +75,10 @@ export default function BabySitterDetails() {
   const [children, setChildren] = useState([]);
   const [selectedChildIds, setSelectedChildIds] = useState([]);
   const [allChildrenSelected, setAllChildrenSelected] = useState(false);
+  // Phase 10.0 — "Today's Required Tasks": ids of the predefined tasks the
+  // parent wants the babysitter to perform during this booking. Optional —
+  // zero tasks is a valid, submittable state.
+  const [selectedTasks, setSelectedTasks] = useState([]);
   const [requesting, setRequesting] = useState(false);
 
   // Safe defaults when parent opens details without searching
@@ -154,6 +163,9 @@ export default function BabySitterDetails() {
     `${name} is a dedicated and certified childcare specialist with over ${exp} years of hands-on experience in infant care, toddler nutrition, and developmental activities. Trained in pediatric first-aid and CPR.`;
   const phone = sitter.Phone || sitter.PhoneNumber;
 
+  // Phase 10.0 — resolved labels for the booking summary row.
+  const summaryTasks = resolveAssignedTasks(selectedTasks);
+
   const handleHireClick = () => {
     if (children.length === 0) {
       showToast?.('Please register your child profile before booking.', { type: 'warning' });
@@ -164,6 +176,10 @@ export default function BabySitterDetails() {
   };
 
   const toggleChildSelection = (cid) => {
+    // Phase 10.0 — tasks belong to the booking's child context. Any change to
+    // the selected child(ren) clears them so a task chosen for one child is
+    // never silently submitted for another.
+    setSelectedTasks([]);
     // Clicking a child while "All" is on deselects All and picks this one.
     if (allChildrenSelected) {
       setAllChildrenSelected(false);
@@ -284,6 +300,9 @@ export default function BabySitterDetails() {
         EndDate: availabilityType === 'Repeat Days' ? endDate : startDate,
         AvailabilityType: availabilityType === 'Repeat Days' ? 'Repeat Days' : 'Single Day',
         SelectedDays: availabilityType === 'Repeat Days' ? selectedDays : [],
+        // Phase 10.0 — the chosen "Today's Required Tasks" travel with the
+        // existing booking payload (validated again on the server).
+        AssignedTasks: normalizeTaskIds(selectedTasks),
       };
 
       const res = await API.createJob(payload);
@@ -448,6 +467,9 @@ export default function BabySitterDetails() {
             <button
               type="button"
               onClick={() => {
+                // Phase 10.0 — the child context changes here too, so the
+                // task selection resets with it.
+                setSelectedTasks([]);
                 if (allChildrenSelected) {
                   setAllChildrenSelected(false);
                   setSelectedChildIds([]);
@@ -584,8 +606,23 @@ export default function BabySitterDetails() {
               )}
             </div>
           </div>
+          {/* Phase 10.0 — Step 3: task allocation. Hidden in the replacement
+              flow, where the submit path invites a sitter to an EXISTING job
+              and cannot change that job's allocation. Disabled until a child
+              is selected so tasks never belong to an ambiguous booking, and
+              disabled while a request is in flight. */}
+          {!isReplacement && (
+            <>
+              <p style={{ margin: '0 0 8px', fontSize: '12px', fontWeight: 700, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.6px' }}>Step 3: Today&apos;s Required Tasks</p>
+              <AssignedTaskSelector
+                selectedTasks={selectedTasks}
+                onChange={setSelectedTasks}
+                disabled={requesting || !(allChildrenSelected || selectedChildIds.length > 0)}
+              />
+            </>
+          )}
           {/* Locked Booking Summary Card */}
-          <p style={{ margin: '0 0 8px', fontSize: '12px', fontWeight: 700, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.6px' }}>Step 3: Booking Summary</p>
+          <p style={{ margin: '0 0 8px', fontSize: '12px', fontWeight: 700, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.6px' }}>Step 4: Booking Summary</p>
           <div style={{ background: 'rgb(var(--surface-rgb) / 0.7)', borderRadius: 16, padding: 14, marginBottom: 20, border: '1px solid rgb(var(--primary-rgb) / 0.15)' }}>
             <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0.5, color: 'var(--color-text-muted)', marginBottom: 8 }}>BOOKING SUMMARY (LOCKED FROM YOUR SEARCH)</div>
             <div style={{ display: 'flex', gap: 10, marginBottom: 8 }}>
@@ -605,13 +642,35 @@ export default function BabySitterDetails() {
                 <div style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>{finalStartTime} – {finalEndTime}</div>
               </div>
             </div>
-            <div style={{ display: 'flex', gap: 10 }}>
+            <div style={{ display: 'flex', gap: 10, marginBottom: 8 }}>
               <span>📍</span>
               <div>
                 <div style={{ fontWeight: 600 }}>Location</div>
                 <div style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>{finalAddress}</div>
               </div>
             </div>
+            {/* Phase 10.0 — the task allocation is echoed in the summary so
+                the parent reviews exactly what will be sent. Hidden in the
+                replacement flow, which cannot change an existing job's tasks. */}
+            {!isReplacement && (
+              <div style={{ display: 'flex', gap: 10 }}>
+                <span>✅</span>
+                <div>
+                  <div style={{ fontWeight: 600 }}>Required Tasks</div>
+                  {summaryTasks.length === 0 ? (
+                    <div style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>None requested</div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 2, marginTop: 2 }}>
+                      {summaryTasks.map((task) => (
+                        <div key={task.id} style={{ fontSize: 13, color: 'var(--color-text-muted)', fontWeight: 600 }}>
+                          ✓ {task.label}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
           <div style={{ display: 'flex', gap: '12px' }}>
             <button type="button" disabled={requesting} onClick={() => setShowChildModal(false)} style={{ flex: 1, padding: '14px 24px', borderRadius: '999px', background: 'rgb(var(--surface-rgb) / 0.5)', color: 'var(--color-text-secondary)', fontWeight: 700, fontSize: '14px', border: 'none', cursor: 'pointer', transition: 'all 0.2s ease' }}>Cancel</button>

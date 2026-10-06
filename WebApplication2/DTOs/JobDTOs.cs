@@ -113,6 +113,12 @@ namespace WebApplication2.DTOs
         public double? Latitude { get; set; }
         public double? Longitude { get; set; }
 
+        // Phase 10.0 — server-authoritative task allocation for this job, as
+        // stable ids chosen by the parent at booking time. Always a list:
+        // historical jobs (AssignedTasks NULL) return []. Both the parent and
+        // the babysitter active-job screens read this same field.
+        public List<string> AssignedTasks { get; set; } = new List<string>();
+
         // Workflow redesign: the timer on active-job screens is driven by
         // this timestamp (set when the parent confirms the session start).
         public DateTime? SessionStartedAt { get; set; }

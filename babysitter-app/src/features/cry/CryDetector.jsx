@@ -732,7 +732,23 @@ export default function CryDetector({ independent = false, embedded = false }) {
 
       {/* Primary Listen Action */}
       <div style={{ marginTop: 'auto', paddingTop: 'var(--space-2)' }}>
-        {isListening ? (
+        {embedded ? (
+          <button
+            type="button"
+            role="switch"
+            aria-checked={isListening}
+            className={styles.cryDetectionSwitch}
+            onClick={isListening ? stopListening : startListening}
+          >
+            <span className={styles.cryDetectionCopy}>
+              <span className={styles.cryDetectionTitle}>Cry Detection</span>
+              <span className={styles.cryDetectionStatus}>{isListening ? 'On' : 'Off'}</span>
+            </span>
+            <span className={styles.switchTrack} aria-hidden="true">
+              <span className={styles.switchThumb} />
+            </span>
+          </button>
+        ) : isListening ? (
           <Button
             variant="danger"
             size="lg"

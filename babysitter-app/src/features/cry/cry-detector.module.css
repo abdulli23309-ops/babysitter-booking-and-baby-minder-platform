@@ -21,6 +21,71 @@
   display: none;
 }
 
+.cryDetectionSwitch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  width: 100%;
+  min-height: 56px;
+  padding: 8px 4px;
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.cryDetectionCopy {
+  display: grid;
+  gap: 3px;
+}
+
+.cryDetectionTitle {
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+}
+
+.cryDetectionStatus {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.switchTrack {
+  display: flex;
+  align-items: center;
+  width: 52px;
+  height: 32px;
+  flex: none;
+  padding: 3px;
+  border-radius: var(--radius-full);
+  background: #C8C9CE;
+  transition: background var(--transition-base);
+}
+
+.cryDetectionSwitch[aria-checked='true'] .switchTrack {
+  background: var(--color-primary);
+}
+
+.switchThumb {
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-full);
+  background: var(--color-surface);
+  box-shadow: 0 1px 4px rgba(26, 29, 46, 0.2);
+  transition: transform var(--transition-base);
+}
+
+.cryDetectionSwitch[aria-checked='true'] .switchThumb {
+  transform: translateX(20px);
+}
+
+.cryDetectionSwitch:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 3px;
+}
+
 .cryContainerAlarmed {
   background: var(--color-danger-tint);
   animation: alarmPulse 1.6s ease-in-out infinite alternate;

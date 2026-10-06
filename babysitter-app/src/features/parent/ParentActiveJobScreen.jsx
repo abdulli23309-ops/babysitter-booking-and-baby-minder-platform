@@ -8,8 +8,10 @@ import { getAvatarUrl } from '../../utils/imageUtils';
 import { API } from '../../services/api';
 import useMonitoring from '../../hooks/useMonitoring';
 import MonitoringStatusBar from '../../components/monitoring/MonitoringStatusBar';
+import FeedingRecordingsPanel from '../../components/monitoring/FeedingRecordingsPanel';
 import { formatLocalDate } from '../../utils/dateUtils';
 import ParentBottomNav from '../../components/layout/ParentBottomNav';
+import AssignedTasksCard from '../../components/ui/AssignedTasksCard';
 import styles from './live-session.module.css';
 const formatChildren = (job) => {
   const list = job?.Children ?? job?.children ?? [];
@@ -331,7 +333,12 @@ export default function ParentActiveJobScreen() {
       {/* ── Caregiver Banner Card ── */}
       <div className={styles.caregiverCard}>
         <div className={styles.avatarWrapper}>
-          {!imgError ? (
+          {/* PHASE 9.4 - a NULL picture used to render <img src={null}>,
+              whose load-error event never fires reliably in browsers, so a
+              missing photo showed a broken image instead of the initial.
+              The initial fallback now applies whenever there is no usable
+              URL (and still after a real 404). */}
+          {resolvedAvatar && !imgError ? (
             <img
               src={resolvedAvatar}
               alt={sitterName}
@@ -535,6 +542,29 @@ export default function ParentActiveJobScreen() {
           </div>
         </div>
       </div>
+
+      {/* ── Phase 10.0 — ASSIGNED TASKS (read-only) ─
+          The exact allocation the parent selected at booking time, returned
+          server-side by the job-details endpoint. Sits directly below the
+          session/monitoring card and above the bottom navigation. Missing or
+          NULL task data resolves to the calm empty state. */}
+      <AssignedTasksCard assignedTasks={job.AssignedTasks ?? job.assignedTasks} />
+
+      {/* ── PHASE 3: FEEDING RECORDINGS (cinematic history, mandate C) ──
+          A distinct section below the session cards, consuming the EXISTING
+          /feeding/history + /feeding/video endpoints. No new backend, no
+          invented rows: every card is a real FeedingRecording. Playback runs
+          through the panel's authenticated blob fetch (the endpoint demands a
+          bearer header a <video src> cannot send). Rendered only when the
+          booking actually resolved a child - an absent scope must not produce
+          a request that would only 400/403. */}
+      {monitorChildId ? (
+        <FeedingRecordingsPanel
+          jobId={job.Job_ID ?? job.jobId}
+          childId={monitorChildId}
+          className={styles.feedingRecordingsSection}
+        />
+      ) : null}
 
       {/* ── Shared Parent Bottom Navigation ── */}
       <ParentBottomNav />

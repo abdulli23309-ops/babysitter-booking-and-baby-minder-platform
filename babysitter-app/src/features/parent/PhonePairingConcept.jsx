@@ -23,7 +23,18 @@ function getErrorMessage(error, fallback) {
 }
 const getStatus = (error) => error?.response?.status ?? error?.status;
 
-export default function PhonePairingConcept({ initialView = 'parent' }) {
+/**
+ * `onCredentialChange` (optional - passed only by `MonitorDeviceScreen`) is the
+ * PHASE B.1 signal. `deviceStore` is plain sessionStorage, so React cannot
+ * observe a credential written from inside this component, and a child's state
+ * update never re-renders its parent. The route wrapper renders this form while
+ * unpaired and `MonitorCameraScreen` while paired, so it must be told to re-read
+ * the store after this component writes (successful pair) or clears (disconnect,
+ * 401/403) the credential - otherwise a phone that pairs in place stays on this
+ * surface forever, heartbeating but never running the feeding claim loop. The
+ * parent route passes no such prop: it owns no device surface.
+ */
+export default function PhonePairingConcept({ initialView = 'parent', onCredentialChange }) {
   const { userId } = useAuth();
   // PHASE 8.9 - `view` was state only so the removed Parent/Monitor tabs could
   // flip it. Which side of the screen this is now comes from the ROUTE
@@ -117,13 +128,15 @@ export default function PhonePairingConcept({ initialView = 'parent' }) {
           deviceStore.clear();
           setCredential('');
           setDeviceSessionInfo(null);
+          // PHASE B.1 - credential gone; let the route wrapper re-read it.
+          onCredentialChange?.();
         }
       }
     };
     refreshDevice();
     const timer = window.setInterval(refreshDevice, 20000);
     return () => { alive = false; window.clearInterval(timer); };
-  }, [view, credential]);
+  }, [view, credential, onCredentialChange]);
 
   const generateCode = async () => {
     if (!childId) return;
@@ -142,6 +155,11 @@ export default function PhonePairingConcept({ initialView = 'parent' }) {
       const normalizedCode = pin.replace(/\s+/g, '').trim().toUpperCase();
       await pairDevice(normalizedCode);
       setCredential(deviceStore.getCredential());
+      // PHASE B.1 - the credential is now in sessionStorage, which this form's
+      // own state cannot surface to its parent. Signal the route wrapper so it
+      // re-reads the store and replaces this form with the production camera
+      // screen - the surface that owns the feeding claim loop.
+      onCredentialChange?.();
       setPin('');
       setMessage('Device paired. Allow camera and microphone access when the browser asks.');
     } catch (error) { setMessage(getErrorMessage(error, 'The code is invalid or expired.')); }
@@ -163,6 +181,9 @@ export default function PhonePairingConcept({ initialView = 'parent' }) {
   const disconnectDevice = () => {
     deviceStore.clear();
     setCredential('');
+    // PHASE B.1 - credential cleared; let the route wrapper re-read it, so the
+    // two-state branch above can never disagree with the store.
+    onCredentialChange?.();
     setDeviceSessionInfo(null);
     setMedia(null);
     setMessage('This phone is disconnected. Stop the monitoring session on Phone 1 to revoke the pairing.');
@@ -210,7 +231,7 @@ export default function PhonePairingConcept({ initialView = 'parent' }) {
                   {parentSession.DeviceConnected ? 'Monitor phone connected' : 'Waiting for the monitor phone'}
                 </span>
               </div>
-              <MonitoringMediaPanel status={media?.Configured ? 'ready' : media ? 'unavailable' : 'loading'} media={media?.Configured ? media : null} canPublish={false} reason={media?.Reason} childName={parentSession.ChildName} variant="card" />
+              <MonitoringMediaPanel status={media?.Configured ? 'ready' : media ? 'unavailable' : 'loading'} media={media?.Configured ? media : null} canPublish={Boolean(media?.CanPublish)} reason={media?.Reason} childName={parentSession.ChildName} variant="card" />
               <div className={styles.incidents} aria-live="polite">
                 {incidents.filter((incident) => incident.IsOpen ?? !incident.ResolvedAtUtc).map((incident) => (
                   <div className={styles.incident} key={incident.IncidentId}>

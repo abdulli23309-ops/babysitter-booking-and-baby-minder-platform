@@ -5,6 +5,7 @@ import EmptyState from '../../components/ui/EmptyState';
 import Button from '../../components/ui/Button';
 import CopyButton from '../../components/ui/CopyButton';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
+import AssignedTasksCard from '../../components/ui/AssignedTasksCard';
 
 import UserAvatar from '../../components/ui/UserAvatar';
 import SitterMonitoringPanel from '../../components/monitoring/SitterMonitoringPanel';
@@ -18,6 +19,7 @@ import { API } from '../../services/api';
 import { useToast } from '../../components/ui/ToastContext';
 import { useAuth } from '../auth/AuthContext';
 import { formatLocalDate } from '../../utils/dateUtils';
+import { getAvatarUrl } from '../../utils/imageUtils';
 import styles from '../parent/live-session.module.css';
 
 const Icons = {
@@ -73,6 +75,9 @@ export default function ActiveJobDetails() {
     : passedJob?.Job_ID ?? passedJob?.jobId ?? null;
 
   const [job, setJob] = useState(passedJob ?? null);
+  // PHASE 9.9 - remembers WHICH child-photo URL failed, so a later job reload
+  // carrying a different photo still gets its chance to render.
+  const [childPillPicError, setChildPillPicError] = useState(null);
   const [loading, setLoading] = useState(() => !passedJob && Boolean(numericJobId));
 
   /* PHASE 9.1 - ROLE-AWARE SCREEN.
@@ -102,6 +107,23 @@ export default function ActiveJobDetails() {
     : null) || Number(location.state?.childId) || null;
 
   const [responding, setResponding] = useState(false);
+  /* PHASE 3 - THE FIVE-STATE RECORDING MACHINE (replaces Phase 14's single
+   * `recordingBusy` flag). The states and their honesty rules:
+   *
+   *   idle       - nothing requested from this screen
+   *   requesting - POST /feeding/request in the air (button cannot re-fire)
+   *   requested  - server ACCEPTED; the monitor device now owns the work.
+   *                This is NOT "recorded" - the video does not exist yet.
+   *   completed  - the history endpoint confirmed THIS request's PublicId
+   *                reached Status=Completed (real duration, real file).
+   *   conflict   - 409; the server's own semantic copy, amber, never green.
+   *   failed     - the request itself failed.
+   *
+   * `recordingDetail` carries { durationSeconds } on completion and
+   * { message } on conflict/failure - always server-derived copy. */
+  const [recordingState, setRecordingState] = useState('idle');
+  const [recordingDetail, setRecordingDetail] = useState(null);
+  const recordingPollRef = useRef(null);
 
   /* Parent-side action busy flags. Separate from `responding` (which is the
      sitter's cry-response flag) so the two panels can never show each other's
@@ -189,6 +211,138 @@ export default function ActiveJobDetails() {
       toast.success(ok ? label : 'That action is no longer available.');
     } finally {
       setResponding(false);
+    }
+  };
+
+  /* ==================================================================
+     PHASE 3 - THE COMPLETION WATCHER (and its teardown)
+     ------------------------------------------------------------------
+     The POST returning 2xx proves only that a request was ACCEPTED.
+     Actual completion is a server fact discovered by polling the
+     EXISTING history endpoint for THIS request's own PublicId (rows
+     only appear there at Status=Completed or Failed, so the first
+     sighting is the verdict).
+
+     The poll stops itself on: completion, failure, authorization loss
+     (401/403 - e.g. the job ended) or after the 5-minute cap. On
+     timeout the state stays `requested` - we never claim a success we
+     have not seen. It is also torn down on unmount.
+  ================================================================== */
+  const stopRecordingPoll = useCallback(() => {
+    if (recordingPollRef.current) {
+      window.clearInterval(recordingPollRef.current);
+      recordingPollRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => stopRecordingPoll, [stopRecordingPoll]);
+
+  const watchForCompletion = useCallback((jobId, childId, publicId) => {
+    stopRecordingPoll();
+    const startedAt = Date.now();
+    recordingPollRef.current = window.setInterval(async () => {
+      if (Date.now() - startedAt >= 5 * 60 * 1000) {
+        stopRecordingPoll(); // stays `requested`; a later refresh shows truth
+        return;
+      }
+      try {
+        const rows = await API.getFeedingHistory(jobId, childId);
+        const mine = Array.isArray(rows) ? rows.find((r) => r?.Id === publicId) : null;
+        if (mine?.Status === 'Completed') {
+          stopRecordingPoll();
+          setRecordingDetail({ durationSeconds: mine.DurationSeconds ?? null });
+          setRecordingState('completed');
+          toast.success(
+            `Feeding video recorded successfully — ${mine.DurationSeconds ?? 30} sec · Recorded just now`,
+          );
+        } else if (mine?.Status === 'Failed') {
+          stopRecordingPoll();
+          setRecordingDetail({ message: 'The feeding recording failed on the monitor device.' });
+          setRecordingState('failed');
+          toast.error('The feeding recording failed on the monitor device.');
+        }
+      } catch (err) {
+        const status = err?.status ?? err?.originalError?.response?.status ?? null;
+        if (status === 401 || status === 403) stopRecordingPoll(); // access gone
+        // Transient network errors: keep polling until the cap.
+      }
+    }, 3000);
+  }, [stopRecordingPoll, toast]);
+
+  /* ==================================================================
+     PHASE 9.3 - REQUEST A FEEDING-VIDEO RECORDING
+
+     The babysitter's unified "Log Feeding" action. This is the first and
+     only place in the frontend that creates a Phase 1 FeedingRecording
+     request, and it deliberately does so by CALLING the server - never by
+     writing a row, a status or an id locally. The standalone "Record
+     Feeding" button is gone (Phase 9.3): the care note is entered by
+     SitterActionDashboard, which calls straight into here, so the
+     babysitter never operates the recording subsystem itself.
+
+     The backend owns:
+       - authorization (MonitoringAccess.Check for this job+child),
+   - the "is the job still in progress" gate,
+     - the PublicId, and
+       - duplicate protection (UX_FeedingRecording_Active).
+
+     So the honest sequence is: POST, read the verdict, then report THAT
+     verdict. There is deliberately no optimistic success path - if the
+     request is refused, the sitter is told so.
+  ================================================================== */
+  const requestFeedingRecording = async () => {
+    const jobId = Number(numericJobId);
+    const childId = Number(monitoredChild?.Child_ID ?? monitoredChild?.ChildId);
+    if (!jobId || !childId) {
+      toast.error('We could not work out which child to record.');
+      return;
+    }
+    if (recordingState === 'requesting') return;
+
+    stopRecordingPoll();
+    setRecordingDetail(null);
+    setRecordingState('requesting');
+    try {
+      const created = await API.requestFeedingVideo(jobId, childId);
+      // ACCEPTED, NOT recorded. The monitor device owns the work now; the
+      // success announcement waits for watchForCompletion to see Completion.
+      setRecordingState('requested');
+      toast.success('Feeding logged. Recording requested.');
+      // `created.Id` is the SERVER-generated PublicId: the exact row the
+      // completion watcher must look for.
+      if (created?.Id) watchForCompletion(jobId, childId, created.Id);
+    } catch (err) {
+      const status = err?.status ?? null;
+      if (status === 409) {
+        // The SERVER's semantic copy (recovered in api.js), shown amber -
+        // never a green success, never the generic axios string.
+        const message = err?.serverMessage
+          || 'A feeding video is already being recorded for this child.';
+        setRecordingDetail({ message });
+        setRecordingState('conflict');
+        // PHASE 9.3 - the care note was already logged locally before this
+        // request fired, and it is deliberately NOT rolled back. The SERVER's
+        // own semantic copy stays fully visible after the honest prefix.
+        toast.warning(`Feeding logged. ${message}`);
+      } else if (status === 403) {
+        setRecordingState('idle');
+        toast.error(err?.serverMessage
+          || 'You are not authorized to record a feeding video for this session.');
+      } else if (status === 503) {
+        const message = 'Feeding-video storage is not configured on this server yet.';
+        setRecordingDetail({ message });
+        setRecordingState('failed');
+        // Feeding log + request verdict are reported separately (Phase 9.3);
+        // the specific storage reason stays visible on the status card.
+        toast.error('Feeding logged, but the recording could not be requested.');
+      } else {
+        const message = err?.message || 'The feeding video could not be requested.';
+        setRecordingDetail({ message });
+        setRecordingState('failed');
+        // Feeding log + request verdict are reported separately (Phase 9.3);
+        // the underlying error stays visible on the status card.
+        toast.error('Feeding logged, but the recording could not be requested.');
+      }
     }
   };
 
@@ -528,6 +682,10 @@ export default function ActiveJobDetails() {
         {childCount > 0 ? (
           <section className={styles.monitoringSection}>
             {jobIsLive && monitoredChild ? (
+              /* REST session/cry polling state is deliberately not passed into
+                 the live media stage. MonitoringMediaPanel owns its status from
+                 MiroTalk bridge transport events, so an API failure cannot
+                 cover or relabel an attached video stream. */
               <LiveMediaStage
                 childName={monitoredChild.ChildName}
                 childCount={childCount}
@@ -561,14 +719,20 @@ export default function ActiveJobDetails() {
                 pausing={pausing}
                 ending={ending}
                 pauseRequested={pauseRequested}
-              />
+  />
             ) : (
-              <SitterActionDashboard
-                onLog={(label) => toast.success(`${label} logged.`)}
+          <SitterActionDashboard
+      /* PHASE 9.3 - the unified "Log Feeding" action calls the real feeding-
+          * video endpoint right after the care note is entered. It is wired
+          * HERE because this is where the authenticated bearer token and
+  * the resolved job/child scope both already exist. */
+           disabled={!jobIsLive}
+         onRequestRecording={requestFeedingRecording}
+                     recordingState={recordingState}
+            recordingDetail={recordingDetail}
                 /* Actions only mean something while a session is genuinely
-                   running, and the panel says why rather than going dead
-                   silently. */
-                disabled={!jobIsLive}
+   running, and the panel says why rather than going dead
+      silently. */
                 disabledReason={
                   jobIsLive
                     ? ''
@@ -659,7 +823,22 @@ export default function ActiveJobDetails() {
             </p>
             {showPrimaryChip && (
               <div className={styles.childPill}>
-                <span style={{ fontSize: '14px' }}>☺</span>
+                {/* PHASE 9.9 - avatar hydration: the child's DB photo
+                    (job.PictureAddress from job-details) fills this circle; the
+                    name initial (last resort: the old emoji) is the conditional
+                    fallback for null URLs and load failures. */}
+                <span className={styles.childPillAvatar}>
+                  {job.PictureAddress && childPillPicError !== job.PictureAddress ? (
+                    <img
+                      className={styles.childPillAvatarImg}
+                      src={getAvatarUrl(job.PictureAddress, 'Children')}
+                      alt=""
+                      onError={() => setChildPillPicError(job.PictureAddress)}
+                    />
+                  ) : (
+                    (job.ChildName || '').trim().charAt(0).toUpperCase() || '☺'
+                  )}
+                </span>
                 <span>
                   {job.ChildName || 'Child'} ({childAge}y)
                 </span>
@@ -746,6 +925,11 @@ export default function ActiveJobDetails() {
             </div>
           </div>
         </div>
+
+        {/* ── Phase 10.0 — ASSIGNED TASKS (read-only) ─
+            The same server-authoritative allocation the parent sees: one
+            Job.AssignedTasks, read by both roles. No checkboxes, no editing. */}
+        <AssignedTasksCard assignedTasks={job.AssignedTasks ?? job.assignedTasks} />
       </main>
 
       <BabysitterBottomNav />

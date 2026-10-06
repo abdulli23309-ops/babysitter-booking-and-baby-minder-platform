@@ -378,6 +378,44 @@ namespace WebApplication2.Controllers
         // NEVER changes the escalation timeline, so View Child is a pure read and
         // deliberately has no state-changing endpoint. It also drives the
         // sweep-on-poll fallback for the caller's own session.
+        //
+        // -----------------------------------------------------------------
+        // PHASE 9.2 - "NO INCIDENT" IS A 200 WITH A NULL BODY, NOT A 404.
+        // -----------------------------------------------------------------
+        // WHY THIS CHANGED
+        //   This endpoint is POLLED every few seconds by useMonitoring (and by the
+        //   notification screens) for the whole duration of a sitting. In the
+        //   overwhelmingly common case - a calm, quiet nursery - there is simply no
+        //   incident to return. That used to surface as HTTP 404, because
+        //   CryIncidentService.GetIncident signals "no incident" with
+        //   MonitoringDenial.IncidentNotFound and MonitoringError() maps every
+        //   NotFound-class denial to a literal 404.
+        //
+        //   That conflated two very different situations behind one status code:
+        //     - "this baby is fine and nothing has been reported"  (the NORMAL
+        //       state, and the answer for the vast majority of polls), and
+        //     - "you are not allowed to see this child's incidents" (a real
+        //       authorization outcome the caller must handle).
+        //   A REST client cannot tell those apart from a bare status code without
+        //   body-sniffing, so the frontend had to special-case 404 in three places
+        //   or - far worse - start treating a routine poll failure as a fault. It
+        //   did both, and a healthy monitoring session rendered "Reconnecting..."
+        //   while the video was in fact streaming.
+        //
+        // WHAT THIS ENDPOINT NOW PROMISES
+        //   200  - body is the incident DTO, OR null when there is no incident.
+        //          Both are successful reads; null means "nothing has been
+        //          reported for this child yet".
+        //   400  - non-positive ids.
+        //   403  - a genuine authorization refusal (NotAssignedSitter,
+        //          NotGuardian, InvalidRole, ChildNotInJob, JobNotInProgress).
+        //   404  - the scope itself does not exist (JobNotFound, ChildNotFound).
+        //
+        //   In other words: the EXISTENCE of the scope is still expressed by the
+        //   status code; the EXISTENCE OF AN INCIDENT is data, and data is now
+        //   returned as data. No caller loses information, and the audit write
+        //   that GetIncident performs for real denials is untouched - only the
+        //   mapping of IncidentNotFound changed.
         [HttpGet]
         [Route("cry")]
         public IHttpActionResult GetCryIncident(int jobId, int childId)
@@ -385,10 +423,66 @@ namespace WebApplication2.Controllers
             if (jobId <= 0 || childId <= 0)
                 return BadRequest("jobId and childId must be positive integers.");
 
-            return CryAction(
-                () => _cryIncidentService.GetIncident(
-                    jobId, childId, ClaimsPrincipalHelper.GetUserId(), ClaimsPrincipalHelper.GetRole()),
-                "read failed for job " + jobId + ", child " + childId);
+            try
+            {
+                var incident = _cryIncidentService.GetIncident(
+                    jobId, childId,
+                    ClaimsPrincipalHelper.GetUserId(),
+                    ClaimsPrincipalHelper.GetRole());
+
+                // Defence in depth. GetIncident is not supposed to return null
+                // (it throws instead), but normalising here means this contract -
+                // "200 with a null body means no incident" - holds regardless of
+                // how the service evolves. Ok(null) serialises to the JSON literal
+                // `null`, which axios delivers as a SUCCESSFUL response whose data
+                // is null; callers already render `incident ?? null` as "no alert".
+                return Ok(incident);
+            }
+            catch (MonitoringAccessException ex)
+            {
+                // THE ONLY DENIAL THAT BECOMES A 200. "No incident exists" is a
+                // successful read of an empty set, not a missing resource.
+                if (ex.Denial == MonitoringDenial.IncidentNotFound)
+                {
+                    // Deliberately NOT audited as a denial: nothing was refused.
+                    // The caller was fully authorized and the answer is simply
+                    // "nothing reported yet".
+                    return Ok<CryIncidentDto>(null);
+                }
+
+                // Everything else keeps its original, stricter mapping: 403 for an
+                // authorization refusal, 404 only when the job or child genuinely
+                // does not exist.
+                return MonitoringError(ex);
+            }
+            catch (CryIncidentService.CryDetectionPausedException ex)
+            {
+                // A sweep-on-poll conflict can surface here in principle. It is a
+                // state conflict, so it stays a 409 with the same body the POST
+                // endpoint returns, rather than leaking an exception detail.
+                return Content(HttpStatusCode.Conflict, new
+                {
+                    error = "paused",
+                    message = ex.Message,
+                    pauseExpiresAtUtc = ex.PauseExpiresAtUtc
+                });
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Trace.TraceError(
+                    "MonitoringController: cry read failed for job {0}, child {1}: {2}",
+                    jobId, childId, ex);
+                return Content(HttpStatusCode.InternalServerError,
+                    "A server error occurred while processing the cry incident.");
+            }
         }
 
         // POST api/monitoring/cry/going-to-child   body: { "jobId": 171, "childId": 27 }
@@ -758,7 +852,7 @@ namespace WebApplication2.Controllers
         // own: they delegate to MonitoringAccess inside the service, so
         // "who may watch this baby" stays answerable in exactly one place.
 
-        // GET api/monitoring/media?jobId=&childId=
+        // GET api/monitoring/media?jobId=&childId= (jobId is optional for parents)
         //
         // PURPOSE       Issue (or refuse) a server-signed media session for one
         //               monitoring scope, so the browser never holds a provider
@@ -766,25 +860,24 @@ namespace WebApplication2.Controllers
         // AUTH          [SessionAuthorize]; MonitoringAccess decides the caller.
         //               The participant role is derived server-side, so a sitter
         //               is always receive-only.
-        // REQUEST       jobId, childId (scope only - no actor, no role, no token).
+        // REQUEST       childId and optional jobId (scope only - no actor, role or token).
         // RESPONSE      MonitoringMediaDto. Configured=false + Reason is a valid,
         //               expected 200 while no provider credentials exist; the UI
         //               then shows an honest "live video unavailable" state.
-        // FAILURE       400 bad ids, 403/404 when MonitoringAccess denies,
-        //               404 when there is no ACTIVE monitoring session.
-        // STATE IMPACT  None - creates no session and writes nothing.
+        // FAILURE       400 bad child id, 403/404 when authorization denies.
+        // STATE IMPACT  A parent fallback may create its independent session.
         [HttpGet]
         [Route("media")]
         [SessionAuthorize]
-        public IHttpActionResult GetMonitoringMedia(int jobId, int childId)
+        public IHttpActionResult GetMonitoringMedia(int? jobId, int childId)
         {
-            if (jobId <= 0 || childId <= 0)
-                return BadRequest("jobId and childId must be positive integers.");
+            if (childId <= 0 || jobId < 0)
+                return BadRequest("childId must be positive and jobId cannot be negative.");
 
             var media = new MediaSessionService();
             try
             {
-                return Ok(media.GetMediaSession(jobId, childId,
+                return Ok(media.GetMediaSession(jobId ?? 0, childId,
                     ClaimsPrincipalHelper.GetUserId(), ClaimsPrincipalHelper.GetRole()));
             }
             catch (MonitoringAccessException ex) { return MonitoringError(ex); }

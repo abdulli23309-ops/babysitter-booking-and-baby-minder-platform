@@ -206,6 +206,35 @@ namespace WebApplication2.Infrastructure
         }
 
         /// <summary>
+        /// Authorizes the independent parent scope using the same guardian
+        /// authority as the job path, without requiring a Job or JobChildren row.
+        /// </summary>
+        public static MonitoringDenial CheckIndependentParent(
+            BabySitterBooking_and_BabyMinderEntities db,
+            int currentUserId,
+            string currentRole,
+            int childId)
+        {
+            if (db == null)
+                throw new ArgumentNullException(nameof(db));
+
+            bool isParent = string.Equals(currentRole, UserRole.Parent.ToDisplayString(), StringComparison.OrdinalIgnoreCase);
+            if (currentUserId <= 0 || !isParent)
+                return MonitoringDenial.InvalidRole;
+
+            int guardianCount = db.Database.SqlQuery<int>(
+                "SELECT COUNT(*) FROM ChildGuardian WHERE Child_ID = @p0 AND Parent_ID = @p1 AND IsDeleted = 0",
+                childId, currentUserId).Single();
+            if (guardianCount == 0)
+                return MonitoringDenial.NotGuardian;
+
+            int childCount = db.Database.SqlQuery<int>(
+                "SELECT COUNT(*) FROM Child WHERE Child_ID = @p0 AND IsDeleted = 0",
+                childId).Single();
+            return childCount == 0 ? MonitoringDenial.ChildNotFound : MonitoringDenial.Allowed;
+        }
+
+        /// <summary>
         /// Status normalization for "job is actively in progress".
         /// Accepts BOTH real-world spellings found in this database
         /// ("InProgress" legacy rows and "In Progress" display code), trimmed

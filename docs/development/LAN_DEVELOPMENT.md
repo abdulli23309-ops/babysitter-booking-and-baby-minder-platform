@@ -7,6 +7,11 @@ LAN IP address can change (DHCP).
 automatically → Parent Monitoring works → Babysitter Monitoring works.* No daily
 hunting/editing of an IP address.
 
+> **Something not connecting?** See
+> [LAN_TRIAGE_RUNBOOK.md](./LAN_TRIAGE_RUNBOOK.md) — a diagnostic-first guide for
+> "refused to connect" that identifies *which* of the three servers is failing
+> before any IP or config is touched.
+
 ---
 
 ## 1. The one answer: where does Little Care get the development LAN/media address?
@@ -271,3 +276,48 @@ Get-NetTCPConnection -State Listen | Where-Object { $_.LocalPort -in 3010,5173,4
 wildcard CORS, no new media server, no hostname invented (a `.local` name is not
 used because phone mDNS resolution cannot be guaranteed on all networks).
 
+
+## Audit corrections and limits (2026-10-05)
+
+The current launcher now filters candidates to up physical adapters and orders
+eligible default routes by route metric, interface metric, and interface index.
+It refuses to guess if it has no physical default route and multiple physical
+private addresses. The previous description above that implied every default
+route was necessarily a real LAN route was too strong.
+
+The backend reads `Web.MonitoringMedia.config` through the external `appSettings
+file` attribute. The tracked fallback for `MonitoringMediaServerUrl` is blank;
+if the generated local override is missing, media fails closed instead of
+pointing to a historical DHCP address. The local override and MiroTalk `.env`
+are runtime-generated/local files and must not be committed with an IP or room
+salt. The launcher now stops on missing required runtime configuration and on
+duplicate settings rather than continuing with stale state.
+
+A DHCP move does not require source edits, manual config edits, or a new CA
+trust. The CA stays stable and the launcher refreshes the IP-specific leaf.
+Because this is IP-based, the only expected phone action is opening the new
+frontend URL printed by the launcher. Firewall rules use ports plus
+`RemoteAddress LocalSubnet`, so their behavior does not depend on the DHCP IP;
+initial rule creation still requires elevation.
+
+The launcher additionally opens TLS connections to the current LAN IP on ports
+3010 and 5173 and confirms both services present the generated leaf certificate;
+it validates the leaf against the stable CA. This still does not prove browser
+trust on a phone, backend API health, SFU ICE candidate correctness, firewall
+reachability from another device, or a working camera-to-viewer session. Its
+message is deliberately “LAN HTTPS endpoints: READY,” not “monitoring ready.”
+A physical phone test is still required to claim monitoring works across the LAN.
+This audit environment currently exposes no active default routes,
+physical adapters, IPv4 addresses, or listeners, so a real LAN test, controlled
+address transition, and phone test could not be performed here. Do not describe
+those as passing until run on a connected development PC and a second device.
+
+A stable `.local` hostname was not introduced: it would require mDNS to work on
+both Windows and the phone, a DNS SAN in the certificate, and matching behavior
+in MiroTalk. The IP workflow is simpler for this LAN demo and keeps discovery
+under one launcher-controlled source of truth.
+
+Never hand-edit `SFU_ANNOUNCED_IP`, `MonitoringMediaServerUrl`, generated leaf
+certificates, or frontend media URLs in source. If the launcher reports missing
+inputs, repair the deployment/template source; do not restore a developer IP as
+a fallback.

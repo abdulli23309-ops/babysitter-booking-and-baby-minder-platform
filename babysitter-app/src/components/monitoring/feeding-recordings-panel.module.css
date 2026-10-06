@@ -1,0 +1,338 @@
+/* ============================================================================
+   FeedingRecordingsPanel - PHASE 3 surface, PHASE 9.4 peachy retheme.
+
+   COMPONENT-SCOPED DESIGN TOKENS (Decision 2 - tokens.css is NOT modified).
+   Phase 9.4 stripped the dark navy/slate glass: this card lives inside a
+   LIGHT UI, so it is now a soft peachy-pink surface with deep-navy text:
+     peach fill   #FFE8E5                - the card ground (never dark)
+     peach line   rgba(255,140,120,0.2)  - soft structural border
+     deep navy    #0B132B                - headers / timestamps (contrast)
+     dark slate   #333333                - secondary text (contrast)
+     emerald      #10B981                - success glyph (semantic only)
+     amber        #F59E0B                - failed-attempt glyph (semantic)
+   Global app tokens continue to drive everything else on the page.
+   ========================================================================== */
+.panel {
+  --feed-navy: #0B132B;
+  --feed-slate: #333333;
+  --feed-emerald: #10B981;
+  --feed-amber: #F59E0B;
+  --feed-peach: #FFE8E5;
+  --feed-peach-strong: #FF8C78;
+  --feed-line: rgba(255, 140, 120, 0.2);
+
+  position: relative;
+  margin: 18px 0 6px;
+  padding: 18px 16px 16px;
+  border-radius: 18px;
+  background: var(--feed-peach); /* soft peachy pink - dark theme GONE */
+  border: 1px solid var(--feed-line); /* blends with the peach, holds shape */
+  box-shadow: 0 8px 24px rgba(232, 98, 42, 0.08);
+}
+
+/* ---- Header: typographic hierarchy carries the live/recorded separation ---- */
+.header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.eyebrow {
+  margin: 0 0 2px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--feed-slate);
+  opacity: 0.85;
+}
+
+.title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  color: var(--feed-navy); /* deep navy header on peach - high contrast */
+}
+
+.refresh {
+  border: 1px solid rgba(11, 19, 43, 0.18);
+  background: rgba(255, 255, 255, 0.65);
+  color: var(--feed-slate);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 7px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.refresh:hover:not(:disabled) {
+  color: var(--feed-navy);
+  border-color: rgba(255, 140, 120, 0.6);
+}
+
+.refresh:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* The dividing line between "now" and "recorded". */
+.rule {
+  height: 1px;
+  margin: 14px 0 12px;
+  background: linear-gradient(90deg, var(--feed-peach-strong), rgba(255, 140, 120, 0.15) 65%, transparent);
+}
+
+.note,
+.noteError {
+  margin: 6px 2px 2px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--feed-slate);
+}
+
+.noteError {
+  color: #B42318;
+}
+
+.loading {
+  display: flex;
+  justify-content: center;
+  padding: 18px 0 8px;
+}
+
+/* ---- The scrollable recording list ---- */
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 320px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 140, 120, 0.45) transparent;
+}
+
+/* PHASE 9.8 anti-squish row: icon | text | button on ONE stable line. */
+.card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100% !important;
+  box-sizing: border-box;
+  flex-wrap: nowrap !important;
+  padding: 12px 16px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.7); /* light row over the peach ground */
+  border: 1px solid rgba(255, 140, 120, 0.22);
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.card:hover {
+  border-color: rgba(255, 140, 120, 0.55);
+  transform: translateY(-1px);
+}
+
+.card[data-failed='true'] {
+  border-color: rgba(245, 158, 11, 0.45);
+  background: rgba(245, 158, 11, 0.1);
+}
+
+/* PHASE 9.8 - premium icon container: soft peach, 10px radius, never shrinks. */
+.cardIcon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: rgba(255, 140, 120, 0.15);
+  color: #0B132B;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.card[data-failed='true'] .cardIcon {
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.5);
+  color: #B45309;
+}
+
+.cardBody {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-width: 0; /* CRITICAL (PHASE 9.8): Prevents flex text squishing */
+}
+
+.cardWhen {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: #0B132B;
+  white-space: nowrap;
+  /* PHASE 9.8: NO overflow/text-overflow/max-width here - the full time
+     string ("5:30 PM") must never be chopped. */
+}
+
+.cardMeta {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--feed-slate);
+  /* PHASE 9.8: metadata stays on ONE line (it used to wrap vertically);
+     ellipsis only as a last resort for unusually long status strings. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* PHASE 9.9 - icon-only minimalist play control: a perfect 38px circle with no
+   visible label (the accessible name survives via aria-label/title on the
+   button). Phase 9.8's anti-squish contract is preserved: the button never
+   shrinks (flex-shrink: 0) and the row never wraps. */
+.play {
+  flex: 0 0 auto;
+  flex-shrink: 0 !important; /* PHASE 9.8: button never resizes the text column */
+  width: 38px !important;
+  height: 38px !important;
+  padding: 0 !important;
+  box-sizing: border-box;
+  border-radius: 50% !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 140, 120, 0.55);
+  background: rgba(255, 255, 255, 0.95);
+  color: var(--feed-navy, #0B132B);
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  transition: transform 0.2s ease, background 0.2s ease;
+}
+
+.play:hover {
+  background: #FFFFFF;
+  transform: scale(1.06);
+}
+
+.play:focus-visible {
+  outline: 2px solid var(--feed-navy, #0B132B);
+  outline-offset: 2px;
+}
+
+.play svg {
+  width: 16px;
+  height: 16px;
+  margin-left: 2px; /* optical alignment for the play triangle */
+  fill: currentColor;
+}
+
+/* ---- Player modal (inner shell; the dialog itself is the shared UI Modal
+   with variant="player": strict 24px interior padding, 640px shell, opaque
+   surface and token z-index, so page text can never bleed through) ---- */
+.playerShell {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  min-width: 0; /* the old min-width:560px overflowed the dialog box */
+}
+
+.playerTitle {
+  margin: 0;
+  padding-right: 44px; /* clear space for the floating close button */
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--feed-navy); /* dark title on the opaque modal surface */
+}
+
+.playerLoading {
+  display: flex;
+  justify-content: center;
+  padding: 42px 0;
+}
+
+.playerError {
+  margin: 0;
+  padding: 26px 8px;
+  text-align: center;
+  font-size: 13.5px;
+  color: #B42318;
+}
+
+.playerVideo {
+  display: block;
+  width: 100%; /* constrained inside the padded container */
+  max-height: 60vh;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #000;
+  outline: none;
+}
+
+/* Sleek circular floating X pinned to the modal container's top-right corner
+   (anchored by .modalPlayer { position: relative } in modal.module.css). */
+.playerClose {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(11, 19, 43, 0.14);
+  background: rgba(11, 19, 43, 0.05);
+  color: var(--feed-navy);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+
+.playerClose:hover {
+  background: rgba(11, 19, 43, 0.1);
+  border-color: rgba(11, 19, 43, 0.3);
+  transform: rotate(90deg);
+}
+
+.playerClose:focus-visible {
+  outline: 2px solid var(--feed-navy);
+  outline-offset: 2px;
+}
+
+/* ===== PHASE 9.7 + 9.8 — FORCED BOX / ANTI-SQUISH OVERRIDES (LAST WORD) =====
+   Applied with !important + final source order so they win every tie against
+   upstream component rules:
+   - .panel/.list/.card: never wider than the viewport (kills the horizontal
+     bleed past the 480px shell; .list keeps overflow-x clipped as a
+     belt-and-braces guard and loses its 1px right margin);
+   - .card (9.8): ONE stable flex line - icon | text | button - never stacks,
+     padding forced at 12px 16px. */
+.panel {
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  margin-right: 0 !important;
+}
+
+.list {
+  max-width: 100% !important;
+  overflow-x: hidden !important;
+  margin-right: 0 !important;
+  list-style: none;
+  padding-left: 0;
+}
+
+.card {
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  flex-wrap: nowrap !important; /* PHASE 9.8: one stable line, never stacks */
+  margin-right: 0 !important;
+  padding: 12px 16px !important;
+}
+

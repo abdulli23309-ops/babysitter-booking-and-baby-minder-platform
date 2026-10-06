@@ -63,6 +63,13 @@
 .sessionContent > .jobReference { order: 8; }
 .sessionContent > .lastUpdated { order: 9; }
 
+/* Phase 10.0 — Task Allocation. The card sits directly below the session
+   info / monitoring area on both role screens and above the bottom nav.
+   It must carry an explicit order, otherwise a flex child with the default
+   order of 0 would jump above every explicitly-ordered card. */
+.sessionContainer > .assignedTasksCard,
+.sessionContent > .assignedTasksCard { order: 6; }
+
 .backBtn {
   width: 36px;
   height: 36px;
@@ -110,7 +117,7 @@
   box-shadow: 0 8px 24px rgb(var(--shadow-ink-rgb) / 0.07);
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px; /* PHASE 9.4 - strict avatar + text flex gap */
   margin-bottom: 24px;
 }
 
@@ -174,6 +181,10 @@
   color: var(--color-text);
   margin: 0 0 2px;
   letter-spacing: -0.2px;
+  /* PHASE 9.4 - a long name ellipses instead of overlapping the avatar row. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .caregiverId {
@@ -201,6 +212,32 @@
   font-size: 12px;
   font-weight: 700;
   width: fit-content;
+}
+
+/* PHASE 9.9 - avatar hydration: 26px circular container for the child's DB
+   photo (fills completely, cover crop); doubles as the initial/emoji fallback
+   surface when the URL is missing or fails to load. */
+.childPillAvatar {
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  overflow: hidden;
+  background: #ffffff;
+  color: var(--color-primary);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.childPillAvatarImg {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
 }
 
 /* ── Circular Live Duration Section ── */
@@ -367,6 +404,85 @@
 
 .sessionChildrenCard { margin-top: 12px; }
 
+/* ── Phase 10.0 — Assigned Tasks (read-only, both active-job roles) ──
+   Same surface language as .infoCard (white/frosted surface, subtle
+   border, 22px radius, restrained shadow) so the card belongs to the
+   SESSION / LOCATION / MONITORING family. */
+.assignedTasksCard {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-subtle, rgba(0, 0, 0, 0.07));
+  border-radius: 22px;
+  padding: 18px 22px;
+  box-shadow: 0 8px 24px rgb(var(--shadow-ink-rgb) / 0.07);
+  margin-bottom: 24px;
+}
+
+.assignedTasksHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-bottom: 12px;
+}
+
+.assignedTasksLabel {
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--color-text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+
+.assignedTasksHint {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text-muted);
+}
+
+.assignedTasksList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.assignedTaskRow {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 10px 0;
+}
+
+.assignedTaskRow:not(:last-child) {
+  border-bottom: 1px solid var(--color-surface-sunken);
+}
+
+.assignedTaskCheck {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--color-success-soft);
+  color: var(--color-success);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.assignedTaskText {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+  overflow-wrap: break-word;
+}
+
+.assignedTasksEmpty {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text-muted);
+}
+
 @media (max-width: 360px) {
   .ringOuter { width: 78vw; height: 78vw; }
 }
@@ -529,3 +645,12 @@
    This wrapped the old variant="card" panel on this screen. The media now sits
    inside LiveMediaStage, which supplies its own margin, navy background and 24px
    shadow, so a second wrapper would only have added a stray edge. */
+
+/* PHASE 3 - the Feeding Recordings section on the Parent Active Job screen.
+   The panel brings its own glass surface and mandate palette; this rule only
+   places it in the screen's rhythm (clear of the info card above and the
+   bottom navigation below). */
+.feedingRecordingsSection {
+  margin-top: 22px;
+  margin-bottom: 10px;
+}

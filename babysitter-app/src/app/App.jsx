@@ -47,6 +47,7 @@ import BabyMonitoringScreen from '../features/parent/BabyMonitoringScreen';
 import ChildCryAlertScreen from '../features/parent/ChildCryAlertScreen';
 import SupportScreen from '../features/support/SupportScreen';
 import PhonePairingConcept from '../features/parent/PhonePairingConcept';
+import MonitorDeviceScreen from './MonitorDeviceScreen';
 import MonitorDeviceRoute from './MonitorDeviceRoute';
 
 function App() {
@@ -62,7 +63,21 @@ function App() {
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
               <Route path="/create-account" element={<CreateAccount />} />
-              <Route path="/monitor-device" element={<PhonePairingConcept initialView="monitor" />} />
+              {/* PHASE 9.3 - /monitor-device is now the CINEMATIC CAMERA (Screen 1).
+                   It used to render PhonePairingConcept directly, which meant the
+                   URL named "the monitor device" but showed a pairing PIN form -
+                   the live view only appeared after pairing, and shared a layout
+                   with the parent's pairing panel. That coupling is what made the
+                   nursery screen read as a wireframe.
+
+                   This route now decides between the two states itself:
+                     - no credential  -> the pairing PIN form (the original job)
+                     - credential     -> the full-bleed camera surface
+
+                   Both are the DEVICE side, so both stay on this route. The state
+                   split is explicit and visible in the URL bar of the component
+                   rather than hidden in a tab. */}
+<Route path="/monitor-device" element={<MonitorDeviceScreen />} />
 
               {/* ---- Parent-protected routes ---- */}
               <Route path="/parent-dashboard" element={<ProtectedRoute allowedRoles={['parent']}><ParentDashboard /></ProtectedRoute>} />

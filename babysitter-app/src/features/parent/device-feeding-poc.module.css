@@ -1,0 +1,83 @@
+/* ============================================================
+   DeviceFeedingPoc - Phase 2 dev panel.
+
+   Deliberately plain, monospace and dense. This is an INSTRUMENT PANEL, not
+   product UI: an operator reads measurements off it during a camera-capability
+   test, and every value must be unambiguous at a glance. No gradients, no
+   animation, nothing that could be mistaken for a shipping surface.
+   ============================================================ */
+
+.panel {
+  position: relative;
+  z-index: 10;
+  margin: 8px 12px 0;
+  padding: 12px 14px;
+  border: 1px dashed #E5484D;
+  border-radius: 12px;
+  background: #FFF8F7;
+  color: #1A1D2E;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.72rem;
+  line-height: 1.5;
+}
+
+.title {
+  margin: 0 0 8px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #B42318;
+}
+
+.confirm {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  cursor: pointer;
+}
+
+.run {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #1A1D2E;
+  border-radius: 8px;
+  background: #1A1D2E;
+  color: #FFFFFF;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.run:disabled { opacity: 0.55; cursor: progress; }
+
+.results { margin-top: 12px; }
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 2px 0;
+  border-bottom: 1px solid rgba(26, 29, 46, 0.08);
+}
+
+.label { color: #5B6478; }
+
+.value { font-weight: 700; color: #5B6478; }
+.value[data-tone='ok'] { color: #067647; }
+.value[data-tone='bad'] { color: #B42318; }
+
+.raw {
+  margin: 10px 0 0;
+  padding: 8px;
+  max-height: 220px;
+  overflow: auto;
+  border-radius: 8px;
+  background: #FFFFFF;
+  border: 1px solid rgba(26, 29, 46, 0.12);
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 0.66rem;
+  color: #1A1D2E;
+}

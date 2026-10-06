@@ -1,13 +1,11 @@
 /* ========================================================================
    SitterActionDashboard - Phase 9.1 Premium Active Session.
 
-   Design intent: the Babysitter's action grid should feel like a control
-   surface, not a form. Large touch-friendly cards, muted navy fills, white
-   type, and a hairline white border - so the grid reads as one dark block
-   beneath the video rather than a stack of mismatched buttons.
-
-   The primary "Log Feeding" card is emerald, tying it to the "Live" status
-   dot above it: both mean "this is the good, working path".
+   Design intent: the Babysitter's Care Log should feel like a control
+   surface, not a form. PHASE 9.3 - it holds exactly ONE action, the emerald
+   "Log Feeding" card, which fills the panel width: one care action, one
+   button. The emerald treatment ties it to the "Live" status dot above it:
+   both mean "this is the good, working path".
    ======================================================================== */
 
 .panel {
@@ -38,13 +36,13 @@
   color: var(--color-text-secondary);
 }
 
-/* --- The grid --------------------------------------------------------------
-   A two-column grid where the primary action spans both columns. On a 320px
-   phone the two secondary cards still clear the 44px minimum touch target
-   with room to spare. */
+/* --- The single action -----------------------------------------------------
+   PHASE 9.3 - the Care Log has exactly one action, so the old two-column
+   layout (and its empty sibling column) is gone: the feeding card simply
+   fills the container, on desktop and on the 480px mobile shell alike. */
 .grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-3);
 }
 
@@ -72,9 +70,8 @@
 }
 
 .action[data-primary='true'] {
-  /* The primary action spans the full width, because a feed is the thing a
-     sitter reports most and it must be impossible to miss. */
-  grid-column: 1 / -1;
+  /* The one Care Log action fills the container width, because a feed is the
+     thing a sitter reports most and it must be impossible to miss. */
   min-height: 96px;
   flex-direction: row;
   align-items: center;
@@ -217,4 +214,119 @@
      press entirely - the border highlight carries the feedback instead. */
   .action { transition: none; }
   .action:active { transform: none; }
+}
+
+/* ============================================================================
+   PHASE 3 - RECORDING MICRO-INTERACTIONS
+
+   Component-scoped mandate palette (tokens.css stays untouched):
+     emerald #10B981 - active/success, cyan #06B6D4 - primary, amber for 409.
+   ========================================================================== */
+.action[data-recording-active='true'] {
+  border-color: rgba(16, 185, 129, 0.65);
+  background:
+    radial-gradient(120% 120% at 50% 0%, rgba(16, 185, 129, 0.18), rgba(16, 185, 129, 0.04) 60%),
+    #141B2D;
+  color: #10B981;
+  animation: recording-pulse 1.6s ease-in-out infinite;
+}
+
+.action[data-recording-active='true'] .actionLabel {
+  color: #10B981;
+  font-weight: 700;
+}
+
+@keyframes recording-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.35);
+  }
+  50% {
+    box-shadow: 0 0 0 7px rgba(16, 185, 129, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .action[data-recording-active='true'] {
+    animation: none;
+    border-color: #10B981;
+  }
+}
+
+/* ---- The status card: one surface, four honest tones ---- */
+.recordingCard {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: var(--space-3, 12px);
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: #141B2D;
+}
+
+.recordingCard[data-tone='active'] {
+  border-color: rgba(6, 182, 212, 0.45);
+  background: linear-gradient(180deg, rgba(6, 182, 212, 0.10), rgba(20, 27, 45, 0.9));
+}
+
+.recordingCard[data-tone='success'] {
+  border-color: rgba(16, 185, 129, 0.5);
+  background: linear-gradient(180deg, rgba(16, 185, 129, 0.12), rgba(20, 27, 45, 0.9));
+}
+
+.recordingCard[data-tone='conflict'] {
+  border-color: rgba(245, 158, 11, 0.55);
+  background: linear-gradient(180deg, rgba(245, 158, 11, 0.12), rgba(20, 27, 45, 0.9));
+}
+
+.recordingCard[data-tone='error'] {
+  border-color: rgba(248, 113, 113, 0.5);
+  background: linear-gradient(180deg, rgba(248, 113, 113, 0.10), rgba(20, 27, 45, 0.9));
+}
+
+.recordingDot {
+  flex: 0 0 auto;
+  width: 10px;
+  height: 10px;
+  margin-top: 4px;
+  border-radius: 50%;
+  background: #06B6D4;
+  animation: recording-dot 1.2s ease-in-out infinite;
+}
+
+@keyframes recording-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.35; transform: scale(0.82); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .recordingDot { animation: none; }
+}
+
+.recordingTitle {
+  margin: 0;
+  font-size: var(--font-size-sm, 13.5px);
+  font-weight: 700;
+  line-height: 1.35;
+  color: #E2E8F0;
+}
+
+.recordingCard[data-tone='success'] .recordingTitle { color: #10B981; }
+.recordingCard[data-tone='conflict'] .recordingTitle { color: #FBBF24; }
+.recordingCard[data-tone='error'] .recordingTitle { color: #F87171; }
+.recordingCard[data-tone='active'] .recordingTitle { color: #67E8F9; }
+
+.recordingBody {
+  margin: 3px 0 0;
+  font-size: var(--font-size-xs, 12px);
+  line-height: 1.45;
+  color: var(--color-text-secondary, #94A3B8);
+}
+
+.recordingMeta {
+  margin: 3px 0 0;
+  font-size: var(--font-size-xs, 12px);
+  font-weight: 600;
+  line-height: 1.45;
+  color: #6EE7B7;
 }
