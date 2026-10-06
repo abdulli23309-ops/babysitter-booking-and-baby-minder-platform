@@ -51,3 +51,15 @@ scratch/
 # ── Test artifacts ────────────────────────────────
 coverage/
 .nyc_output/
+
+# ── Code-only repository ───────────────────────────
+# Documentation, test harnesses and local tooling stay on your disk but
+# are NOT tracked or pushed — only the root README.md is kept as docs.
+# SQL schema scripts are unaffected (project code, remain tracked).
+*.md
+!/README.md
+*.mjs
+*.cjs
+*.ps1
+docs/testing/
+
