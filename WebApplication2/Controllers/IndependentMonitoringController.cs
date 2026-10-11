@@ -433,7 +433,7 @@ namespace WebApplication2.Controllers
         public IHttpActionResult RequestFeedingVideo([FromBody] FeedingRecordingRequest request)
         {
             if (request == null || request.JobId <= 0 || request.ChildId <= 0)
-                return BadRequest("A job and a child are required.");
+                return BadRequest("Please select a child before recording.");
 
             try
             {
@@ -446,6 +446,54 @@ namespace WebApplication2.Controllers
             {
                 Trace.TraceError("Feeding request authorization failed: {0}", ex);
                 return Content(HttpStatusCode.InternalServerError, "The feeding video could not be requested.");
+            }
+
+            // Honest pre-check: verify that an active, non-revoked monitoring device is currently paired to this child.
+            bool hasActiveDevice = _db.Database.SqlQuery<int>(
+                @"SELECT COUNT(1)
+                    FROM dbo.MonitoringDeviceSession d
+                    JOIN dbo.IndependentMonitoringSession s ON s.IndependentMonitoringSession_ID = d.IndependentMonitoringSession_ID
+                   WHERE s.Child_ID = @p0 AND s.Status = 'Active' AND s.IsDeleted = 0
+                     AND d.RevokedAtUtc IS NULL AND d.ExpiresAtUtc > GETUTCDATE()",
+                request.ChildId).Single() > 0;
+
+            if (!hasActiveDevice)
+            {
+                // Check if Phone 2 is paired to a different child in this job
+                bool pairedToOtherChild = _db.Database.SqlQuery<int>(
+                    @"SELECT COUNT(1)
+                        FROM dbo.MonitoringDeviceSession d
+                        JOIN dbo.IndependentMonitoringSession s ON s.IndependentMonitoringSession_ID = d.IndependentMonitoringSession_ID
+                       WHERE s.Child_ID != @p0 AND s.Status = 'Active' AND s.IsDeleted = 0
+                         AND d.RevokedAtUtc IS NULL AND d.ExpiresAtUtc > GETUTCDATE()
+                         AND EXISTS (SELECT 1 FROM dbo.JobChildren jc WHERE jc.Job_ID = @p1 AND jc.Child_ID = s.Child_ID AND jc.IsDeleted = 0)",
+                    request.ChildId, request.JobId).Single() > 0;
+
+                if (pairedToOtherChild)
+                {
+                    return Content(HttpStatusCode.Conflict,
+                        "The monitoring phone is paired with a different child. Please select the correct child and pair the phone again.");
+                }
+
+                return Content(HttpStatusCode.BadRequest,
+                    "No monitoring phone is currently paired to this child. Please ensure Phone 2 is paired to this child.");
+            }
+
+            // Honest pre-check: the device can only CLAIM the work while an
+            // Active MonitorSession exists for this exact Job+Child
+            // (FeedingRecordingService.ClaimPending joins MonitorSession on
+            // Status='Active'), so refuse NOW with an actionable message
+            // instead of letting the row sit until the stale sweep turns it
+            // into a silent "Request timed out" failure minutes later.
+            bool hasActiveMonitorSession = _db.Database.SqlQuery<int>(
+                @"SELECT COUNT(1) FROM dbo.MonitorSession
+                   WHERE Job_ID = @p0 AND Child_ID = @p1 AND Status = 'Active' AND IsDeleted = 0",
+                request.JobId, request.ChildId).Single() > 0;
+
+            if (!hasActiveMonitorSession)
+            {
+                return Content(HttpStatusCode.BadRequest,
+                    "No active monitoring session was found for this child. Reconnect or start monitoring before recording.");
             }
 
             using (var service = new FeedingRecordingService(_db, ownsContext: false))
@@ -709,9 +757,9 @@ return Ok(new { failed = true });
         private static string Hash(string value) { using (var sha = SHA256.Create()) return BitConverter.ToString(sha.ComputeHash(Encoding.UTF8.GetBytes(value))).Replace("-", string.Empty).ToLowerInvariant(); }
 
         protected override void Dispose(bool disposing) { if (disposing) _db.Dispose(); base.Dispose(disposing); }
-        private sealed class PairingRow { public int MonitoringPairingCode_ID { get; set; } public int Parent_ID { get; set; } public int Child_ID { get; set; } public int AttemptCount { get; set; } }
-        private sealed class DeviceRow { public int DeviceSessionId { get; set; } public int SessionId { get; set; } public int ParentId { get; set; } public int ChildId { get; set; } public DateTime? LastSeenAtUtc { get; set; } }
-        private sealed class ParentCryRow { public long IncidentId { get; set; } public int ChildId { get; set; } public string ChildName { get; set; } public DateTime DetectedAtUtc { get; set; } public DateTime? ResolvedAtUtc { get; set; } public bool IsOpen { get; set; } }
-        private sealed class ParentSessionRow { public int SessionId { get; set; } public int ChildId { get; set; } public string ChildName { get; set; } public string Status { get; set; } public DateTime StartedAtUtc { get; set; } public DateTime? LastDeviceSeenAtUtc { get; set; } public bool DeviceAuthorized { get; set; } public bool DeviceConnected { get; set; } }
+        public class PairingRow { public int MonitoringPairingCode_ID { get; set; } public int Parent_ID { get; set; } public int Child_ID { get; set; } public int AttemptCount { get; set; } }
+        public class DeviceRow { public int DeviceSessionId { get; set; } public int SessionId { get; set; } public int ParentId { get; set; } public int ChildId { get; set; } public DateTime? LastSeenAtUtc { get; set; } }
+        public class ParentCryRow { public long IncidentId { get; set; } public int ChildId { get; set; } public string ChildName { get; set; } public DateTime DetectedAtUtc { get; set; } public DateTime? ResolvedAtUtc { get; set; } public bool IsOpen { get; set; } }
+        public class ParentSessionRow { public int SessionId { get; set; } public int ChildId { get; set; } public string ChildName { get; set; } public string Status { get; set; } public DateTime StartedAtUtc { get; set; } public DateTime? LastDeviceSeenAtUtc { get; set; } public bool DeviceAuthorized { get; set; } public bool DeviceConnected { get; set; } }
     }
 }

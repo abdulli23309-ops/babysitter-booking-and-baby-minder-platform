@@ -60,15 +60,71 @@ export default function BabySitterDetails() {
   // autoSearch is required as well as targetJobId: SearchBabySitter strips the
   // flag the moment it auto-fires, so by the time the parent reaches this modal
   // only targetJobId survives — that is the intended signal.
-  const replacementFlow = (() => {
-    try {
-      const raw = JSON.parse(localStorage.getItem('lastBookingSearch') || 'null');
-      if (!raw?.targetJobId) return null;
-      return raw;
-    } catch { return null; }
-  })();
+  //
+  // Remediation — replacement context is now STATE, validated against the
+  // authoritative job record on arrival. SearchBabySitter intentionally carries
+  // targetJobId across every later search (to protect the live replacement
+  // flow), which meant an ABANDONED replacement could leave the flag behind
+  // forever and make a fresh normal booking behave as a replacement — hiding
+  // the "Today's Required Tasks" selector. The rules now are:
+  // Phase 8K / Phase 10.0: replacement context is determined strictly from
+  // explicit navigation state. Normal searches and direct visits must NEVER
+  // accidentally enter replacement mode due to stale localStorage.
+  const [replacementFlow, setReplacementFlow] = useState(() => {
+    if (location.state?.isReplacement === false) return null;
+    if (location.state?.targetJobId) {
+      return { targetJobId: location.state.targetJobId };
+    }
+    if (location.state?.isReplacement === true) {
+      try {
+        const raw = JSON.parse(localStorage.getItem('lastBookingSearch') || 'null');
+        return raw?.targetJobId ? raw : null;
+      } catch { return null; }
+    }
+    return null;
+  });
 
   const isReplacement = Boolean(replacementFlow);
+
+  // Strip ONLY the replacement marker; the rest of lastBookingSearch is the
+  // locked search (Step 2 schedule) and must survive for the normal booking.
+  const clearReplacementContext = () => {
+    setReplacementFlow(null);
+    try {
+      const raw = JSON.parse(localStorage.getItem('lastBookingSearch') || 'null');
+      if (raw && typeof raw === 'object' && raw.targetJobId) {
+        delete raw.targetJobId;
+        localStorage.setItem('lastBookingSearch', JSON.stringify(raw));
+      }
+    } catch { /* storage unavailable */ }
+  };
+
+  useEffect(() => {
+    const targetJobId = replacementFlow?.targetJobId;
+    if (!targetJobId) return undefined;
+    let cancelled = false;
+    (async () => {
+      try {
+        const job = await API.getJobDetails(targetJobId);
+        const status = String(job?.Status ?? job?.status ?? '').trim().toLowerCase();
+        // BookingStatus only offers the replacement CTA while its job is
+        // Open/Pending (isOpenSeriesDay) — mirror exactly that rule here.
+        const stillValid = status === 'open' || status === 'pending';
+        if (!cancelled && !stillValid) clearReplacementContext();
+      } catch (err) {
+        // An explicit 4xx (404 deleted / 403 another parent's / 400 bad id)
+        // proves the target no longer applies — clear it. Network errors,
+        // 5xx and 401 leave the target unverified: keep replacement semantics.
+        const httpStatus = err?.status ?? null;
+        const gone = typeof httpStatus === 'number'
+          && httpStatus >= 400 && httpStatus < 500 && httpStatus !== 401;
+        if (!cancelled && gone) clearReplacementContext();
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
 
   // Booking Modal States
   const [showChildModal, setShowChildModal] = useState(false);
@@ -270,6 +326,7 @@ export default function BabySitterDetails() {
         showToast?.('Replacement request sent.', { type: 'success' });
         setShowChildModal(false);
         // Clear the flow so a later normal booking is not mistaken for one.
+        setReplacementFlow(null);
         try { localStorage.removeItem('lastBookingSearch'); } catch { /* storage unavailable */ }
         navigate('/my-jobs');
         return;
@@ -525,6 +582,20 @@ export default function BabySitterDetails() {
               );
             })}
           </div>
+          {/* Remediation — Step 3 (task allocation) now renders IMMEDIATELY
+              after Step 1 so the six predefined tasks are unmissable in the
+              normal booking flow, before the schedule. Hidden ONLY while a
+              validated replacement is active: the submit path then invites a
+              sitter to an EXISTING job and cannot change that job's allocation.
+              Disabled until a child is selected so tasks never belong to an
+              ambiguous booking, and disabled while a request is in flight. */}
+          {!isReplacement && (
+            <AssignedTaskSelector
+              selectedTasks={selectedTasks}
+              onChange={setSelectedTasks}
+              disabled={requesting || !(allChildrenSelected || selectedChildIds.length > 0)}
+            />
+          )}
           {/* Step 2 is ALWAYS read-only (Phase 8L): the parent already chose this
               schedule in the search filters (lockedSearch / lastBookingSearch).
               Re-asking here invited the parent to change dates or weekdays and
@@ -606,23 +677,8 @@ export default function BabySitterDetails() {
               )}
             </div>
           </div>
-          {/* Phase 10.0 — Step 3: task allocation. Hidden in the replacement
-              flow, where the submit path invites a sitter to an EXISTING job
-              and cannot change that job's allocation. Disabled until a child
-              is selected so tasks never belong to an ambiguous booking, and
-              disabled while a request is in flight. */}
-          {!isReplacement && (
-            <>
-              <p style={{ margin: '0 0 8px', fontSize: '12px', fontWeight: 700, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.6px' }}>Step 3: Today&apos;s Required Tasks</p>
-              <AssignedTaskSelector
-                selectedTasks={selectedTasks}
-                onChange={setSelectedTasks}
-                disabled={requesting || !(allChildrenSelected || selectedChildIds.length > 0)}
-              />
-            </>
-          )}
           {/* Locked Booking Summary Card */}
-          <p style={{ margin: '0 0 8px', fontSize: '12px', fontWeight: 700, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.6px' }}>Step 4: Booking Summary</p>
+          <p style={{ margin: '0 0 8px', fontSize: '12px', fontWeight: 700, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.6px' }}>Step 3: Booking Summary</p>
           <div style={{ background: 'rgb(var(--surface-rgb) / 0.7)', borderRadius: 16, padding: 14, marginBottom: 20, border: '1px solid rgb(var(--primary-rgb) / 0.15)' }}>
             <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0.5, color: 'var(--color-text-muted)', marginBottom: 8 }}>BOOKING SUMMARY (LOCKED FROM YOUR SEARCH)</div>
             <div style={{ display: 'flex', gap: 10, marginBottom: 8 }}>
@@ -656,9 +712,9 @@ export default function BabySitterDetails() {
               <div style={{ display: 'flex', gap: 10 }}>
                 <span>✅</span>
                 <div>
-                  <div style={{ fontWeight: 600 }}>Required Tasks</div>
+                  <div style={{ fontWeight: 600 }}>Today&apos;s Required Tasks</div>
                   {summaryTasks.length === 0 ? (
-                    <div style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>None requested</div>
+                    <div style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>No additional tasks selected</div>
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 2, marginTop: 2 }}>
                       {summaryTasks.map((task) => (

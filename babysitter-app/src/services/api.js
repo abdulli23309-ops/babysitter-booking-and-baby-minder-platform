@@ -289,9 +289,10 @@ export const API = {
       return await apiPost('/independent-monitoring/feeding/request', { jobId, childId });
     } catch (err) {
       const raw = err?.originalError?.response;
-      const status = err?.status ?? raw?.status ?? null;
       const body = raw?.data;
-      const serverMessage = typeof body === 'string' && body.trim() ? body.trim() : null;
+      const serverMessage = typeof body === 'string' && body.trim()
+        ? body.trim()
+        : (body?.Message || body?.message || null);
       const failure = new Error(
         serverMessage || err?.message || 'The feeding video could not be requested.'
       );

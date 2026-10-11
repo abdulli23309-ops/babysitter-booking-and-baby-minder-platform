@@ -128,6 +128,53 @@ namespace WebApplication2.Services.Implementations
                 return null;
             }
 
+            // Stale request auto-expiry sweep: safely transition any abandoned 'Requested' rows
+            // older than 120 seconds to 'Failed' with an honest reason. This releases the
+            // UX_FeedingRecording_Active index slot without needing in-memory timers.
+            _db.Database.ExecuteSqlCommand(
+                @"UPDATE dbo.FeedingRecording
+                     SET Status = 'Failed',
+                         FailureReason = 'Request timed out: No monitoring device claimed the request within the timeout window.',
+                         CompletedAtUtc = GETUTCDATE()
+                   WHERE Status = 'Requested'
+                     AND CreatedAtUtc < DATEADD(second, -120, GETUTCDATE());
+                  UPDATE dbo.FeedingRecording
+                     SET Status = 'Failed',
+                         FailureReason = 'Recording timed out: Device did not complete upload within the expected window.',
+                         CompletedAtUtc = GETUTCDATE()
+                   WHERE Status IN ('Recording', 'Uploading')
+                     AND CreatedAtUtc < DATEADD(second, -300, GETUTCDATE());");
+
+            // Verify that an active, non-revoked monitoring device is paired to this child.
+            int activeDevices = _db.Database.SqlQuery<int>(
+                @"SELECT COUNT(1)
+                    FROM dbo.MonitoringDeviceSession d
+                    JOIN dbo.IndependentMonitoringSession s ON s.IndependentMonitoringSession_ID = d.IndependentMonitoringSession_ID
+                   WHERE s.Child_ID = @p0 AND s.Status = 'Active' AND s.IsDeleted = 0
+                     AND d.RevokedAtUtc IS NULL AND d.ExpiresAtUtc > GETUTCDATE()",
+                childId).Single();
+
+            if (activeDevices == 0)
+            {
+                Trace.TraceInformation(
+                    "FeedingRecordingService: request refused for child {0}, no active monitoring device is paired.", childId);
+                return null;
+            }
+
+            // Verify that an active MonitorSession exists for this job and child.
+            int activeMonitorSessions = _db.Database.SqlQuery<int>(
+                @"SELECT COUNT(1)
+                    FROM dbo.MonitorSession m
+                   WHERE m.Job_ID = @p0 AND m.Child_ID = @p1 AND m.Status = 'Active' AND m.IsDeleted = 0",
+                jobId, childId).Single();
+
+            if (activeMonitorSessions == 0)
+            {
+                Trace.TraceInformation(
+                    "FeedingRecordingService: request refused for job {0}, child {1}, no active MonitorSession.", jobId, childId);
+                return null;
+            }
+
             var publicId = Guid.NewGuid();
             try
             {
@@ -142,20 +189,19 @@ namespace WebApplication2.Services.Implementations
             }
             catch (SqlException ex) when (ex.Number == 2601 || ex.Number == 2627)
             {
-   // are how UX_FeedingRecording_Active enforces "one in-flight
-   // request per Job+Child" at the storage layer. This is the
-         // server-side half of the double-click protection required by
-        // the feature brief: the client-side disable is a convenience,
-   // this is the actual control.
-    Trace.TraceInformation(
-  "FeedingRecordingService: a request already exists for job {0}, child {1}.", jobId, childId);
-        return null;
-   }
-
-         return ReadOne(publicId);
-        }
-
                 // 2601 = duplicate key, 2627 = unique constraint violation. Both
+                // are how UX_FeedingRecording_Active enforces "one in-flight
+                // request per Job+Child" at the storage layer. This is the
+                // server-side half of the double-click protection required by
+                // the feature brief: the client-side disable is a convenience,
+                // this is the actual control.
+                Trace.TraceInformation(
+                    "FeedingRecordingService: a request already exists for job {0}, child {1}.", jobId, childId);
+                return null;
+            }
+
+            return ReadOne(publicId);
+        }
 
         // ===================== PHONE 2 DISCOVERY =====================
 
@@ -363,6 +409,17 @@ namespace WebApplication2.Services.Implementations
         public IList<FeedingVideoDto> GetHistory(int jobId, int childId)
         {
             if (jobId <= 0 || childId <= 0) return new List<FeedingVideoDto>();
+
+            // Stale sweep: transition any uncompleted/abandoned request older than 120s
+            // so history reports it as an honest failure instead of an infinite wait.
+            _db.Database.ExecuteSqlCommand(
+                @"UPDATE dbo.FeedingRecording
+                     SET Status = 'Failed',
+                         FailureReason = 'Request timed out: No monitoring device claimed the request within the timeout window.',
+                         CompletedAtUtc = GETUTCDATE()
+                   WHERE Job_ID = @p0 AND Child_ID = @p1 AND Status = 'Requested'
+                     AND CreatedAtUtc < DATEADD(second, -120, GETUTCDATE());",
+                jobId, childId);
 
             var rows = _db.Database.SqlQuery<FeedingRow>(
                 @"SELECT TOP 200 PublicId, Job_ID, Child_ID, Status, CreatedAtUtc,

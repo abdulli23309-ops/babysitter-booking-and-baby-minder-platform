@@ -78,8 +78,16 @@ const LittleCareMark = () => (
    ("CONNECTION LOST", "Connection problem. Retrying.", "Preparing live video").
    Exactly two words are ever shown, and the colour is derived from the same
    `conferenceStatus` the rest of the panel uses, so the pill cannot disagree
-   with the surface it sits on. */
-function StatusPill({ live }) {
+   with the surface it sits on.
+
+   TRUTHFUL LABELS. The pill used to show "Reconnecting..." whenever the
+   surface was not live - including when the SERVER had conclusively said
+   there is no monitoring session at all. "Reconnecting" implies a dropped
+   connection that is being retried; an absent session is a different,
+   recoverable condition and is now named as such. "Reconnecting..." is
+   reserved for a genuine SFU transport failure (the only state where a
+   retry actually applies). */
+function StatusPill({ live, label }) {
   return (
     <div
       className={styles.statusPill}
@@ -88,7 +96,7 @@ function StatusPill({ live }) {
       aria-live="polite"
     >
       <span className={styles.statusDot} aria-hidden="true" />
-      <span className={styles.statusText}>{live ? 'Live' : 'Reconnecting...'}</span>
+      <span className={styles.statusText}>{live ? 'Live' : (label || 'Reconnecting...')}</span>
     </div>
   );
 }
@@ -121,6 +129,12 @@ function copyFor({ status, childName, reason }) {
       return { title: 'Not authorised to view', body: reason || 'You are not authorised to watch this child.', tone: 'blocked' };
     case 'error':
       return { title: 'Live video unavailable', body: reason || 'The live video service could not be reached.', tone: 'blocked' };
+    case 'no-selection':
+      return {
+        title: 'Please select a child',
+        body: 'Select which child you want to monitor from the session above.',
+        tone: 'neutral',
+      };
     case 'idle':
     default:
       return { title: 'No active monitoring session', body: 'Start Child Mode to monitor this child.', tone: 'neutral' };
@@ -579,23 +593,38 @@ export default function MonitoringMediaPanel({
        vocabulary inside the feed. */
     /* Each label describes exactly one condition, and none of them is reachable
        from a REST failure. "Reconnecting" is reserved for a real SFU transport
-       failure; every other state is about opening the room. */
+       failure; every other state is about opening the room - or, when the
+       SERVER said there is no session, about the session simply not existing
+       yet, which must never masquerade as a connection problem. */
     const stateLabel = !frameSrc
-      ? 'Preparing live video'
+      ? (status === 'idle' ? 'Monitoring off'
+        : status === 'no-session' ? 'Session not started'
+        : 'Preparing live video')
       : transportValue === 'failed'
         ? 'Reconnecting'
         : feedIsLive
           ? 'Monitoring active'
           : 'Opening monitoring room';
-    /* PHASE 9.2 - the pill is LIVE whenever the surface is actually usable, and
-       is only "Reconnecting..." when the SFU itself reported a failure. It reads
-       `feedIsLive` rather than re-deriving the condition, so the pill cannot
-       drift out of step with the status the rest of the panel shows. */
+    /* PHASE 9.2 - the pill is LIVE whenever the surface is actually usable.
+       It reads `feedIsLive` rather than re-deriving the condition, so the
+       pill cannot drift out of step with the status the rest of the panel
+       shows. When it is NOT live, the label names the actual condition:
+       a genuine transport failure still says "Reconnecting...", but an
+       absent session (the server answered conclusively) says so instead. */
     const pillLive = Boolean(frameSrc) && feedIsLive;
+    const pillLabel = pillLive
+      ? 'Live'
+      : transportValue === 'failed'
+        ? 'Reconnecting...'
+        : status === 'idle' ? 'Monitoring off'
+        : status === 'no-session' ? 'Session not started'
+        : status === 'denied' ? 'Not authorised'
+        : status === 'unavailable' || status === 'error' ? 'Video unavailable'
+        : 'Connecting...';
     return (
       <section className={isStage ? styles.stageSurface : styles.mediaSurface} aria-label="Live monitoring media">
         <div className={frameClass} data-state={conferenceStatus} data-variant={variant}>
-{showOwnChrome && isStage ? <StatusPill live={pillLive} /> : null}
+{showOwnChrome && isStage ? <StatusPill live={pillLive} label={pillLabel} /> : null}
           {frameSrc ? (
             /* The media surface. The SFU is a separate origin on purpose: it
                can neither read our DOM nor our session. The join URL carries
@@ -750,12 +779,12 @@ button says so rather than pretending an automatic retry is enough. */}
      is not going to reconnect, and pretending otherwise would be a lie. */
   const isStage = variant === 'stage';
   const isCinema = variant === 'cinema';
-  const waitingForFeed = status === 'loading' || status === 'no-session' || status === 'idle';
+  const isConnecting = status === 'loading';
   const emptyFrameClass = isStage || isCinema ? `${styles.frame} ${styles.stageFrame}` : styles.frame;
 
   return (
     <div className={emptyFrameClass} data-tone={tone} data-variant={variant}>
-      {isStage && waitingForFeed ? <StatusPill live={false} /> : null}
+      {isStage && isConnecting ? <StatusPill live={false} label="Connecting..." /> : null}
       <div className={`${styles.empty} ${isCinema ? styles.cinemaEmpty : ''}`} role="status" aria-live="polite">
         {isStage || isCinema ? <LittleCareMark /> : null}
         <div className={styles.emptyIcon} aria-hidden="true">

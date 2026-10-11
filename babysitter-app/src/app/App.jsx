@@ -143,6 +143,7 @@ function App() {
                   auth context. Route guarding only keeps signed-out users out;
                   every real action is still authorised server-side. */}
               <Route path="/active-job-details" element={<ProtectedRoute allowedRoles={['parent', 'babysitter']}><ActiveJobDetails /></ProtectedRoute>} />
+              <Route path="/active-job-details/:jobId" element={<ProtectedRoute allowedRoles={['parent', 'babysitter']}><ActiveJobDetails /></ProtectedRoute>} />
               <Route path="/completed-job-details" element={<ProtectedRoute allowedRoles={['babysitter']}><CompletedJobDetails /></ProtectedRoute>} />
               <Route path="/completed-job-details/:jobId" element={<ProtectedRoute allowedRoles={['babysitter']}><CompletedJobDetails /></ProtectedRoute>} />
               <Route path="/job-details" element={<ProtectedRoute allowedRoles={['babysitter']}><JobDetails /></ProtectedRoute>} />

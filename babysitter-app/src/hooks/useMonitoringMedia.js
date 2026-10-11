@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { API } from '../services/api';
 
 /**
@@ -144,9 +144,9 @@ export default function useMonitoringMedia(jobId, childId, enabled = true, refre
   }, [load]);
 
   return {
-    // No scope yet => nothing to show. Scope present but no matching result =>
-    // a request is genuinely in flight.
-    status: scopeKey ? (current?.status ?? 'loading') : 'idle',
+    // No scope yet => nothing to show. If enabled but no childId => 'no-selection'.
+    // Scope present but no matching result => a request is genuinely in flight.
+    status: scopeKey ? (current?.status ?? 'loading') : (enabled && !childId ? 'no-selection' : 'idle'),
     media: current?.media ?? null,
     // The SERVER says whether this participant may publish. Never derive it
     // locally from the user's role - that would be client-side authority.

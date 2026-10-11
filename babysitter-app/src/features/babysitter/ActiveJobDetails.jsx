@@ -68,11 +68,11 @@ export default function ActiveJobDetails() {
   const toast = useToast();
   const location = useLocation();
   const { jobId: routeJobId } = useParams();
-
+  const queryJobId = new URLSearchParams(location.search).get('jobId');
   const passedJob = location.state?.job;
   const numericJobId = routeJobId
     ? parseInt(routeJobId, 10)
-    : passedJob?.Job_ID ?? passedJob?.jobId ?? null;
+    : (queryJobId ? parseInt(queryJobId, 10) : (passedJob?.Job_ID ?? passedJob?.jobId ?? null));
 
   const [job, setJob] = useState(passedJob ?? null);
   // PHASE 9.9 - remembers WHICH child-photo URL failed, so a later job reload
@@ -105,6 +105,25 @@ export default function ActiveJobDetails() {
   const childParam = Number(location.search?.includes('childId=')
     ? new URLSearchParams(location.search).get('childId')
     : null) || Number(location.state?.childId) || null;
+
+  const [selectedChildId, setSelectedChildId] = useState(() => {
+    // Explicit URL/router selection wins; otherwise the per-job remembered
+    // pick is read ONCE at mount (lazy initialiser, not an effect - reading
+    // and setting state in an effect would cascade a render). The value is
+    // only a LOCATOR: `monitoredChild` below validates it against this
+    // job's server-returned Children, so a stale stored id resolves to
+    // null and the sitter is asked to select again.
+    if (childParam) return childParam;
+    if (numericJobId) {
+      try {
+        const stored = Number(window.sessionStorage.getItem(`lc:selectedChild:${numericJobId}`));
+        if (Number.isFinite(stored) && stored > 0) return stored;
+      } catch {
+        // Storage unavailable - the sitter will simply be asked to select.
+      }
+    }
+    return null;
+  });
 
   const [responding, setResponding] = useState(false);
   /* PHASE 3 - THE FIVE-STATE RECORDING MACHINE (replaces Phase 14's single
@@ -151,23 +170,73 @@ export default function ActiveJobDetails() {
     [job]
   );
 
-  /* PHASE 9.1 - the resolved monitored child (see the note above). A `childId`
-     from the URL wins when it matches a child on THIS booking; otherwise we
-     fall back to the first child. A stale or foreign childId therefore can
-     never produce a blank header - it just falls back, and the server would
-     refuse it anyway. */
+  /* WHICH CHILD IS BEING MONITORED / RECORDED
+     ------------------------------------------
+     A single-child booking IS the explicit selection: the booking fixed the
+     child, so there is nothing to choose. A multi-child job requires an
+     EXPLICIT selection - from the ?childId= URL parameter or the per-job
+     remembered pick, both VALIDATED against this job's real Children below.
+     There is deliberately NO "first child" fallback: silently resolving
+     child #1 is exactly how a feeding request ended up targeting a child
+     the monitoring phone was not paired with. When nothing valid is
+     selected, `monitoredChild` is null and the UI asks the sitter to pick;
+     every server call still re-validates (jobId, childId) regardless. */
   const monitoredChild = useMemo(() => {
     if (children.length === 0) return null;
-    if (childParam) {
-      const match = children.find((c) => Number(c.Child_ID ?? c.ChildId) === childParam);
-      if (match) return match;
+    if (children.length === 1) return children[0];
+    const targetId = Number(selectedChildId ?? childParam);
+    if (!Number.isFinite(targetId) || targetId <= 0) return null;
+    return children.find((c) => Number(c.Child_ID ?? c.ChildId) === targetId) ?? null;
+  }, [children, selectedChildId, childParam]);
+
+  // REMEMBER the selection per job so normal screen transitions do not lose
+  // it. sessionStorage is a LOCATOR only - it is always validated against
+  // the job's server-returned Children before use, and every action
+  // re-authorizes on the server, so a stale or tampered stored id can never
+  // widen access or target a child outside this job.
+  useEffect(() => {
+    if (selectedChildId == null || !numericJobId) return;
+    try {
+      window.sessionStorage.setItem(`lc:selectedChild:${numericJobId}`, String(selectedChildId));
+    } catch {
+      // Storage unavailable (private mode/quota): selection just will not
+      // survive a reload; nothing else depends on it.
     }
-    return children[0];
-  }, [children, childParam]);
+  }, [numericJobId, selectedChildId]);
+
+  const [pairedChildId, setPairedChildId] = useState(null);
+
+  useEffect(() => {
+    let alive = true;
+    API.getAccessibleMonitoringScopes().then((scopes) => {
+      if (!alive) return;
+      const list = Array.isArray(scopes) ? scopes : [];
+      const paired = list.find((s) => s.HasPairedDevice && children.some((c) => Number(c.Child_ID ?? c.ChildId) === s.ChildId));
+      if (paired) {
+        setPairedChildId(paired.ChildId);
+        // If no explicit selection exists, automatically select the authoritative paired child
+        setSelectedChildId((curr) => curr ?? paired.ChildId);
+      }
+    }).catch(() => { /* safe ignore */ });
+    return () => { alive = false; };
+  }, [children]);
+
+  const handleSelectChild = (childId) => {
+    const numeric = Number(childId);
+    setSelectedChildId(numeric);
+    try {
+      const params = new URLSearchParams(location.search);
+      if (numericJobId) params.set('jobId', String(numericJobId));
+      params.set('childId', String(numeric));
+      navigate({ search: params.toString() }, { replace: true });
+    } catch {
+      // safe fallback
+    }
+  };
 
   // The children are fixed by the BOOKING (JobChildren) and are only ever
-  // REPORTED by this screen. Which child the monitoring phone watches is now
-  // RESOLVED server-side (see above), not picked from a dropdown.
+  // REPORTED by this screen. The monitoring scope is the EXPLICITLY selected
+  // child (resolved above); the server re-validates it on every call.
 
   const monitoring = useMonitoring({
     jobId: numericJobId,
@@ -294,7 +363,15 @@ export default function ActiveJobDetails() {
     const jobId = Number(numericJobId);
     const childId = Number(monitoredChild?.Child_ID ?? monitoredChild?.ChildId);
     if (!jobId || !childId) {
-      toast.error('We could not work out which child to record.');
+      // An unresolved scope must NEVER become a request. Multi-child jobs
+      // now require an explicit selection; a single-child job whose
+      // Children have not loaded yet is reported honestly rather than
+      // guessed at from list position or a display name.
+      toast.error(
+        children.length > 1
+          ? 'Please select a child before recording.'
+          : 'We could not load this booking\u2019s children yet, so the recording target is unknown. Please try again in a moment.'
+      );
       return;
     }
     if (recordingState === 'requesting') return;
@@ -336,12 +413,17 @@ export default function ActiveJobDetails() {
         // the specific storage reason stays visible on the status card.
         toast.error('Feeding logged, but the recording could not be requested.');
       } else {
+        // The SERVER's refusal is the authoritative explanation - e.g.
+        // "No monitoring phone is currently paired to this child..." (the
+        // phone is paired to a SIBLING of the selected child) or "No active
+        // monitoring session was found for this child...". Show THAT
+        // message in the toast: the old fixed "Feeding logged, but..."
+        // prefix was both misleading (nothing was logged) and hid the one
+        // line that tells the sitter how to recover.
         const message = err?.message || 'The feeding video could not be requested.';
         setRecordingDetail({ message });
         setRecordingState('failed');
-        // Feeding log + request verdict are reported separately (Phase 9.3);
-        // the underlying error stays visible on the status card.
-        toast.error('Feeding logged, but the recording could not be requested.');
+        toast.error(message);
       }
     }
   };
@@ -387,16 +469,23 @@ export default function ActiveJobDetails() {
   };
 
 
-  // Hydrate from the API when no job was passed via navigation state.
+  // Hydrate from the API. A navigation-state snapshot is only a fast-paint
+  // seed: it is NOT authoritative. This effect used to skip whenever
+  // `passedJob` existed, so a snapshot missing `Children` (or carrying a
+  // stale child list) left this screen permanently unable to resolve which
+  // child to monitor or record - the "could not work out which child to
+  // record" dead end. The API response now always wins, merged over the
+  // seed exactly like the parent's Active Session screen does.
   useEffect(() => {
-    if (!numericJobId || passedJob) return undefined;
+    if (!numericJobId) return undefined;
     let isMounted = true;
     (async () => {
       try {
         const data = await API.getJobDetails(numericJobId);
-        if (isMounted) setJob(data ?? null);
+        if (isMounted && data) setJob((prev) => ({ ...(prev || {}), ...data }));
       } catch (err) {
-        if (isMounted) setJob(null);
+        // Keep the fast-paint snapshot on a failed refresh rather than
+        // wiping the screen; the background poll below keeps retrying.
         const _message = err && err.message ? err.message : 'Something went wrong. Please try again.';
         toast.error(_message);
       } finally {
@@ -406,7 +495,7 @@ export default function ActiveJobDetails() {
     return () => {
       isMounted = false;
     };
-  }, [numericJobId, passedJob, toast]);
+  }, [numericJobId, toast]);
 
   // ── Sitter review trigger ──
   // The parent ends the session from their own screen. This screen has no
@@ -636,31 +725,62 @@ export default function ActiveJobDetails() {
           <div className={styles.headerSpacer} />
         </div>
 
-        {/* ── Children in this session (READ-ONLY) ──
-            The booking already established who is being cared for
-            (JobChildren), so the general active-session area only REPORTS the
-            children. It never asks the sitter to choose one. With a single
-            child the existing "Caring for ..." line above already says it, so
-            this list is rendered only when there is more than one - exactly the
-            case where the old "Child to monitor" dropdown used to appear. */}
+        {/* ── Children in this session (Interactive Child Selector) ──
+            In multi-child jobs, the sitter can tap any child to switch the active
+            monitoring/recording scope. The selected child is clearly highlighted. */}
         {childCount > 1 ? (
           <div className={styles.sessionChildrenCard}>
             <p className={styles.sessionChildrenLabel}>
-              Children in this session ({childCount})
+              Children in this session ({childCount}) — Tap to switch active child
             </p>
-            <ul className={styles.sessionChildrenList}>
-              {children.map((c, i) => (
-                <li key={c.Child_ID ?? i} className={styles.sessionChildRow}>
-                  <span aria-hidden="true">👶</span>
-                  <span>{c.ChildName ?? `Child ${c.Child_ID}`}</span>
-                  {c.ChildAge != null ? (
-                    <span className={styles.sessionChildAge}>
-                      · {c.ChildAge}y
-                    </span>
-                  ) : null}
-                </li>
-              ))}
-            </ul>
+            {!monitoredChild ? (
+              /* No explicit selection yet: SAY SO. The old behaviour silently
+                 fell back to the first child, which is how a feeding request
+                 ended up aimed at a child the monitoring phone was not
+                 paired with. */
+              <p className={styles.sessionChildrenPrompt} role="status">
+                Please select a child to monitor and record.
+              </p>
+            ) : null}
+            <div className={styles.sessionChildrenList} role="tablist" aria-label="Children in this session">
+              {children.map((c, i) => {
+                const cId = Number(c.Child_ID ?? c.ChildId ?? i);
+                const isSelected = Number(monitoredChild?.Child_ID ?? monitoredChild?.ChildId) === cId;
+                const isPaired = Number(pairedChildId) === cId;
+                return (
+                  <button
+                    key={cId}
+                    type="button"
+                    role="tab"
+                    aria-selected={isSelected}
+                    className={`${styles.sessionChildBtn} ${isSelected ? styles.sessionChildBtnActive : ''}`}
+                    onClick={() => handleSelectChild(cId)}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span aria-hidden="true">👶</span>
+                      <span style={{ fontWeight: 600 }}>{c.ChildName ?? `Child ${cId}`}</span>
+                      {c.ChildAge != null ? (
+                        <span className={styles.sessionChildAge}>
+                          · {c.ChildAge}y
+                        </span>
+                      ) : null}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      {isPaired && (
+                        <span className={styles.sessionChildPairedBadge} title="Phone 2 is paired with this child">
+                          📱 Phone 2 Paired
+                        </span>
+                      )}
+                      {isSelected && (
+                        <span className={styles.sessionChildSelectedBadge}>
+                          Active Monitoring
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         ) : null}
 
@@ -726,17 +846,23 @@ export default function ActiveJobDetails() {
           * video endpoint right after the care note is entered. It is wired
           * HERE because this is where the authenticated bearer token and
   * the resolved job/child scope both already exist. */
-           disabled={!jobIsLive}
+           disabled={!jobIsLive || !monitoredChild}
          onRequestRecording={requestFeedingRecording}
                      recordingState={recordingState}
             recordingDetail={recordingDetail}
                 /* Actions only mean something while a session is genuinely
    running, and the panel says why rather than going dead
       silently. */
+                /* Actions only mean something while a session is genuinely
+   running, and the panel says why rather than going dead
+      silently. A multi-child job with no explicit selection is a
+      distinct, recoverable state and is named as such. */
                 disabledReason={
-                  jobIsLive
-                    ? ''
-                    : 'Care actions become available once this session is in progress.'
+                  !jobIsLive
+                    ? 'Care actions become available once this session is in progress.'
+                    : !monitoredChild
+                      ? 'Please select a child above before recording a feeding video.'
+                      : ''
                 }
               />
             )}

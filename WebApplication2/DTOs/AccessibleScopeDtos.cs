@@ -20,6 +20,8 @@ namespace WebApplication2.DTOs
         public string ChildName { get; set; }
         public string Status { get; set; }
         public int MonitorSession_ID { get; set; }
+        public int HasPairedDevice { get; set; }
+        public int DeviceConnected { get; set; }
     }
 
     /// <summary>
@@ -53,5 +55,15 @@ namespace WebApplication2.DTOs
         /// UI can show "connected" without inventing it.
         /// </summary>
         public bool HasActiveSession { get; set; }
+
+        /// <summary>
+        /// True when an active, non-revoked Phone 2 device session is paired to this child.
+        /// </summary>
+        public bool HasPairedDevice { get; set; }
+
+        /// <summary>
+        /// True when the paired Phone 2 device has sent a heartbeat recently.
+        /// </summary>
+        public bool DeviceConnected { get; set; }
     }
 }

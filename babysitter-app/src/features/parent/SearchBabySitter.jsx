@@ -242,20 +242,14 @@ export default function SearchBabySitter() {
         setSitters(activeOnly);
         try {
           // Phase 8K: preserve the flow keys the BookingStatus CTA wrote.
-          // This write used to be a wholesale replace, which silently dropped
-          // `targetJobId` on the very first successful search — so
-          // BabySitterDetails never detected the replacement flow and fell
-          // through to createJob, minting a duplicate job on today's date.
-          // Spreading `existing` first keeps targetJobId (and any future flow
-          // marker) alive across searches. `autoSearch` is intentionally NOT
-          // re-added: the mount effect already consumed it.
+          // Write search parameters to lastBookingSearch. Only carry
+          // targetJobId if this search is explicitly in an active replacement flow.
           const existing = (() => {
             try { return JSON.parse(localStorage.getItem('lastBookingSearch') || 'null'); }
             catch { return null; }
           })();
 
-          localStorage.setItem('lastBookingSearch', JSON.stringify({
-            ...(existing && typeof existing === 'object' ? existing : {}),
+          const searchPayload = {
             StartDate: activeStartD,
             EndDate: sanitizedEndDate,
             StartTime: activeStartT,
@@ -266,7 +260,13 @@ export default function SearchBabySitter() {
             Address: resolvedAddress,
             Latitude: activeLat,
             Longitude: activeLng,
-          }));
+          };
+
+          if (stored?.autoSearch && existing?.targetJobId) {
+            searchPayload.targetJobId = existing.targetJobId;
+          }
+
+          localStorage.setItem('lastBookingSearch', JSON.stringify(searchPayload));
         } catch { /* storage full or unavailable */ }
       } else {
         setSitters([]);
@@ -397,9 +397,17 @@ export default function SearchBabySitter() {
     const isOneDay = availabilityType === 'One Day';
     const sanitizedEndDate = isOneDay ? startDate : endDate;
     const daysList = isOneDay ? [] : Object.keys(selectedDays).filter((d) => selectedDays[d]);
+    const storedSearch = (() => {
+      try { return JSON.parse(localStorage.getItem('lastBookingSearch') || 'null'); }
+      catch { return null; }
+    })();
+    const targetJobId = storedSearch?.targetJobId || null;
+    const isReplacement = Boolean(targetJobId);
     navigate('/babysitter-details', {
       state: {
         sitter,
+        isReplacement,
+        targetJobId,
         searchParams: {
           startDate,
           endDate: sanitizedEndDate,

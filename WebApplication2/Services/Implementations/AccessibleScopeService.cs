@@ -69,7 +69,20 @@ namespace WebApplication2.Services.Implementations
             // SQL - the same approved approach used by the monitoring services.
             const string sql = @"
 SELECT DISTINCT j.Job_ID, jc.Child_ID, c.ChildName, j.Status,
-       ISNULL(ms.MonitorSession_ID, 0) AS MonitorSession_ID
+       ISNULL(ms.MonitorSession_ID, 0) AS MonitorSession_ID,
+       CASE WHEN EXISTS (
+           SELECT 1 FROM dbo.MonitoringDeviceSession d
+           JOIN dbo.IndependentMonitoringSession ims ON ims.IndependentMonitoringSession_ID = d.IndependentMonitoringSession_ID
+           WHERE ims.Child_ID = jc.Child_ID AND ims.Status = 'Active' AND ims.IsDeleted = 0
+             AND d.RevokedAtUtc IS NULL AND d.ExpiresAtUtc > GETUTCDATE()
+       ) THEN 1 ELSE 0 END AS HasPairedDevice,
+       CASE WHEN EXISTS (
+           SELECT 1 FROM dbo.MonitoringDeviceSession d
+           JOIN dbo.IndependentMonitoringSession ims ON ims.IndependentMonitoringSession_ID = d.IndependentMonitoringSession_ID
+           WHERE ims.Child_ID = jc.Child_ID AND ims.Status = 'Active' AND ims.IsDeleted = 0
+             AND d.RevokedAtUtc IS NULL AND d.ExpiresAtUtc > GETUTCDATE()
+             AND d.LastSeenAtUtc > DATEADD(second, -60, GETUTCDATE())
+       ) THEN 1 ELSE 0 END AS DeviceConnected
 FROM Job j
 JOIN JobChildren jc ON jc.Job_ID = j.Job_ID AND jc.IsDeleted = 0
 JOIN Child c        ON c.Child_ID = jc.Child_ID  AND c.IsDeleted = 0
@@ -89,7 +102,20 @@ SELECT 0 AS Job_ID, c.Child_ID, c.ChildName, CAST('Independent' AS NVARCHAR(50))
          SELECT 1 FROM dbo.IndependentMonitoringSession ims
          WHERE ims.Parent_ID = @p0 AND ims.Child_ID = c.Child_ID
          AND ims.Status = 'Active' AND ims.IsDeleted = 0
-     ) THEN 1 ELSE 0 END AS MonitorSession_ID
+     ) THEN 1 ELSE 0 END AS MonitorSession_ID,
+     CASE WHEN EXISTS (
+         SELECT 1 FROM dbo.MonitoringDeviceSession d
+         JOIN dbo.IndependentMonitoringSession ims ON ims.IndependentMonitoringSession_ID = d.IndependentMonitoringSession_ID
+         WHERE ims.Parent_ID = @p0 AND ims.Child_ID = c.Child_ID AND ims.Status = 'Active' AND ims.IsDeleted = 0
+           AND d.RevokedAtUtc IS NULL AND d.ExpiresAtUtc > GETUTCDATE()
+     ) THEN 1 ELSE 0 END AS HasPairedDevice,
+     CASE WHEN EXISTS (
+         SELECT 1 FROM dbo.MonitoringDeviceSession d
+         JOIN dbo.IndependentMonitoringSession ims ON ims.IndependentMonitoringSession_ID = d.IndependentMonitoringSession_ID
+         WHERE ims.Parent_ID = @p0 AND ims.Child_ID = c.Child_ID AND ims.Status = 'Active' AND ims.IsDeleted = 0
+           AND d.RevokedAtUtc IS NULL AND d.ExpiresAtUtc > GETUTCDATE()
+           AND d.LastSeenAtUtc > DATEADD(second, -60, GETUTCDATE())
+     ) THEN 1 ELSE 0 END AS DeviceConnected
 FROM Child c
 JOIN ChildGuardian cg ON cg.Child_ID = c.Child_ID AND cg.Parent_ID = @p0 AND cg.IsDeleted = 0
 WHERE @p1 = 1 AND c.IsDeleted = 0
@@ -114,10 +140,14 @@ WHERE @p1 = 1 AND c.IsDeleted = 0
                 ChildName = r.ChildName,
                 JobStatus = r.Status,
                 Via = isParent ? "Guardian" : "AssignedSitter",
-                HasActiveSession = r.MonitorSession_ID > 0
+                HasActiveSession = r.MonitorSession_ID > 0,
+                HasPairedDevice = r.HasPairedDevice == 1,
+                DeviceConnected = r.DeviceConnected == 1
             })
-            // Most useful first: a live session, then the newest job.
-            .OrderByDescending(s => s.HasActiveSession)
+            // Most useful first: connected device, paired device, active session, then newest job.
+            .OrderByDescending(s => s.DeviceConnected)
+            .ThenByDescending(s => s.HasPairedDevice)
+            .ThenByDescending(s => s.HasActiveSession)
             .ThenByDescending(s => s.JobId)
             .ToList();
         }

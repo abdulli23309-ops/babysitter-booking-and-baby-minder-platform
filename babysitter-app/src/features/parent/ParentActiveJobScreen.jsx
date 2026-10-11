@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
@@ -85,16 +85,60 @@ export default function ParentActiveJobScreen() {
   // ==================================================================
   // Children are fixed by the BOOKING (JobChildren)
   // ------------------------------------------------------------------
-  // This screen only ever REPORTS them. The parent is never asked to re-select
-  // which child the sitter is caring for, and monitoring scope is chosen inside
-  // the monitoring flow, never here.
-  //
-  // These declarations and the hook below MUST stay above every early return,
-  // otherwise the hook order changes between renders
-  // (react-hooks/rules-of-hooks).
-  const sessionChildren = job?.Children ?? job?.children ?? [];
-  const monitorChildId = sessionChildren[0]?.Child_ID ?? null;
-  const monitorChildName = sessionChildren[0]?.ChildName ?? job?.ChildName ?? null;
+  // In multi-child jobs, the parent can select which child to view
+  // monitoring status and feeding recordings for.
+  // Memoised: this array is a dependency of the paired-device effect below,
+  // so an inline `?? []` would re-create it every render and re-fire the
+  // effect each time.
+  const sessionChildren = useMemo(
+    () => job?.Children ?? job?.children ?? [],
+    [job]
+  );
+  const childParam = Number(new URLSearchParams(location.search).get('childId'))
+    || Number(location.state?.childId)
+    || null;
+  const [selectedChildId, setSelectedChildId] = useState(() => childParam);
+  const [pairedChildId, setPairedChildId] = useState(null);
+
+  useEffect(() => {
+    let alive = true;
+    API.getAccessibleMonitoringScopes().then((scopes) => {
+      if (!alive) return;
+      const list = Array.isArray(scopes) ? scopes : [];
+      const paired = list.find((s) => s.HasPairedDevice && sessionChildren.some((c) => Number(c.Child_ID ?? c.ChildId) === s.ChildId));
+      if (paired) {
+        setPairedChildId(paired.ChildId);
+        setSelectedChildId((curr) => curr ?? paired.ChildId);
+      }
+    }).catch(() => { /* safe ignore */ });
+    return () => { alive = false; };
+  }, [sessionChildren]);
+
+  const handleSelectChild = (cId) => {
+    setSelectedChildId(cId);
+    try {
+      const params = new URLSearchParams(location.search);
+      params.set('childId', String(cId));
+      navigate({ search: params.toString() }, { replace: true });
+    } catch {
+      // safe fallback
+    }
+  };
+
+  // EXPLICIT selection. A single-child booking IS the selection; a
+  // multi-child job requires the parent to tap a child above (or auto-selects
+  // the authoritative paired child from the backend). There is no
+  // silent "first child" fallback: attributing monitoring status and
+  // feeding recordings to child #1 by default is how the wrong child's
+  // data gets presented as if it were the selected one.
+  const activeSelectedChild = sessionChildren.length === 1
+    ? sessionChildren[0]
+    : sessionChildren.find(
+        (c) => Number(c.Child_ID ?? c.ChildId) === Number(selectedChildId)
+      ) || null;
+
+  const monitorChildId = activeSelectedChild?.Child_ID ?? null;
+  const monitorChildName = activeSelectedChild?.ChildName ?? job?.ChildName ?? null;
 
   // CHILD MONITORING is a SEPARATE fact from the babysitting session: the
   // session stays In Progress while the monitoring connection can be Lost,
@@ -381,27 +425,59 @@ export default function ParentActiveJobScreen() {
         </div>
       </div>
 
-      {/* ── Children in this session (READ-ONLY) ──
-          The booking already established who is being cared for, so the parent
-          is never asked to pick a child on this screen. With one child the chip
-          on the caregiver card above already names them, so this list is
-          rendered only when there is more than one. */}
+      {/* ── Children in this session (Interactive Child Selector) ──
+          In multi-child jobs, the parent can select which child to view
+          monitoring status and feeding recordings for. */}
       {sessionChildren.length > 1 ? (
         <div className={styles.sessionChildrenCard}>
           <p className={styles.sessionChildrenLabel}>
-            Children in this session ({sessionChildren.length})
+            Children in this session ({sessionChildren.length}) — Tap to view child
           </p>
-          <ul className={styles.sessionChildrenList}>
-            {sessionChildren.map((c, i) => (
-              <li key={c.Child_ID ?? i} className={styles.sessionChildRow}>
-                <span aria-hidden="true">👶</span>
-                <span>{c.ChildName ?? `Child ${c.Child_ID}`}</span>
-                {c.ChildAge != null ? (
-                  <span className={styles.sessionChildAge}>· {c.ChildAge}y</span>
-                ) : null}
-              </li>
-            ))}
-          </ul>
+          {!monitorChildId ? (
+            /* No explicit selection yet: say so rather than silently
+               presenting the first child's monitoring state and feeding
+               recordings as if they belonged to everyone. */
+            <p className={styles.sessionChildrenPrompt} role="status">
+              Please select a child to view their monitoring status and recordings.
+            </p>
+          ) : null}
+          <div className={styles.sessionChildrenList} role="tablist" aria-label="Children in this session">
+            {sessionChildren.map((c, i) => {
+              const cId = Number(c.Child_ID ?? c.ChildId ?? i);
+              const isSelected = Number(monitorChildId) === cId;
+              const isPaired = Number(pairedChildId) === cId;
+              return (
+                <button
+                  key={cId}
+                  type="button"
+                  role="tab"
+                  aria-selected={isSelected}
+                  className={`${styles.sessionChildBtn} ${isSelected ? styles.sessionChildBtnActive : ''}`}
+                  onClick={() => handleSelectChild(cId)}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span aria-hidden="true">👶</span>
+                    <span style={{ fontWeight: 600 }}>{c.ChildName ?? `Child ${cId}`}</span>
+                    {c.ChildAge != null ? (
+                      <span className={styles.sessionChildAge}>· {c.ChildAge}y</span>
+                    ) : null}
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    {isPaired && (
+                      <span className={styles.sessionChildPairedBadge} title="Phone 2 is paired with this child">
+                        📱 Phone 2 Paired
+                      </span>
+                    )}
+                    {isSelected && (
+                      <span className={styles.sessionChildSelectedBadge}>
+                        Selected
+                      </span>
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
         </div>
       ) : null}
 
@@ -537,7 +613,9 @@ export default function ParentActiveJobScreen() {
             <span className={styles.infoLabel} style={{ marginTop: 8 }}>
               {monitorChildId
                 ? `Live status, cry alerts, pause and do-not-disturb for ${monitorChildName ?? childName}.`
-                : 'Monitoring becomes available once this booking has a child attached.'}
+                : sessionChildren.length > 1
+                  ? 'Select a child above to open their live monitoring.'
+                  : 'Monitoring becomes available once this booking has a child attached.'}
             </span>
           </div>
         </div>
