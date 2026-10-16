@@ -34,6 +34,13 @@ namespace WebApplication2.DTOs
         // server-side against AssignedTaskCatalog before persistence. Optional:
         // absent/null/empty means the booking requests zero tasks.
         public List<string> AssignedTasks { get; set; }
+
+        // Phase 1A - idempotency key for SERIES creation. One GUID per logical
+        // booking-modal submission; reused by the client across retries so a
+        // duplicate/concurrent request replays the original series instead of
+        // creating a second one. Optional for API compatibility; single-day
+        // bookings do not use it.
+        public string ClientRequestId { get; set; }
     }
 
     public class CreateJobResult
@@ -43,6 +50,15 @@ namespace WebApplication2.DTOs
         public int JobId { get; set; }
         public int? JobSeries_ID { get; set; }
         public int SeriesCount { get; set; }   // how many jobs were created
+
+        // Phase 1A - true when this response replays a previously COMMITTED
+        // series for the same ClientRequestId (no new rows were created).
+        public bool IdempotentReplay { get; set; }
+
+        // Phase 3G - true when the server could not create a recurring series
+        // because the dbo.JobSeries schema is absent. The client should downgrade
+        // to a single-day booking instead of retrying the series.
+        public bool PreferSingleDay { get; set; }
     }
 
     public class ParentJobSlotTimeDto

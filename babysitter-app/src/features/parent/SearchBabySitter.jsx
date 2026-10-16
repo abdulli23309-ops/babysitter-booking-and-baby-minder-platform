@@ -6,7 +6,7 @@ import UserAvatar from '../../components/ui/UserAvatar';
 import { useAuth } from '../auth/AuthContext';
 import { useToast } from '../../components/ui/ToastContext';
 import { API } from '../../services/api';
-import { formatLocalDate, todayISO, addDaysISO } from '../../utils/dateUtils';
+import { formatLocalDate, todayISO, addDaysISO, daysBetweenISO, validateSeriesRange, DEFAULT_SERIES_WINDOW_DAYS, MAX_SERIES_SPAN_DAYS } from '../../utils/dateUtils';
 import LocationPointPicker from '../../components/ui/LocationPointPicker';
 import styles from './search-babysitter.module.css';
 
@@ -591,6 +591,57 @@ export default function SearchBabySitter() {
             </div>
           </div>
         </div>
+
+        {/* Phase C: the END DATE above is pre-filled with a 30-calendar-day
+            window (today .. today + 29) as a DEFAULT — not a cap. Say so
+            explicitly, and mirror the server's span/occurrence rules live so a
+            parent never carries a range JobService will reject into the
+            booking modal. Validation only runs once at least one weekday is
+            selected, so an untouched form shows no spurious error. */}
+        {availabilityType === 'Repeat Days' && (() => {
+          const activeDays = Object.keys(selectedDays).filter((d) => selectedDays[d]);
+          const isDefaultWindow = endDate === addDaysISO(startDate || todayISO(), DEFAULT_SERIES_WINDOW_DAYS);
+          const rawSpan = daysBetweenISO(startDate, endDate);
+          const check = activeDays.length > 0
+            ? validateSeriesRange(startDate, endDate, activeDays)
+            : null;
+          return (
+            <div
+              role="status"
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 6,
+                padding: '10px 14px',
+                borderRadius: 12,
+                background: check && !check.ok
+                  ? 'var(--color-danger-tint, rgba(220, 38, 38, 0.08))'
+                  : 'var(--color-surface-sunken)',
+                border: check && !check.ok
+                  ? '1px solid var(--color-danger-border-strong, rgba(220, 38, 38, 0.35))'
+                  : '1px solid var(--color-border-subtle)',
+                fontSize: 13,
+                color: 'var(--color-text-muted)',
+              }}
+            >
+              <span>
+                {isDefaultWindow
+                  ? `📅 Showing a ${DEFAULT_SERIES_WINDOW_DAYS + 1}-day window by default — extend the end date to book a longer period (up to ${MAX_SERIES_SPAN_DAYS} days).`
+                  : `📅 Custom range of ${Number.isNaN(rawSpan) ? 0 : rawSpan + 1} calendar days.`}
+              </span>
+              {check && check.ok && (
+                <span style={{ color: 'var(--color-success-strong, #15803d)', fontWeight: 600 }}>
+                  ✔ {check.occurrenceCount} booking day{check.occurrenceCount === 1 ? '' : 's'} will be created.
+                </span>
+              )}
+              {check && !check.ok && (
+                <span style={{ color: 'var(--color-danger-strong, #b91c1c)', fontWeight: 600 }}>
+                  ⚠ {check.error}
+                </span>
+              )}
+            </div>
+          );
+        })()}
 
         {/* Select Days (Only rendered for Repeat Days) */}
         {availabilityType === 'Repeat Days' && (

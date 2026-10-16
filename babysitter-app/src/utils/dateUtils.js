@@ -86,15 +86,89 @@ export function countSelectedWeekdays(startISO, endISO, dayKeys) {
   const wanted = new Set(dayKeys.map((day) => String(day).slice(0, 3).toLowerCase()));
   const cursor = new Date(`${startISO}T00:00:00`);
 
-  let count = 0;
-  // `span` is already bounded by the caller; the extra guard keeps this loop
-  // from running away if it is ever called with an unbounded range.
-  for (let i = 0; i <= Math.min(span, 365); i += 1) {
-    const dayIndex = (cursor.getDay() + 6) % 7; // JS: 0=Sun -> Mon-first index
+  // Phase 1A: arithmetic count over the FULL span (no 365-day cap) — mirrors
+  // backend CountSeriesOccurrences: fullWeeks * maskSize + remainder-day check.
+  const startIdx = (cursor.getDay() + 6) % 7; // JS: 0=Sun -> Mon-first index
+  const fullWeeks = Math.floor(span / 7);
+  const rem = span % 7;
+
+  let count = fullWeeks * wanted.size;
+  for (let o = 0; o <= rem; o += 1) {
+    const dayIndex = (startIdx + o) % 7;
     if (wanted.has(WEEKDAY_KEYS[dayIndex].toLowerCase())) count += 1;
-    cursor.setDate(cursor.getDate() + 1);
   }
   return count;
+}
+
+/**
+ * Phase C — limits mirrored from the backend so the browser rejects the SAME
+ * requests the server would reject, with the SAME message.
+ *
+ *   MAX_SERIES_SPAN_DAYS     mirrors JobService's kill-switch: while
+ *                            EnableLongSeriesBookings=false, a span
+ *                            (EndDate - StartDate) > 365 days is rejected
+ *                            explicitly (never truncated).
+ *   MAX_SERIES_OCCURRENCES   mirrors Web.config MaxSeriesOccurrences (6000),
+ *                            which JobService enforces BEFORE the span gate.
+ *   DEFAULT_SERIES_WINDOW_DAYS the UI's pre-filled search window (today ..
+ *                            today+29 = 30 inclusive calendar days). This is
+ *                            a DEFAULT, not a limit.
+ * The validation ORDER below matches JobService: zero matches → occurrence
+ * cap → span gate, so the client message equals the server's actual rejection.
+ */
+export const MAX_SERIES_SPAN_DAYS = 365;
+export const MAX_SERIES_OCCURRENCES = 6000;
+export const DEFAULT_SERIES_WINDOW_DAYS = 29;
+
+/**
+ * Validates a recurring-booking range exactly the way JobService will.
+ * Returns { ok, error, spanDays, occurrenceCount } where `error` is the
+ * backend's own message when the request would be rejected, plus null on
+ * success. `maxSpanDays` / `maxOccurrences` may be injected for boundary
+ * tests against non-production configuration.
+ */
+export function validateSeriesRange(startISO, endISO, dayKeys, options = {}) {
+  const maxSpanDays = options.maxSpanDays ?? MAX_SERIES_SPAN_DAYS;
+  const maxOccurrences = options.maxOccurrences ?? MAX_SERIES_OCCURRENCES;
+
+  if (!startISO || !endISO) {
+    return { ok: false, error: 'Please set both start and end dates.', spanDays: NaN, occurrenceCount: 0 };
+  }
+
+  const spanDays = daysBetweenISO(startISO, endISO);
+  if (Number.isNaN(spanDays)) {
+    return { ok: false, error: 'Invalid date range.', spanDays: NaN, occurrenceCount: 0 };
+  }
+  if (spanDays < 0) {
+    return { ok: false, error: 'End date must be on or after start date.', spanDays, occurrenceCount: 0 };
+  }
+
+  if (!Array.isArray(dayKeys) || dayKeys.length === 0) {
+    return { ok: false, error: 'Select at least one weekday.', spanDays, occurrenceCount: 0 };
+  }
+
+  const occurrenceCount = countSelectedWeekdays(startISO, endISO, dayKeys);
+  if (occurrenceCount === 0) {
+    return { ok: false, error: 'No dates matched the selected weekdays in that range.', spanDays, occurrenceCount };
+  }
+  if (occurrenceCount > maxOccurrences) {
+    return {
+      ok: false,
+      error: `This schedule would create ${occurrenceCount} bookings (limit ${maxOccurrences}). Reduce the number of weekdays per week or shorten the end date.`,
+      spanDays,
+      occurrenceCount,
+    };
+  }
+  if (spanDays > maxSpanDays) {
+    return {
+      ok: false,
+      error: 'Long recurring bookings are not yet enabled. The maximum enabled series span is 365 days.',
+      spanDays,
+      occurrenceCount,
+    };
+  }
+
+  return { ok: true, error: null, spanDays, occurrenceCount };
 }
 
 /**

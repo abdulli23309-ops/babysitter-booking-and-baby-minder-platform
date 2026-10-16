@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import ParentBottomNav from '../../components/layout/ParentBottomNav';
 import BackButton from '../../components/ui/BackButton';
@@ -17,6 +17,7 @@ import {
   todayISO,
   toDayKey,
   countSelectedWeekdays,
+  validateSeriesRange,
   formatLocalDate,
 } from '../../utils/dateUtils';
 import styles from './sitter-details.module.css';
@@ -40,6 +41,17 @@ export default function BabySitterDetails() {
   const location = useLocation();
   const { user, userId } = useAuth();
   const { showToast } = useToast?.() ?? { showToast: () => {} };
+
+  // Phase 1A (idempotency): one ClientRequestId per logical booking-modal
+  // submission. Reused across retries (double-tap / timeout-then-retry) so the
+  // server replays the original series instead of creating a duplicate; reset
+  // after a successful booking so the next booking is a new logical request.
+  const clientRequestIdRef = useRef(null);
+  // Snapshot of the exact payload most recently handed to createJob, kept so
+  // the "Book single day instead" recovery button (rendered outside the
+  // handler) can rebuild the same booking with single-day overrides while
+  // preserving child/time/location and the idempotency key.
+  const lastPayloadRef = useRef(null);
 
   const sitter = location.state?.sitter;
 
@@ -144,6 +156,8 @@ export default function BabySitterDetails() {
   // Phase 8L: these four hold the schedule that is now DISPLAY-ONLY in Step 2.
   // The read-only summary renders the `final*` values derived from
   // lockedSearch, so nothing mutates them any more — the setters are removed.
+  const sitterId = sitter?.Sitter_ID ?? sitter?.BabySitter_ID ?? sitter?.id ?? null;
+
   // The state itself is kept because the submit handler and the validation
   // block still read availabilityType / startDate / endDate / selectedDays.
   const [availabilityType] = useState(
@@ -156,6 +170,7 @@ export default function BabySitterDetails() {
     return raw.map(d => toDayKey(d)).filter(Boolean);
   });
   const [scheduleError, setScheduleError] = useState('');
+  const [seriesUnavailable, setSeriesUnavailable] = useState(false);
 
   const finalStart = ls.StartDate || today;
   const finalEnd = ls.EndDate || finalStart;
@@ -274,20 +289,17 @@ export default function BabySitterDetails() {
         setScheduleError('End date must be on or after start date.');
         return;
       }
-      const days = Math.round(
-        (new Date(endDate) - new Date(startDate)) / 86400000
-      );
-      if (days > 30) {
-        setScheduleError('Series cannot exceed 30 days.');
-        return;
-      }
-      if (selectedDays.length === 0) {
-        setScheduleError('Select at least one weekday.');
-        return;
-      }
-      const willCreate = countSelectedWeekdays(startDate, endDate, selectedDays);
-      if (willCreate === 0) {
-        setScheduleError('No matching weekdays in the selected range.');
+      // Phase 1A removed the old client-side "Series cannot exceed 30 days"
+      // gate — the 30-day window is a DEFAULT, not a limit.
+      // Phase C: validate with the shared helper that mirrors JobService's
+      // CURRENT server rules and messages in the same order (weekday set →
+      // zero matches → 6000-occurrence cap → 365-day span gate). The backend
+      // still has the final say; this only stops a doomed request early with
+      // the exact text the server would return (explicit rejection, never
+      // silent truncation).
+      const rangeCheck = validateSeriesRange(startDate, endDate, selectedDays);
+      if (!rangeCheck.ok) {
+        setScheduleError(rangeCheck.error);
         return;
       }
     }
@@ -300,8 +312,6 @@ export default function BabySitterDetails() {
     }
     setRequesting(true);
     try {
-      const sitterId = sitter.Sitter_ID ?? sitter.BabySitter_ID ?? sitter.id;
-
       // Phase 8K: replacement flow — invite the picked sitter to the EXISTING
       // job (Job 152 in this case) instead of creating a brand-new one.
       // Contract (JobInvitationsController.Invite, PHASE D):
@@ -360,9 +370,17 @@ export default function BabySitterDetails() {
         // Phase 10.0 — the chosen "Today's Required Tasks" travel with the
         // existing booking payload (validated again on the server).
         AssignedTasks: normalizeTaskIds(selectedTasks),
+        // Phase 1A — idempotency key (see clientRequestIdRef above).
+        ClientRequestId: (clientRequestIdRef.current ??= (
+          typeof crypto !== 'undefined' && crypto.randomUUID
+            ? crypto.randomUUID()
+            : `r-${Date.now()}-${Math.random().toString(36).slice(2)}`
+        )),
       };
 
+      lastPayloadRef.current = payload;
       const res = await API.createJob(payload);
+      clientRequestIdRef.current = null; // logical request completed — next booking gets a fresh key
 
       showToast?.('Booking request sent. Waiting for confirmation.', { type: 'success' });
       const created = res?.SeriesCount ?? res?.seriesCount ?? 1;
@@ -375,6 +393,22 @@ export default function BabySitterDetails() {
       setShowChildModal(false);
       navigate('/my-jobs');
     } catch (err) {
+      // Phase 1A: surface the server's validation text (E1–E6 / kill-switch) in
+      // the modal as well as the toast, verbatim. A 503 with PreferSingleDay
+      // means the server's dbo.JobSeries schema is absent; surface a friendly
+      // message and offer a single-day conversion instead of a raw error.
+      if (err?.response?.status === 503 && err?.response?.data?.PreferSingleDay === true) {
+        setSeriesUnavailable(true);
+        setScheduleError(
+          "Recurring bookings are temporarily unavailable. Please book a single day instead."
+        );
+        showToast?.(
+          "Recurring bookings are unavailable. We're booking your request as a single day instead.",
+          { type: 'warning' }
+        );
+        return;
+      }
+      setScheduleError(err?.message || `Booking request failed for ${name}.`);
       showToast?.(err?.message || `Booking request failed for ${name}.`, { type: 'warning' });
     } finally {
       setRequesting(false);
@@ -674,6 +708,50 @@ export default function BabySitterDetails() {
                 <p style={{ margin: 0, fontSize: 13, color: 'var(--color-error)' }}>
                   {scheduleError}
                 </p>
+              )}
+
+              {seriesUnavailable && (
+                <div style={{ marginBottom: 12, padding: '10px 12px', border: '1px solid rgb(var(--warning-rgb) / 0.35)', borderRadius: 8, background: 'rgb(var(--warning-rgb) / 0.08)', color: 'var(--color-warning)' }}>
+                  <strong>Recurring bookings are unavailable.</strong>
+                  <div style={{ fontSize: 13, color: 'var(--color-text-muted)', marginTop: 4 }}>
+                    The babysitter's recurring schedule could not be created on the server. To keep your booking, please confirm and book a single day instead. Your selected child, time, and location are unchanged.
+                  </div>
+                  <button
+                    type="button"
+                    disabled={requesting}
+                    onClick={async () => {
+                      if (requesting) return;
+                      // Rebuild from the snapshot of the failed submit so the
+                      // child/time/location and idempotency key carry over.
+                      const base = lastPayloadRef.current;
+                      if (!base) return;
+                      setSeriesUnavailable(false);
+                      setRequesting(true);
+                      try {
+                        const singleDayPayload = {
+                          ...base,
+                          AvailabilityType: 'Single Day',
+                          EndDate: startDate,
+                          SelectedDays: [],
+                        };
+                        const res = await API.createJob(singleDayPayload);
+                        if (res?.Success === false && res?.PreferSingleDay === true) {
+                          throw new Error('Could not switch to a single day right now.');
+                        }
+                        clientRequestIdRef.current = null;
+                        setShowChildModal(false);
+                        navigate('/my-jobs');
+                      } catch (err) {
+                        setScheduleError(err?.message || 'Booking request failed.');
+                        showToast?.(err?.message || 'Booking request failed.', { type: 'warning' });
+                        setRequesting(false);
+                      }
+                    }}
+                    style={{ marginTop: 8, padding: '8px 14px', borderRadius: 6, background: 'var(--color-primary)', color: 'white', border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: '13px' }}
+                  >
+                    Book single day instead
+                  </button>
+                </div>
               )}
             </div>
           </div>

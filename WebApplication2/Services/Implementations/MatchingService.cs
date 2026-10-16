@@ -220,14 +220,12 @@ namespace WebApplication2.Services.Implementations
                         .ToList();
 
                     if (!requiredSlotIds.All(id => availableSlotIds.Contains(id)))
-                        continue;   // this date does not qualify, try the next
+                        return false;   // this date does not qualify → sitter cannot cover all dates
 
                     if (HasConflictingJobs(s.Sitter_ID, date, requiredSlotIds, requireCommuteBuffer: true))
-                        continue;   // this date has a conflict, try the next
-
-                    return true;    // at least one qualifying date is enough
+                        return false;   // this date has a conflict → sitter cannot cover all dates
                 }
-                return false;
+                return true;    // all dates qualify → sitter covers the entire series
             }).ToList();
 
             // ─── Geo-matching radius filter (raw SQL — coordinates live outside the EDMX) ─────

@@ -72,6 +72,7 @@ export default function BabysitterMyJobs() {
   const [selectedTab, setSelectedTab] = useState('active');
   const [jobs, setJobs] = useState([]);
   const [invitations, setInvitations] = useState([]);
+  const [invitationsError, setInvitationsError] = useState(null);
   const [loading, setLoading] = useState(() => Boolean(userId));
 
   const fetchJobs = useCallback(async () => {
@@ -118,15 +119,31 @@ export default function BabysitterMyJobs() {
     };
   }, [userId, toast]);
 
-  // Fetch sitter invitations (pending requests) alongside jobs.
+  // Fetch sitter invitations (pending + accepted) alongside jobs.
+  // Phase A: a FAILED fetch must not become a fake "No new requests" empty
+  // state — keep whatever we loaded, record the error, and let the Requests
+  // tab render an error + retry instead.
+  const loadInvitations = useCallback(async () => {
+    try {
+      const data = await API.getSitterInvitations();
+      setInvitations(Array.isArray(data) ? data : []);
+      setInvitationsError(null);
+    } catch (err) {
+      setInvitationsError(err?.message || 'Could not load your requests.');
+    }
+  }, []);
+
   useEffect(() => {
     let mounted = true;
     (async () => {
       try {
         const data = await API.getSitterInvitations();
-        if (mounted) setInvitations(Array.isArray(data) ? data : []);
-      } catch {
-        if (mounted) setInvitations([]);
+        if (mounted) {
+          setInvitations(Array.isArray(data) ? data : []);
+          setInvitationsError(null);
+        }
+      } catch (err) {
+        if (mounted) setInvitationsError(err?.message || 'Could not load your requests.');
       }
     })();
     return () => { mounted = false; };
@@ -158,14 +175,20 @@ export default function BabysitterMyJobs() {
     jobs.filter((j) => HISTORY_JOB_STATUSES.has(normalizeJobStatus(j.Status)))
   ));
 
-  // Pending requests: invitations that are still "invited" (not yet accepted/rejected).
+  // Open requests: invitations still awaiting action — "invited" (you must
+  // respond) AND "accepted" (waiting for the parent to hire). Both belong on
+  // this tab now; an accepted row disappears only when the job leaves 'Open'
+  // server-side, at which point it shows under Upcoming instead.
   // The sitter-invitation DTO names the job's fields JobTitle / JobCity / JobPayment,
   // so normalise them onto the names the job card already reads (Title / City /
   // Payment). Without this the card rendered "AMOUNT: PKR 0" and the hard-coded
   // 'Islamabad' location fallback.
   const pendingRequests = groupJobsBySeries(
     invitations
-      .filter((i) => (i.Status || '').toLowerCase() === 'invited')
+      .filter((i) => {
+        const st = String(i.Status || '').toLowerCase();
+        return st === 'invited' || st === 'accepted';
+      })
       .map((i) => ({
         ...i,
         Payment: i.JobPayment ?? 0,
@@ -207,10 +230,10 @@ export default function BabysitterMyJobs() {
         targetJobId != null ? `/upcoming-job-details/${targetJobId}` : '/upcoming-job-details',
         { state: { job } }
       );
-    } else if (job.Status === 'Invited') {
-      // Pending invitation: the Accept / Reject screen. Invitations used to
-      // fall through to the completed screen (bug) because they were not
-      // branched on. This mirrors how /job-request opens an invitation card.
+    } else if (st === 'invited' || st === 'accepted') {
+      // Pending OR accepted invitation: the invitation detail screen (Phase A:
+      // 'Accepted' rows previously fell through to the completed screen).
+      // This mirrors how /job-request opens an invitation card.
       navigate(
         targetJobId != null ? `/job-details/${targetJobId}` : '/job-details',
         { state: { job } }
@@ -286,6 +309,42 @@ export default function BabysitterMyJobs() {
       {loading ? (
         <div style={{ padding: '40px 0', display: 'flex', justifyContent: 'center' }}>
           <LoadingSpinner size="lg" label="Loading schedule..." />
+        </div>
+      ) : displayedJobs.length === 0 && selectedTab === 'requests' && invitationsError ? (
+        /* Phase A: API failure is an error state, never a fake empty list. */
+        <div
+          role="alert"
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 10,
+            alignItems: 'flex-start',
+            padding: 20,
+            borderRadius: 16,
+            background: 'var(--color-surface)',
+            border: '1.5px solid var(--color-danger-border, rgba(220,38,38,0.35))',
+          }}
+        >
+          <strong style={{ fontSize: 15, color: 'var(--color-text-strong)' }}>
+            ⚠️ Couldn&apos;t load your requests
+          </strong>
+          <span style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>{invitationsError}</span>
+          <button
+            type="button"
+            onClick={loadInvitations}
+            style={{
+              padding: '8px 18px',
+              borderRadius: 999,
+              border: '1.5px solid currentColor',
+              background: 'transparent',
+              color: 'var(--color-primary)',
+              fontWeight: 700,
+              fontSize: 13,
+              cursor: 'pointer',
+            }}
+          >
+            Retry
+          </button>
         </div>
       ) : displayedJobs.length === 0 ? (
         <EmptyState
@@ -395,6 +454,20 @@ export default function BabysitterMyJobs() {
                   ) : HISTORY_JOB_STATUSES.has(normalizeJobStatus(job.Status)) ? (
                     <span className={styles.badgeCompleted}>
                       Completed
+                    </span>
+                  ) : ['invited', 'accepted'].includes(normalizeJobStatus(job.Status)) ? (
+                    <span
+                      className={styles.badgeUpcoming}
+                      style={normalizeJobStatus(job.Status) === 'accepted'
+                        ? {
+                            background: 'var(--color-info-tint, rgba(59, 130, 246, 0.12))',
+                            color: 'var(--color-info, #1d4ed8)',
+                          }
+                        : undefined}
+                    >
+                      {normalizeJobStatus(job.Status) === 'accepted'
+                        ? 'Accepted — waiting for parent'
+                        : 'Invited'}
                     </span>
                   ) : (
                     <span className={styles.badgeCancelled}>

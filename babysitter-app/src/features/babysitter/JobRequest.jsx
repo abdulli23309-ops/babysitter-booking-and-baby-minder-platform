@@ -19,50 +19,160 @@ const sortByJobDateDesc = (list) =>
     return (b.Job_ID ?? 0) - (a.Job_ID ?? 0);
   });
 
-const SeriesRequestCard = ({ group, isActionPending, handleAccept, handleDecline }) => {
+// JS getDay(): 0=Sun. Mon-first order to match the UI's weekday chips.
+const WEEKDAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+// The recurring pattern actually present in the occurrence dates — "Every Thu"
+// for a single-weekday series, otherwise the sorted weekday list. Read back
+// from the rows the API returned, never assumed from the request payload.
+const weekdayPatternOf = (jobs) => {
+  const names = [...new Set(
+    jobs
+      .map((j) => (j.JobDate ? WEEKDAY_SHORT[new Date(j.JobDate).getDay()] : null))
+      .filter(Boolean),
+  )].sort((a, b) => WEEKDAY_SHORT.indexOf(a) - WEEKDAY_SHORT.indexOf(b));
+  if (names.length === 0) return 'Flexible days';
+  if (names.length === 1) return `Every ${names[0]}`;
+  return names.join(', ');
+};
+
+// Phase A: summarise THIS sitter's invitation rows across the series. The
+// backend accept/decline cascades to every sibling row in one transaction, so
+// the card reflects the rows it actually received — pending, fully accepted
+// (waiting for the parent to hire), or a mixed/stale state.
+const seriesInvitationState = (jobs) => {
+  if (!Array.isArray(jobs) || jobs.length === 0) return 'pending';
+  const statuses = jobs.map((j) => String(j.Status || '').trim().toLowerCase());
+  const accepted = statuses.filter((s) => s === 'accepted').length;
+  const invited = statuses.filter((s) => s === 'invited').length;
+  if (accepted === jobs.length) return 'accepted';
+  if (invited === jobs.length) return 'pending';
+  return 'mixed';
+};
+
+const SERIES_STATE_BADGES = {
+  pending: {
+    label: 'Awaiting your response',
+    bg: 'var(--badge-purple-bg, rgba(147, 51, 234, 0.1))',
+    color: 'var(--badge-purple-text, #9333ea)',
+    border: '1px solid transparent',
+  },
+  accepted: {
+    label: 'Accepted — waiting for parent',
+    bg: 'var(--color-info-tint)',
+    color: 'var(--color-info)',
+    border: '1px solid var(--color-info-border)',
+  },
+  mixed: {
+    label: 'Mixed response',
+    bg: 'var(--color-warning-tint, rgba(217, 119, 6, 0.12))',
+    color: 'var(--color-warning-strong)',
+    border: '1px solid var(--color-warning-border)',
+  },
+};
+
+const SeriesRequestCard = ({ group, isBusy, handleAccept, handleDecline }) => {
   const [expanded, setExpanded] = useState(false);
   const { anchor, jobs, aggregate } = group;
   const { totalCount, startDate, endDate, totalPayment, perDayPayment, children, timeLabel } = aggregate;
   const startStr = startDate ? startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'Flexible';
   const endStr = endDate ? endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
   const dateRange = endStr && endStr !== startStr ? `${startStr} - ${endStr}` : startStr;
+
+  const state = seriesInvitationState(jobs);
+  const badge = SERIES_STATE_BADGES[state];
+  const hasInvited = jobs.some((j) => String(j.Status || '').toLowerCase() === 'invited');
+  const panelId = `series-occurrences-${group.seriesId}`;
+  const isAnchorPending = isBusy && isBusy === anchor?.JobInvitation_ID;
+  const parentName = anchor?.ParentName || 'A parent';
+
   return (
-    <div className={styles.requestCard}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-        <span style={{ display: 'inline-flex', alignItems: 'center', padding: '4px 10px', borderRadius: 999, fontSize: 12, fontWeight: 700, background: 'var(--badge-purple-bg, rgba(147, 51, 234, 0.1))', color: 'var(--badge-purple-text, #9333ea)', width: 'max-content' }}>
-          🔁 Series · {totalCount} days · Invited
+    <article className={styles.requestCard} aria-label={`Series from ${parentName}, ${dateRange}, ${weekdayPatternOf(jobs)}`}>
+      <div className={styles.seriesSummary}>
+        <span className={styles.seriesBadge} style={{ background: badge.bg, color: badge.color, border: badge.border }}>
+          🔁 Series · {totalCount} days · {badge.label}
         </span>
-        <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-strong)', marginTop: 4 }}>{dateRange} {timeLabel ? `· ${timeLabel}` : ''}</span>
-        <span style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>👶 {children?.map(c => c.ChildName).join(', ') ?? 'Children'}</span>
-        <div style={{ marginTop: 8 }}>
-          <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--color-text-strong)' }}>PKR {Number(totalPayment).toLocaleString()} total</div>
-          <div style={{ fontSize: 13, color: 'var(--color-text-tertiary)' }}>(PKR {Number(perDayPayment).toLocaleString()} per day)</div>
+        <span className={styles.seriesParent}>👤 {parentName}</span>
+        <span className={styles.seriesMeta}>
+          {weekdayPatternOf(jobs)} · {dateRange}{timeLabel ? ` · ${timeLabel}` : ''}
+        </span>
+        <span className={styles.seriesMeta}>👶 {children?.map((c) => c.ChildName).join(', ') ?? 'Children'}</span>
+        <div className={styles.seriesPaymentBlock}>
+          <div className={styles.seriesTotal}>PKR {Number(totalPayment).toLocaleString()} total</div>
+          {perDayPayment != null && (
+            <div className={styles.seriesPerDay}>(PKR {Number(perDayPayment).toLocaleString()} per day)</div>
+          )}
         </div>
       </div>
-      <div className={styles.requestActions}>
-        <button type="button" disabled={isActionPending} className={styles.btnPrimary} onClick={() => handleAccept(anchor.JobInvitation_ID)}>{isActionPending ? 'Processing…' : 'Accept entire series'}</button>
-        <button type="button" disabled={isActionPending} className={styles.btnOutlineRed} onClick={() => handleDecline(anchor.JobInvitation_ID)}>Decline entire series</button>
-      </div>
-      <button type="button" onClick={() => setExpanded(!expanded)} style={{ background: 'transparent', border: 'none', color: 'var(--color-primary)', fontSize: 13, fontWeight: 600, cursor: 'pointer', padding: 0, marginTop: 12, display: 'flex' }}>
-        {expanded ? 'Collapse ⬆' : `Expand to see all ${totalCount} days ⬇`}
+
+      {hasInvited ? (
+        <div className={styles.requestActions}>
+          <button
+            type="button"
+            disabled={isBusy}
+            className={styles.btnPrimary}
+            aria-label={`Accept series: ${dateRange}, ${totalCount} days`}
+            onClick={() => handleAccept(anchor.JobInvitation_ID, { isSeries: true })}
+          >
+            {isAnchorPending ? 'Accepting…' : 'Accept series'}
+          </button>
+          <button
+            type="button"
+            disabled={isBusy}
+            className={styles.btnOutlineRed}
+            aria-label={`Decline series: ${dateRange}, ${totalCount} days`}
+            onClick={() => handleDecline(anchor.JobInvitation_ID, { isSeries: true, days: jobs.length })}
+          >
+            {isAnchorPending ? 'Declining…' : 'Decline series'}
+          </button>
+        </div>
+      ) : (
+        <p className={styles.acceptedNote} role="status">
+          ✅ {state === 'accepted'
+            ? 'Accepted — waiting for the parent to hire you. These days appear under My Jobs once hired.'
+            : 'No action needed on this series right now.'}
+        </p>
+      )}
+
+      <button
+        type="button"
+        className={styles.expandToggle}
+        aria-expanded={expanded}
+        aria-controls={panelId}
+        aria-label={`${expanded ? 'Collapse' : 'Expand'} occurrence list for series ${dateRange}`}
+        onClick={() => setExpanded(!expanded)}
+      >
+        {expanded ? `Collapse ${totalCount} days ⬆` : `Expand to see all ${totalCount} days ⬇`}
       </button>
+
       {expanded && (
-        <div style={{ marginTop: 12, borderTop: '1px solid var(--color-border-subtle)', paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {jobs.map(inv => (
-            <div key={inv.JobInvitation_ID} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--color-surface-sunken)', padding: '12px', borderRadius: 8 }}>
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 600 }}>Day {inv.SeriesOccurrenceIndex} · {inv.JobDate ? new Date(inv.JobDate).toLocaleDateString() : 'Flexible'}</div>
-                <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{inv.Status}</div>
+        <div id={panelId} className={styles.occurrenceList} role="list" aria-label={`Occurrences of the series ${dateRange}`}>
+          {jobs.map((inv) => (
+            <div
+              key={inv.JobInvitation_ID}
+              role="listitem"
+              className={styles.occurrenceRow}
+              aria-label={`Day ${inv.SeriesOccurrenceIndex ?? ''} ${inv.JobDate ? new Date(inv.JobDate).toDateString() : 'flexible'}, ${inv.Status}`}
+            >
+              <div className={styles.occurrenceInfo}>
+                <span className={styles.occurrenceDate}>
+                  Day {inv.SeriesOccurrenceIndex} · {inv.JobDate
+                    ? new Date(inv.JobDate).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+                    : 'Flexible'}
+                </span>
+                <span className={styles.occurrenceStatus} data-status={String(inv.Status || '').toLowerCase()}>
+                  {inv.Status === 'Accepted' ? 'Accepted' : inv.Status === 'Invited' ? 'Awaiting response' : inv.Status}
+                </span>
               </div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button type="button" className={styles.btnPrimary} style={{ padding: '6px 12px', fontSize: 12 }} onClick={() => handleAccept(inv.JobInvitation_ID)}>Accept</button>
-                <button type="button" className={styles.btnOutlineRed} style={{ padding: '6px 12px', fontSize: 12 }} onClick={() => handleDecline(inv.JobInvitation_ID)}>Decline</button>
-              </div>
+              <span className={styles.occurrencePay}>PKR {Number(inv.JobPayment || 0).toLocaleString()}</span>
             </div>
           ))}
+          <p className={styles.occurrenceHint}>
+            Accepting or declining applies to every day shown above — one series-wide action.
+          </p>
         </div>
       )}
-    </div>
+    </article>
   );
 };
 function formatChildren(job) {
@@ -104,16 +214,22 @@ export default function JobRequest() {
   const [loading, setLoading] = useState(true);
   const [actionId, setActionId] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
+  // Phase A: a FAILED fetch must never masquerade as an empty invitation list.
+  // `loadError` drives a dedicated error panel/banner with a retry control;
+  // an error also never overwrites data we already have (stale list > fake empty).
+  const [loadError, setLoadError] = useState(null);
 
   const loadInvitations = useCallback(async (silent = false) => {
     try {
       const data = await API.getSitterInvitations();
       setInvitations(Array.isArray(data) ? data : []);
+      setLoadError(null);
     } catch (err) {
+      const message = err?.message || 'Could not load invitations.';
       if (!silent) {
-        toast.error(err?.message || 'Could not load invitations.');
+        toast.error(message);
       }
-      setInvitations([]);
+      setLoadError(message);
     }
   }, [toast]);
 
@@ -126,11 +242,11 @@ export default function JobRequest() {
         const data = await API.getSitterInvitations();
         if (!ignore) {
           setInvitations(Array.isArray(data) ? data : []);
+          setLoadError(null);
         }
       } catch (err) {
         if (!ignore) {
-          toast.error(err?.message || 'Could not load invitations.');
-          setInvitations([]);
+          setLoadError(err?.message || 'Could not load invitations.');
         }
       } finally {
         if (!ignore) {
@@ -147,10 +263,15 @@ export default function JobRequest() {
         .then((data) => {
           if (!ignore && Array.isArray(data)) {
             setInvitations(data);
+            setLoadError(null);
           }
         })
-        .catch(() => {
-          /* silent */
+        .catch((err) => {
+          // Background poll failures keep the last good list on screen and only
+          // surface a quiet "couldn't refresh" banner — never an empty list.
+          if (!ignore) {
+            setLoadError(err?.message || 'Could not refresh invitations.');
+          }
         });
     }, 5000);
 
@@ -166,20 +287,33 @@ export default function JobRequest() {
     setTimeout(() => setRefreshing(false), 500);
   };
 
+  // Series-wide accept (backend cascades to every sibling row in one
+  // transaction). The action label on the card says so. `actionId` also acts
+  // as a global lock so no second action can start while one is pending.
   const handleAccept = async (invitationId) => {
+    if (actionId != null) return;
     setActionId(invitationId);
     try {
       await API.acceptInvitation(invitationId);
-      toast.success('Invitation accepted! Waiting for the parent to hire.');
+      toast.success('Series accepted! Waiting for the parent to hire.');
       await loadInvitations(true);
     } catch (err) {
       toast.error(err?.message || 'Failed to accept invitation.');
+      await loadInvitations(true); // re-sync: the server may have partially changed state before the error
     } finally {
       setActionId(null);
     }
   };
 
-  const handleDecline = async (invitationId) => {
+  const handleDecline = async (invitationId, options = {}) => {
+    if (actionId != null) return;
+    // Consequential, series-wide action: confirm before firing the cascade.
+    if (options.isSeries) {
+      const confirmed = window.confirm(
+        `Decline this entire series? This declines all ${options.days ?? 'listed'} day(s) and cannot be undone.`,
+      );
+      if (!confirmed) return;
+    }
     setActionId(invitationId);
     try {
       await API.declineInvitation(invitationId);
@@ -187,6 +321,7 @@ export default function JobRequest() {
       await loadInvitations(true);
     } catch (err) {
       toast.error(err?.message || 'Failed to decline invitation.');
+      await loadInvitations(true);
     } finally {
       setActionId(null);
     }
@@ -237,31 +372,52 @@ export default function JobRequest() {
         <div style={{ padding: 'var(--space-8) 0', display: 'flex', justifyContent: 'center' }}>
           <LoadingSpinner size="lg" label="Checking new invitations..." />
         </div>
+      ) : loadError && invitations.length === 0 ? (
+        /* Phase A: a failed fetch is an ERROR, not an empty list. */
+        <div className={styles.errorPanel} role="alert">
+          <div className={styles.errorTitle}>⚠️ Couldn&apos;t load your invitations</div>
+          <p className={styles.errorText}>{loadError}</p>
+          <button type="button" className={styles.retryBtn} onClick={handleRefresh} disabled={refreshing}>
+            {refreshing ? 'Retrying…' : 'Retry'}
+          </button>
+        </div>
       ) : invitations.length === 0 ? (
         <EmptyState
-          title="No Pending Invitations"
-          description="You currently have no direct job invitations from parents."
+          title="No Invitations Yet"
+          description="You currently have no direct job invitations from parents. New invitations will appear here."
           actionLabel="Set Availability"
           onAction={() => navigate('/set-availability')}
         />
       ) : (
         <div className={styles.requestsList}>
+          {loadError && (
+            /* Background refresh failed but we still have data: keep the list
+               and say so — never replace it with an empty state. */
+            <div className={styles.refreshBanner} role="status">
+              <span>⚠️ Couldn&apos;t refresh — showing your last loaded invitations.</span>
+              <button type="button" className={styles.retryBtn} onClick={handleRefresh} disabled={refreshing}>
+                {refreshing ? 'Retrying…' : 'Retry'}
+              </button>
+            </div>
+          )}
           {groupedInvitations.map((groupItem) => {
             if (groupItem.type === 'series') {
               return (
                 <SeriesRequestCard
                   key={`group-${groupItem.seriesId}`}
                   group={groupItem}
-                  isActionPending={actionId === groupItem.anchor?.JobInvitation_ID}
+                  isBusy={actionId}
                   handleAccept={handleAccept}
                   handleDecline={handleDecline}
-                  navigate={navigate}
                 />
               );
             }
 
             const invitation = groupItem.job;
-            const isActionPending = actionId === invitation.JobInvitation_ID;
+            // Global lock: while ANY action is pending, every action button on
+            // the screen is disabled so duplicate requests cannot race.
+            const isThisPending = actionId === invitation.JobInvitation_ID;
+            const isBusy = actionId != null;
             const badge = getStatusBadge(invitation.Status);
             const dateStr = invitation.JobDate
               ? new Date(invitation.JobDate).toLocaleDateString('en-US', {
@@ -374,7 +530,7 @@ export default function JobRequest() {
                         variant="secondary"
                         size="md"
                         fullWidth
-                        disabled={isActionPending}
+                        disabled={isBusy}
                         onClick={(e) => {
                           e.stopPropagation();
                           handleDecline(invitation.JobInvitation_ID);
@@ -386,8 +542,8 @@ export default function JobRequest() {
                         variant="primary"
                         size="md"
                         fullWidth
-                        loading={isActionPending}
-                        disabled={isActionPending}
+                        loading={isThisPending}
+                        disabled={isBusy}
                         onClick={(e) => {
                           e.stopPropagation();
                           handleAccept(invitation.JobInvitation_ID);
@@ -396,6 +552,11 @@ export default function JobRequest() {
                         Accept
                       </Button>
                     </div>
+                  )}
+                  {invitation.Status === 'Accepted' && (
+                    <p className={styles.acceptedNote} role="status">
+                      ✅ Accepted — waiting for the parent to hire you. This day appears under My Jobs once hired.
+                    </p>
                   )}
                 </div>
               </div>

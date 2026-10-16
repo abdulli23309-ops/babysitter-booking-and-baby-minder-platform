@@ -321,6 +321,7 @@
 
 .applyNowBtn:active {
   transform: scale(0.98);
+}
 
 /* ==================================================================
    Invitation action buttons.
@@ -329,6 +330,11 @@
    name to `undefined`, so `className={styles.btnPrimary}` rendered as
    `className={undefined}` and the Accept / Decline buttons rendered as
    unstyled browser-default rectangles — no fill, no radius, no hover.
+
+   Phase B fix: `.applyNowBtn:active` above was missing its closing brace,
+   which made CSS nesting swallow this whole block as a DESCENDANT rule
+   (only applying inside an active Apply button). The brace is now closed
+   and the stray trailing `}` removed so these stay top-level.
    ================================================================== */
 
 .requestActions {
@@ -392,4 +398,254 @@
   box-shadow: none;
 }
 
+/* Keyboard focus must stay visible on every card action (Phase B a11y). */
+.btnPrimary:focus-visible,
+.btnOutlineRed:focus-visible,
+.expandToggle:focus-visible,
+.retryBtn:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* ============================================================
+   Phase B — series invitation card (summary / states / rows)
+   ============================================================ */
+
+.seriesSummary {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.seriesBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  width: max-content;
+  max-width: 100%;
+  flex-wrap: wrap;
+}
+
+.seriesParent {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text-strong);
+  margin-top: 4px;
+  overflow-wrap: anywhere;
+}
+
+.seriesMeta {
+  font-size: 13px;
+  color: var(--color-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.seriesPaymentBlock {
+  margin-top: 8px;
+}
+
+.seriesTotal {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-text-strong);
+}
+
+.seriesPerDay {
+  font-size: 13px;
+  color: var(--color-text-tertiary);
+}
+
+/* Shown instead of action buttons once every row is accepted — the parent
+   must hire; the sitter has nothing left to click. */
+.acceptedNote {
+  margin: 4px 0 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--color-info-tint, rgba(59, 130, 246, 0.08));
+  border: 1px solid var(--color-info-border, rgba(59, 130, 246, 0.25));
+  color: var(--color-info, #1d4ed8);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+/* Expansion control — a real button so keyboard + aria-expanded work. */
+.expandToggle {
+  background: transparent;
+  border: none;
+  color: var(--color-primary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 6px 0 0;
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  text-align: left;
+  min-width: 0;
+}
+
+.occurrenceList {
+  margin-top: 12px;
+  border-top: 1px solid var(--color-border-subtle);
+  padding-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.occurrenceRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  background: var(--color-surface-sunken);
+  padding: 12px;
+  border-radius: 8px;
+  min-width: 0;
+}
+
+.occurrenceInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.occurrenceDate {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-strong);
+  overflow-wrap: anywhere;
+}
+
+.occurrenceStatus {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  width: max-content;
+  max-width: 100%;
+  background: var(--color-surface-muted, rgba(147, 51, 234, 0.08));
+  color: var(--color-text-secondary);
+}
+
+.occurrenceStatus[data-status='accepted'] {
+  background: var(--color-success-tint, rgba(34, 197, 94, 0.12));
+  color: var(--color-success-strong, #15803d);
+}
+
+.occurrenceStatus[data-status='invited'] {
+  background: var(--color-warning-tint, rgba(217, 119, 6, 0.12));
+  color: var(--color-warning-strong, #b45309);
+}
+
+.occurrencePay {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text);
+  white-space: nowrap;
+}
+
+.occurrenceHint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+  line-height: 1.45;
+}
+
+/* ---------- API failure ≠ empty list (Phase A + B) ---------- */
+
+.errorPanel {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 20px 18px;
+  border-radius: 20px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-danger-border, rgba(220, 38, 38, 0.35));
+  box-shadow: 0 4px 16px rgb(var(--shadow-ink-rgb) / 0.04);
+}
+
+.errorTitle {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-text-strong);
+}
+
+.errorText {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.refreshBanner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: var(--color-warning-tint, rgba(217, 119, 6, 0.1));
+  border: 1px solid var(--color-warning-border, rgba(217, 119, 6, 0.3));
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-warning-strong, #b45309);
+}
+
+.retryBtn {
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1.5px solid currentColor;
+  background: transparent;
+  color: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s ease;
+  outline: none;
+}
+
+.retryBtn:hover:not(:disabled) {
+  background: rgb(var(--shadow-ink-rgb) / 0.06);
+}
+
+.retryBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ============================================================
+   Phase B — responsive: narrow phones stack the action row so
+   two half-width buttons never crowd or overflow horizontally.
+   ============================================================ */
+@media (max-width: 420px) {
+  .requestActions {
+    flex-direction: column;
+  }
+
+  .btnPrimary,
+  .btnOutlineRed {
+    width: 100%;
+    min-width: 0;
+    padding: 12px 16px;
+  }
+
+  .occurrenceRow {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+
+  .refreshBanner {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }

@@ -72,7 +72,10 @@ export default function SeriesCard({ group, viewer = 'parent', seriesStatusLabel
   const matchesMode = (s) => {
     const st = String(s.Status || '').toLowerCase();
     switch (mode) {
-      case 'open':     return st === 'open' || st === 'pending';
+      // Phase A: the sitter's Requests tab feeds INVITATION rows (Invited /
+      // Accepted) through this same 'open' mode — without them counted as
+      // visible, the card header read "0 of 4 days".
+      case 'open':     return st === 'open' || st === 'pending' || st === 'invited' || st === 'accepted';
       case 'upcoming': return st === 'assigned' && !isPast(s.JobDate);
       case 'history': {
         if (st === 'completed') return true;
@@ -121,6 +124,8 @@ export default function SeriesCard({ group, viewer = 'parent', seriesStatusLabel
     if (st === 'cancelled' || st === 'canceled') return 'Cancelled';
     if (st === 'assigned') return 'Assigned';
     if (st === 'open') return 'Open';
+    if (st === 'accepted') return 'Accepted — waiting for parent';
+    if (st === 'invited') return 'Invited';
     return s.Status;
   };
 

@@ -129,6 +129,10 @@ export const seriesStatusLabel = (group) => {
   if (sts.every(s => s === 'cancelled' || s === 'canceled'))
     return 'Cancelled';
 
+  // Phase A: an all-accepted invitation series is "waiting for the parent to
+  // hire" — NOT 'Mixed' and NOT 'Awaiting sitter' (the sitter already acted).
+  if (sts.every(s => s === 'accepted')) return 'Accepted — waiting for parent';
+
   const hasActive = sts.some(s =>
     s === 'in progress' || s === 'sitterarrived');
   const hasCompleted = sts.some(s => s === 'completed');

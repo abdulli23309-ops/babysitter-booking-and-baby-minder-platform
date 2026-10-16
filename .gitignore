@@ -42,6 +42,10 @@ Thumbs.db
 .DS_Store
 desktop.ini
 
+# ── Junk / local artifacts ────────────────────────
+null
+WebApplication2/Images/Children/
+
 # ── Logs / temp ───────────────────────────────────
 *.log
 logs/
@@ -51,6 +55,7 @@ scratch/
 # ── Test artifacts ────────────────────────────────
 coverage/
 .nyc_output/
+tests/
 
 # ── Code-only repository ───────────────────────────
 # Documentation, test harnesses and local tooling stay on your disk but

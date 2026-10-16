@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import ParentBottomNav from '../../components/layout/ParentBottomNav';
 import BackButton from '../../components/ui/BackButton';
@@ -48,6 +48,261 @@ const getStatusBadge = (status) => {
   return STATUS_BADGES[key] ?? { label: raw || 'Unknown', color: 'grey', icon: '❓' };
 };
 
+/**
+ * Phase A — accepted invitees for an OPEN job/series, with the Hire action.
+ * Contract (both wrappers existed in api.js but NOTHING called them):
+ *   GET  /api/jobs/{jobId}/invitations  -> JobInvitationItemDto[]
+ *   POST /api/jobs/{jobId}/hire         { ParentId, SitterId }
+ * Backend Hire cascades assignment across every OPEN sibling of the series,
+ * so the button label says so when this job belongs to one. Distinct states:
+ * loading | API error (retry) | no acceptances yet | accepted list.
+ */
+function AcceptedSittersPanel({ jobId, isSeries, seriesCount, onHired }) {
+  const toast = useToast();
+  const { userId } = useAuth();
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  // Lock while a hire POST is in flight so a double tap cannot fire twice.
+  const [hiringSitterId, setHiringSitterId] = useState(null);
+
+  const load = useCallback(async () => {
+    try {
+      const data = await API.getJobInvitations(jobId);
+      setItems(Array.isArray(data) ? data : []);
+      setError(null);
+    } catch (err) {
+      // A failed fetch is an error — never rendered as "no acceptances".
+      setError(err?.message || 'Could not load invitations for this booking.');
+    } finally {
+      setLoading(false);
+    }
+  }, [jobId]);
+
+  useEffect(() => {
+    let ignore = false;
+    async function loadPanel() {
+      setLoading(true);
+      try {
+        const data = await API.getJobInvitations(jobId);
+        if (!ignore) {
+          setItems(Array.isArray(data) ? data : []);
+          setError(null);
+        }
+      } catch (err) {
+        if (!ignore) {
+          setError(err?.message || 'Could not load invitations for this booking.');
+        }
+      } finally {
+        if (!ignore) setLoading(false);
+      }
+    }
+    loadPanel();
+    return () => {
+      ignore = true;
+    };
+  }, [jobId]);
+
+  const handleHire = async (invite) => {
+    if (hiringSitterId != null) return;
+    const name = invite.SitterName || 'this sitter';
+    const scope = isSeries && seriesCount
+      ? `all ${seriesCount} days of this series`
+      : 'this booking';
+    const confirmed = window.confirm(`Hire ${name} for ${scope}? This cannot be undone from here.`);
+    if (!confirmed) return;
+
+    setHiringSitterId(invite.Sitter_ID);
+    try {
+      await API.hireSitter(jobId, { ParentId: userId, SitterId: invite.Sitter_ID });
+      toast.success(isSeries && seriesCount
+        ? `${name} hired for all ${seriesCount} days.`
+        : `${name} hired.`);
+      await load();
+      onHired?.();
+    } catch (err) {
+      toast.error(err?.message || 'Failed to hire the sitter.');
+      await load(); // re-sync in case the server rejected a stale state
+    } finally {
+      setHiringSitterId(null);
+    }
+  };
+
+  const accepted = items.filter((i) => String(i.Status || '').toLowerCase() === 'accepted');
+  const awaiting = items.filter((i) => String(i.Status || '').toLowerCase() === 'invited').length;
+
+  if (loading) {
+    return (
+      <div style={{ padding: '14px 0' }}>
+        <LoadingSpinner size="sm" label="Checking who accepted…" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div
+        role="alert"
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 8,
+          alignItems: 'flex-start',
+          padding: 16,
+          borderRadius: 16,
+          background: 'var(--color-surface)',
+          border: '1.5px solid var(--color-danger-border, rgba(220,38,38,0.35))',
+          marginBottom: 16,
+        }}
+      >
+        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-text-strong)' }}>
+          ⚠️ Couldn&apos;t load who accepted
+        </div>
+        <p style={{ margin: 0, fontSize: 13, color: 'var(--color-text-muted)' }}>{error}</p>
+        <button
+          type="button"
+          onClick={() => {
+            setLoading(true);
+            load();
+          }}
+          style={{
+            padding: '8px 18px',
+            borderRadius: 999,
+            border: '1.5px solid currentColor',
+            background: 'transparent',
+            color: 'var(--color-primary)',
+            fontWeight: 700,
+            fontSize: 13,
+            cursor: 'pointer',
+          }}
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  if (accepted.length === 0) {
+    // Genuine empty: the API answered, nobody has accepted yet.
+    return (
+      <div
+        style={{
+          padding: 16,
+          borderRadius: 16,
+          background: 'var(--color-surface)',
+          border: '1.5px dashed var(--color-border)',
+          marginBottom: 16,
+          fontSize: 13,
+          color: 'var(--color-text-muted)',
+        }}
+      >
+        <strong style={{ color: 'var(--color-text-strong)' }}>No sitter has accepted yet.</strong>{' '}
+        {awaiting > 0
+          ? `${awaiting} invited sitter${awaiting === 1 ? ' is' : 's are'} still awaiting a response.`
+          : 'Invitations you send will appear here once a sitter accepts.'}
+      </div>
+    );
+  }
+
+  return (
+    <div
+      style={{
+        padding: 16,
+        borderRadius: 20,
+        background: 'var(--color-surface)',
+        border: '1.5px solid var(--color-info-border, rgba(59,130,246,0.3))',
+        boxShadow: '0 4px 16px rgb(var(--shadow-ink-rgb) / 0.04)',
+        marginBottom: 16,
+      }}
+      aria-label="Sitters who accepted this booking"
+    >
+      <div
+        style={{
+          fontSize: 12,
+          fontWeight: 800,
+          letterSpacing: 0.5,
+          color: 'var(--color-info, #1d4ed8)',
+          marginBottom: 10,
+        }}
+      >
+        ✅ ACCEPTED — CHOOSE WHO TO HIRE
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {accepted.map((invite) => {
+          const busy = hiringSitterId != null;
+          const thisPending = hiringSitterId === invite.Sitter_ID;
+          return (
+            <div
+              key={invite.JobInvitation_ID}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                padding: '10px 12px',
+                borderRadius: 12,
+                background: 'var(--color-surface-sunken)',
+                flexWrap: 'wrap',
+              }}
+            >
+              <UserAvatar src={invite.SitterPicture} name={invite.SitterName} size={40} />
+              <div style={{ minWidth: 0, flex: '1 1 140px' }}>
+                <div
+                  style={{
+                    fontSize: 14,
+                    fontWeight: 700,
+                    color: 'var(--color-text-strong)',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {invite.SitterName ?? 'Babysitter'}
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', marginTop: 2 }}>
+                  ★ {invite.SitterRating > 0 ? Number(invite.SitterRating).toFixed(1) : 'New'}
+                  {invite.RespondedAt
+                    ? ` · accepted ${new Date(invite.RespondedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}`
+                    : ''}
+                </div>
+              </div>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => handleHire(invite)}
+                aria-label={`Hire ${invite.SitterName ?? 'this sitter'}${isSeries && seriesCount ? ` for all ${seriesCount} days of this series` : ''}`}
+                style={{
+                  padding: '9px 16px',
+                  borderRadius: 999,
+                  border: 'none',
+                  background: thisPending
+                    ? 'rgba(22, 163, 74, 0.6)'
+                    : 'var(--color-success-strong, #16A34A)',
+                  color: 'var(--color-text-inverse)',
+                  fontWeight: 800,
+                  fontSize: 13,
+                  cursor: busy ? 'not-allowed' : 'pointer',
+                  flexShrink: 0,
+                }}
+              >
+                {thisPending
+                  ? 'Hiring…'
+                  : isSeries && seriesCount
+                    ? 'Hire for whole series'
+                    : 'Hire'}
+              </button>
+            </div>
+          );
+        })}
+      </div>
+      {awaiting > 0 && (
+        <div style={{ marginTop: 10, fontSize: 12, color: 'var(--color-text-tertiary)' }}>
+          {awaiting} other invited sitter{awaiting === 1 ? '' : 's'} haven&apos;t responded yet.
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function BookingStatus() {
   const { jobId: routeJobId } = useParams();
   const location = useLocation();
@@ -82,6 +337,10 @@ export default function BookingStatus() {
   const [cancelling, setCancelling] = useState(false);
   const [startError, setStartError] = useState('');
   const [jobReviews, setJobReviews] = useState([]);
+  // Phase A: bumping this refetches the job after a Hire so the badge,
+  // sitter card, and invitation panel all move to the assigned state
+  // without a full navigation.
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     let ignore = false;
@@ -135,7 +394,7 @@ export default function BookingStatus() {
     }
     if (activeJobId) fetchJob();
     return () => { ignore = true; };
-  }, [activeJobId, navigate, toast, isSeriesHistory, siblings.length, routeJobId, userId]);
+  }, [activeJobId, navigate, toast, isSeriesHistory, siblings.length, routeJobId, userId, refreshKey]);
 
   // Workflow redesign (Option A): once the session is In Progress, this
   // screen hands over to the live session view.
@@ -544,6 +803,20 @@ export default function BookingStatus() {
           >
             {wasDeclined ? 'Find Replacement →' : 'Find a Sitter for This Day →'}
           </button>
+        )}
+
+        {/* Phase A: an OPEN, unhired booking shows who has ACCEPTED and the
+            Hire action. Accepting never assigns jobs — only the parent's hire
+            does (and it cascades across every open series sibling server-side),
+            so this panel is the missing link between "sitter accepted" and
+            "sitter assigned". Hidden as soon as the job leaves 'Open'. */}
+        {currentStatus.toLowerCase() === 'open' && job.AssignedSitter_ID == null && (
+          <AcceptedSittersPanel
+            jobId={job.Job_ID ?? activeJobId}
+            isSeries={job.JobSeries_ID != null}
+            seriesCount={job.SeriesTotalCount ?? null}
+            onHired={() => setRefreshKey((k) => k + 1)}
+          />
         )}
 
         {/* Workflow redesign: SitterArrived banner — parent must confirm */}

@@ -212,6 +212,8 @@
     <Compile Include="Services\Interfaces\IMatchingService.cs" />
     <Compile Include="Services\Implementations\MatchingService.cs" />
     <Compile Include="Services\Interfaces\IJobService.cs" />
+    <Compile Include="Services\Interfaces\IJobSeriesRepository.cs" />
+    <Compile Include="Services\Implementations\JobSeriesRepository.cs" />
     <Compile Include="Services\Implementations\JobService.cs" />
     <Compile Include="Services\Interfaces\IJobInvitationService.cs" />
     <Compile Include="Services\Implementations\JobInvitationService.cs" />

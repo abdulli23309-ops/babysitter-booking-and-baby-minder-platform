@@ -384,19 +384,26 @@ namespace WebApplication2.Controllers
 
                 // Auto-invite the target sitter so a JobInvitation row + notification
                 // are created. A failed invite never fails the booking itself.
+                // Phase 1A: for SERIES bookings the invite already happened INSIDE the
+                // creation transaction (all-or-nothing), so the separate post-create
+                // invite below runs ONLY for single-day bookings.
                 var inviteFailed = false;
-                try
+                var isSeriesBooking = string.Equals(dto.AvailabilityType, "Repeat Days", StringComparison.OrdinalIgnoreCase);
+                if (!isSeriesBooking)
                 {
-                    var invite = _invitationService.Invite(result.JobId, new InviteSittersDto
+                    try
                     {
-                        ParentId = dto.ParentId,
-                        SitterIds = new List<int> { dto.SitterId }
-                    });
-                    inviteFailed = invite == null || !invite.Success;
-                }
-                catch
-                {
-                    inviteFailed = true;
+                        var invite = _invitationService.Invite(result.JobId, new InviteSittersDto
+                        {
+                            ParentId = dto.ParentId,
+                            SitterIds = new List<int> { dto.SitterId }
+                        });
+                        inviteFailed = invite == null || !invite.Success;
+                    }
+                    catch
+                    {
+                        inviteFailed = true;
+                    }
                 }
 
                 var response = new
@@ -517,6 +524,45 @@ namespace WebApplication2.Controllers
             }
         }
 
+        /// <summary>
+        /// Resolves the picture path that should be displayed for a PARENT profile,
+        /// and never a Sitter-typed default. A Sitter-typed placeholder (e.g.
+        /// eidSst-avatar.jpg) is treated as "no parent picture", so the UI falls
+        /// back to the parent-typed default below instead of showing the sitter's
+        /// avatar. A legitimate parent-uploaded picture is returned verbatim; a
+        /// missing or empty value falls back to the parent-typed default
+        /// (eidParent-avatar.jpg).
+        /// </summary>
+        private static string ResolveParentPictureAddress(string pictureAddress)
+        {
+            if (string.IsNullOrWhiteSpace(pictureAddress))
+                return "eidParent-avatar.jpg";
+
+            string raw = pictureAddress.Trim();
+
+            // Explicitly identified Sitter-typed placeholder(s).
+            if (IsSitterSpecificPicture(raw))
+                return "eidParent-avatar.jpg";
+
+            return raw;
+        }
+
+        private static bool IsSitterSpecificPicture(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return false;
+
+            string v = value.Trim().ToLowerInvariant();
+
+            // Known Sitter-typed placeholders / defaults.
+            if (v.Contains("eidSst") || v.Contains("default_sitter") || v.Contains("defaultsitter"))
+                return true;
+
+            // Any value that names the Sitter image folder directly.
+            string firstSegment = v.Split(new[] { '/', '\\' }, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? string.Empty;
+            return firstSegment == "sitters";
+        }
+
         [HttpGet]
         [Route("{parentId}/profile")]
         [SessionAuthorize(Roles = "Parent")]
@@ -544,7 +590,11 @@ namespace WebApplication2.Controllers
                         EmailAddress = parent.EmailAddress,
                         Username = parent.Username,
                         PhoneNumber = parent.PhoneNumber,
-                        PictureAddress = parent.PictureAddress,
+                        // Prefer a parent-typed picture and never a Sitter-typed
+                        // placeholder: returning e.g. eidSst-avatar.jpg directly as
+                        // the parent's PictureAddress would render the parent's
+                        // profile with the sitter's avatar.
+                        PictureAddress = ResolveParentPictureAddress(parent.PictureAddress),
                         Address = parent.Address
                     };
 

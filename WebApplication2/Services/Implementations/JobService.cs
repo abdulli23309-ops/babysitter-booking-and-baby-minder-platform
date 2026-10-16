@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.Configuration;
 using System.Data;
 using System.Data.SqlClient;
 using System.Data.Entity;
 using System.Diagnostics;
+using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
 using WebApplication2.DTOs;
@@ -19,6 +21,7 @@ namespace WebApplication2.Services.Implementations
         private readonly BabySitterBooking_and_BabyMinderEntities _db;
         private readonly bool _ownsContext;
         private readonly INotificationService _notificationService;
+        private readonly IJobSeriesRepository _seriesRepo;
 
         public JobService() : this(new BabySitterBooking_and_BabyMinderEntities(), ownsContext: true, notificationService: null)
         {
@@ -29,6 +32,23 @@ namespace WebApplication2.Services.Implementations
             _db = db ?? throw new ArgumentNullException(nameof(db));
             _ownsContext = ownsContext;
             _notificationService = notificationService ?? new NotificationService();
+            // Phase 1A: shares the SAME context so JobSeries writes enlist in the
+            // caller's transaction (the repository never opens its own context).
+            _seriesRepo = new JobSeriesRepository(_db);
+        }
+
+        /// <summary>
+        /// Phase 1B/G1: raw-SQL notification on the CALLER'S context so it joins
+        /// the ambient transaction (same pattern as the series-create path and
+        /// JobInvitationService.InsertNotification). NotificationService's
+        /// separate per-call context is NOT used inside transactional flows.
+        /// </summary>
+        private void InsertNotification(int userId, string userRole, string message, string type)
+        {
+            _db.Database.ExecuteSqlCommand(
+                "INSERT INTO Notification (UserID, UserRole, Message, IsRead, CreatedAt, Type, IsDeleted) " +
+                "VALUES (@p0, @p1, @p2, 0, GETDATE(), @p3, 0)",
+                userId, userRole, message, type);
         }
 
         /// <summary>
@@ -131,6 +151,89 @@ namespace WebApplication2.Services.Implementations
                 storedValue, jobId);
         }
 
+        // =========================================================================
+        // Phase 1A helpers - recurring series validation / counting / config
+        // =========================================================================
+
+        /// <summary>
+        /// Normalizes a weekday token ('Monday', 'mon', 'Thu', ...) to a
+        /// DayOfWeek using the same English-name semantics the old
+        /// ExpandSeriesDates matching used (full name OR 3-letter, case-insensitive).
+        /// </summary>
+        internal static bool TryNormalizeWeekday(string raw, out DayOfWeek day)
+        {
+            day = DayOfWeek.Sunday;
+            if (string.IsNullOrWhiteSpace(raw)) return false;
+            var t = raw.Trim();
+            if (Enum.GetNames(typeof(DayOfWeek)).Any(n => n.Equals(t, StringComparison.OrdinalIgnoreCase)))
+            {
+                day = (DayOfWeek)Enum.Parse(typeof(DayOfWeek), t, true);
+                return true;
+            }
+            var three = t.Length >= 3 ? t.Substring(0, 3).ToLowerInvariant() : t.ToLowerInvariant();
+            switch (three)
+            {
+                case "mon": day = DayOfWeek.Monday; return true;
+                case "tue": day = DayOfWeek.Tuesday; return true;
+                case "wed": day = DayOfWeek.Wednesday; return true;
+                case "thu": day = DayOfWeek.Thursday; return true;
+                case "fri": day = DayOfWeek.Friday; return true;
+                case "sat": day = DayOfWeek.Saturday; return true;
+                case "sun": day = DayOfWeek.Sunday; return true;
+                default: return false;
+            }
+        }
+
+        /// <summary>
+        /// Arithmetic occurrence count over the INCLUSIVE [start, end] range.
+        /// Bounded work regardless of span (full weeks * mask size + at most 7
+        /// remainder checks). Used BEFORE any write (E5/E6 ceiling enforcement).
+        /// </summary>
+        public static int CountSeriesOccurrences(DateTime start, DateTime end, ICollection<DayOfWeek> wanted)
+        {
+            if (end < start || wanted == null || wanted.Count == 0) return 0;
+            int span = (int)(end - start).TotalDays;      // inclusive => span+1 calendar dates
+            int fullWeeks = span / 7;
+            int rem = span % 7;
+            int count = fullWeeks * wanted.Count;         // each complete week contributes every mask day once
+            for (int o = 0; o <= rem; o++)                // remainder offsets after the last full week
+            {
+                var d = (DayOfWeek)(((int)start.DayOfWeek + o) % 7);
+                if (wanted.Contains(d)) count++;
+            }
+            return count;
+        }
+
+        /// <summary>Day-by-day reference counter (mirrors ExpandSeriesDates exactly).
+        /// Parity-tested against CountSeriesOccurrences for every regression span.</summary>
+        public static int CountSeriesOccurrencesByIteration(DateTime start, DateTime end, ICollection<DayOfWeek> wanted)
+        {
+            if (end < start || wanted == null || wanted.Count == 0) return 0;
+            int c = 0;
+            for (var d = start; d <= end; d = d.AddDays(1))
+                if (wanted.Contains(d.DayOfWeek)) c++;
+            return c;
+        }
+
+        /// <summary>Builds the SQL-side mask csv (',Mon,Wed,') for DATENAME matching.</summary>
+        private static string BuildWeekdayMaskCsv(IEnumerable<DayOfWeek> wanted)
+        {
+            return "," + string.Join(",", wanted.OrderBy(d => d).Select(d => CultureInfo.InvariantCulture.DateTimeFormat.GetAbbreviatedDayName(d))) + ",";
+        }
+
+        private static int ReadMaxSeriesOccurrences()
+        {
+            var raw = ConfigurationManager.AppSettings["MaxSeriesOccurrences"];
+            int v;
+            return int.TryParse(raw, out v) && v > 0 ? v : 6000;
+        }
+
+        private static bool LongSeriesEnabled()
+        {
+            return string.Equals(ConfigurationManager.AppSettings["EnableLongSeriesBookings"],
+                                 "true", StringComparison.OrdinalIgnoreCase);
+        }
+
         public CreateJobResult CreateJobForSitter(CreateJobDto dto)
         {
             if (dto == null)
@@ -222,6 +325,17 @@ namespace WebApplication2.Services.Implementations
                 && dto.SelectedDays != null
                 && dto.SelectedDays.Count > 0;
 
+            // Phase 1A (E1): a recurring request missing EndDate or weekdays must
+            // fail loudly instead of silently downgrading to a single-day booking.
+            if (string.Equals(dto.AvailabilityType, "Repeat Days", StringComparison.OrdinalIgnoreCase)
+                && !isSeries)
+            {
+                throw new ArgumentException(
+                    string.IsNullOrWhiteSpace(dto.EndDate)
+                        ? "End date is required for recurring bookings. Choose the last day of the series."
+                        : "Select at least one weekday for a recurring booking.");
+            }
+
             var primaryChildId = childIdsToBook[0];
             var primaryChild = _db.Children.FirstOrDefault(c => c.Child_ID == primaryChildId);
             var primaryChildName = primaryChild?.ChildName ?? "Child";
@@ -298,126 +412,248 @@ namespace WebApplication2.Services.Implementations
                 };
             }
 
-            // Series creation path
-            DateTime seriesStart = dto.StartDate;
+            // ========================================================================
+            // Series creation path - Phase 1A: one atomic transaction, set-based
+            // writes, requested EndDate honored EXACTLY or rejected before any write.
+            // ========================================================================
+            DateTime seriesStart = dto.StartDate.Date;
+
+            // E1/E3/E4 - EndDate required, parseable 'yyyy-MM-dd', within SQL date bounds
+            if (string.IsNullOrWhiteSpace(dto.EndDate))
+                throw new ArgumentException("End date is required for recurring bookings. Choose the last day of the series.");
             DateTime seriesEnd;
-            if (!DateTime.TryParse(dto.EndDate, out seriesEnd))
-                throw new ArgumentException("Invalid series end date format.");
+            if (!DateTime.TryParseExact(dto.EndDate.Trim(), "yyyy-MM-dd", CultureInfo.InvariantCulture,
+                                        DateTimeStyles.None, out seriesEnd))
+                throw new ArgumentException("End date is not a valid date (expected YYYY-MM-DD).");
+            seriesEnd = seriesEnd.Date;
+            if (seriesEnd < new DateTime(1900, 1, 1) || seriesEnd > new DateTime(9999, 12, 31))
+                throw new ArgumentException("End date must be between 1900-01-01 and 9999-12-31.");
 
-            var seriesDates = ExpandSeriesDates(seriesStart, seriesEnd, dto.SelectedDays);
-            if (seriesDates.Count == 0)
+            // E2 - ordering
+            if (seriesEnd < seriesStart)
+                throw new ArgumentException("End date must be on or after start date.");
+
+            // Weekday mask - same semantics as before (full or 3-letter, English, case-insensitive)
+            var wantedDays = new HashSet<DayOfWeek>();
+            foreach (var rawDay in dto.SelectedDays)
+            {
+                DayOfWeek dow;
+                if (!TryNormalizeWeekday(rawDay, out dow))
+                    throw new ArgumentException($"Invalid weekday: '{rawDay}'. Expected Monday, Mon, etc.");
+                wantedDays.Add(dow);
+            }
+            if (wantedDays.Count == 0)
+                throw new ArgumentException("Select at least one weekday.");
+
+            // E6/E5 - occurrence count computed BEFORE any write
+            int occCount = CountSeriesOccurrences(seriesStart, seriesEnd, wantedDays);
+            if (occCount == 0)
                 throw new InvalidOperationException("No dates matched the selected weekdays in that range.");
+            int ceiling = ReadMaxSeriesOccurrences();
+            if (occCount > ceiling)
+                throw new InvalidOperationException(
+                    $"This schedule would create {occCount} bookings (limit {ceiling}). " +
+                    "Reduce the number of weekdays per week or shorten the end date.");
 
-            var titleBase = childIdsToBook.Count == 1
+            // Kill-switch (Phase 1B gate): while disabled, spans beyond today's 365-day
+            // behavior are REJECTED explicitly - never silently truncated.
+            if (!LongSeriesEnabled() && (seriesEnd - seriesStart).TotalDays > 365)
+                throw new InvalidOperationException(
+                    "Long recurring bookings are not yet enabled. The maximum enabled series span is 365 days.");
+
+            // G1: recurring ("Repeat Days") creation requires the dbo.JobSeries
+            // schema. This is a read-only pre-write availability check - it never
+            // writes, and it must run before any JobSeries lookup so that a missing
+            // schema cannot surface to the client as a raw SQL error. A missing
+            // table means recurring bookings are unavailable; the client should
+            // switch to a single-day booking.
+            if (dto.AvailabilityType.Equals("Repeat Days", StringComparison.OrdinalIgnoreCase)
+                && !JobSeriesTableExists())
+            {
+                return new CreateJobResult
+                {
+                    Success = false,
+                    Message = "Recurring bookings are temporarily unavailable. Please book a single day instead.",
+                    PreferSingleDay = true
+                };
+            }
+
+            // Idempotency fast path - replays a COMMITTED duplicate with no writes.
+            if (!string.IsNullOrWhiteSpace(dto.ClientRequestId))
+            {
+                var pre = _seriesRepo.FindByClientRequestId(dto.ClientRequestId);
+                if (pre != null)
+                {
+                    if (pre.ParentId != dto.ParentId)
+                        throw new InvalidOperationException("Request id conflict. Retry with a new request id.");
+                    return new CreateJobResult
+                    {
+                        Success = true,
+                        Message = $"Duplicate request; returning original series ({pre.OccurrenceCount} bookings).",
+                        JobId = pre.HeadJobId,
+                        JobSeries_ID = pre.JobSeries_ID,
+                        SeriesCount = pre.OccurrenceCount,
+                        IdempotentReplay = true
+                    };
+                }
+            }
+
+            // Setup shared by the transactional writes below
+            var wantedList = wantedDays.OrderBy(d => d).ToList();
+            string maskCsv = BuildWeekdayMaskCsv(wantedList);
+            string maskDisplay = string.Join(",", wantedList.Select(d => CultureInfo.InvariantCulture.DateTimeFormat.GetAbbreviatedDayName(d)));
+            DateTime headDate = seriesStart;
+            while (headDate <= seriesEnd && !wantedDays.Contains(headDate.DayOfWeek))
+                headDate = headDate.AddDays(1);
+            if (headDate > seriesEnd)
+                throw new InvalidOperationException("No dates matched the selected weekdays in that range.");
+            int spanDays = (int)(seriesEnd - seriesStart).TotalDays;
+            string tasksJson = (assignedTasks != null && assignedTasks.Count > 0)
+                ? Newtonsoft.Json.JsonConvert.SerializeObject(assignedTasks)
+                : null;
+            var parentRow = _db.Parents.FirstOrDefault(p => p.Parent_ID == dto.ParentId);
+            string parentName = parentRow != null ? parentRow.FullName : "A parent";
+            string titleBase = childIdsToBook.Count == 1
                 ? $"Care needed for {primaryChildName} in {dto.City ?? "your city"}"
                 : $"Care needed for {childIdsToBook.Count} children in {dto.City ?? "your city"}";
+            string titleSuffix = $" of {occCount})";
+            string jobDescription = childIdsToBook.Count > 1
+                ? $"Babysitting required for {childIdsToBook.Count} children"
+                : "Babysitting required";
+            int headJobId = 0;
 
-            var firstJob = new Job
+            try
             {
-                Parent_ID = dto.ParentId,
-                Child_ID = primaryChildId,
-                Title = $"{titleBase} (Series 1 of {seriesDates.Count})",
-                Description = childIdsToBook.Count > 1
-                    ? $"Babysitting required for {childIdsToBook.Count} children"
-                    : "Babysitting required",
-                JobDate = seriesDates[0],
-                Status = JobStatus.Open.ToDisplayString(),
-                AssignedSitter_ID = null,
-                Payment = payment,
-                City = dto.City ?? "",
-                JobSeries_ID = null,
-                SeriesOccurrenceIndex = 1
-            };
-
-            _db.Jobs.Add(firstJob);
-            _db.SaveChanges();     // now firstJob.Job_ID is populated
-
-            firstJob.JobSeries_ID = firstJob.Job_ID;
-            _db.SaveChanges();
-
-            foreach (var childId in childIdsToBook.Distinct())
-            {
-                _db.Database.ExecuteSqlCommand(
-                    "INSERT INTO JobChildren (Job_ID, Child_ID, IsDeleted) VALUES (@p0, @p1, 0)",
-                    firstJob.Job_ID, childId);
-            }
-
-            foreach (var slotId in requiredSlotIds)
-            {
-                _db.JobTimeSlots.Add(new JobTimeSlot
+                using (var tx = _db.Database.BeginTransaction())
                 {
-                    Job_ID = firstJob.Job_ID,
-                    Slot_ID = slotId
-                });
-            }
-            _db.SaveChanges();
+                    // 1) head job - identity read in the SAME batch (no cross-batch SCOPE_IDENTITY)
+                    headJobId = _db.Database.SqlQuery<int>(
+                        "INSERT INTO Job (Parent_ID, Child_ID, Title, Description, JobDate, Status, Payment, City, IsDeleted, JobSeries_ID, SeriesOccurrenceIndex) " +
+                        "VALUES (@p0, @p1, @p2, @p3, @p4, N'Open', @p5, @p6, 0, NULL, 1); SELECT CAST(SCOPE_IDENTITY() AS int);",
+                        new SqlParameter("@p0", SqlDbType.Int) { Value = dto.ParentId },
+                        new SqlParameter("@p1", SqlDbType.Int) { Value = primaryChildId },
+                        new SqlParameter("@p2", SqlDbType.NVarChar, 200) { Value = titleBase + " (Series 1" + titleSuffix },
+                        new SqlParameter("@p3", SqlDbType.NVarChar) { Value = jobDescription },
+                        new SqlParameter("@p4", SqlDbType.Date) { Value = headDate },
+                        new SqlParameter("@p5", SqlDbType.Decimal) { Value = payment },
+                        new SqlParameter("@p6", SqlDbType.NVarChar, 100) { Value = dto.City ?? "" })
+                        .First();
 
-            if (dto.Latitude.HasValue && dto.Longitude.HasValue)
-            {
-                _db.Database.ExecuteSqlCommand(
-                    "UPDATE Job SET Latitude = @p0, Longitude = @p1 WHERE Job_ID = @p2",
-                    dto.Latitude.Value, dto.Longitude.Value, firstJob.Job_ID);
-            }
+                    // 2) series rule row - requested StartDate/EndDate stored VERBATIM. This
+                    //    insert is also the idempotency gate (unique ClientRequestId key).
+                    _seriesRepo.Insert(headJobId, seriesStart, seriesEnd, maskDisplay,
+                        startTime, endTime, "Active", dto.ClientRequestId);
 
-            // Phase 10.0 — the series head carries the same task allocation the
-            // parent selected for this booking.
-            PersistAssignedTasks(firstJob.Job_ID, assignedTasks);
-
-            for (int i = 1; i < seriesDates.Count; i++)
-            {
-                var j = new Job
-                {
-                    Parent_ID = dto.ParentId,
-                    Child_ID = primaryChildId,
-                    Title = $"{titleBase} (Series {i + 1} of {seriesDates.Count})",
-                    Description = childIdsToBook.Count > 1
-                        ? $"Babysitting required for {childIdsToBook.Count} children"
-                        : "Babysitting required",
-                    JobDate = seriesDates[i],
-                    Status = JobStatus.Open.ToDisplayString(),
-                    AssignedSitter_ID = null,
-                    Payment = payment,
-                    City = dto.City ?? "",
-                    JobSeries_ID = firstJob.Job_ID,
-                    SeriesOccurrenceIndex = i + 1
-                };
-
-                _db.Jobs.Add(j);
-                _db.SaveChanges();
-
-                foreach (var cid in childIdsToBook.Distinct())
-                {
+                    // 3) head self-reference + assigned-task JSON (+ geo for the whole series)
                     _db.Database.ExecuteSqlCommand(
-                        "INSERT INTO JobChildren (Job_ID, Child_ID, IsDeleted) VALUES (@p0, @p1, 0)",
-                        j.Job_ID, cid);
-                }
+                        "UPDATE Job SET JobSeries_ID = @p0, AssignedTasks = @p1 WHERE Job_ID = @p2",
+                        headJobId, (object)tasksJson ?? DBNull.Value, headJobId);
+                    if (dto.Latitude.HasValue && dto.Longitude.HasValue)
+                    {
+                        _db.Database.ExecuteSqlCommand(
+                            "UPDATE Job SET Latitude = @p0, Longitude = @p1 WHERE JobSeries_ID = @p2",
+                            dto.Latitude.Value, dto.Longitude.Value, headJobId);
+                    }
 
-                foreach (var slotId in requiredSlotIds)
-                {
+                    // 4) sibling occurrences - ONE set-based INSERT. DETERMINISTIC date
+                    //    numbers: ROW_NUMBER over the small ordered sys.all_objects (dense
+                    //    0..N) x VALUES(0..15), then TOP(@span) ORDER BY n => exactly
+                    //    {0..span-1}. (An earlier TOP+ROW_NUMBER(SELECT NULL) cross-join
+                    //    construct proved plan-dependent: gaps/tail loss under EF6.)
+                    //    span is bounded by E5: occ <= ceiling, mask >= 1 day => span <= 7*ceiling.
                     _db.Database.ExecuteSqlCommand(
-                        "INSERT INTO JobTimeSlot (Job_ID, Slot_ID) VALUES (@p0, @p1)",
-                        j.Job_ID, slotId);
-                }
+                        ";WITH ar AS (SELECT ROW_NUMBER() OVER (ORDER BY object_id) - 1 AS rn FROM sys.all_objects), " +
+                        "nums AS (SELECT TOP (@span) ar.rn * 16 + v.n AS n " +
+                        "FROM ar CROSS JOIN (VALUES(0),(1),(2),(3),(4),(5),(6),(7),(8),(9),(10),(11),(12),(13),(14),(15)) v(n) " +
+                        "ORDER BY ar.rn * 16 + v.n), " +
+                        "d AS (SELECT DATEADD(DAY, n + 1, CAST(@start AS date)) AS dt FROM nums) " +
+                        "INSERT INTO Job (Parent_ID, Child_ID, Title, Description, JobDate, Status, Payment, City, IsDeleted, JobSeries_ID, SeriesOccurrenceIndex, AssignedTasks) " +
+                        "SELECT @pid, @cid, @tprefix + CAST(ROW_NUMBER() OVER (ORDER BY d.dt) + 1 AS varchar(12)) + @tsuffix, @desc, d.dt, N'Open', @pay, @city, 0, @head, ROW_NUMBER() OVER (ORDER BY d.dt) + 1, @tasks " +
+                        "FROM d WHERE d.dt > @headDate AND d.dt <= @end AND CHARINDEX(',' + LEFT(DATENAME(weekday, d.dt), 3) + ',', @mask) > 0",
+                        new SqlParameter("@span", SqlDbType.Int) { Value = spanDays },
+                        new SqlParameter("@start", SqlDbType.Date) { Value = seriesStart },
+                        new SqlParameter("@pid", SqlDbType.Int) { Value = dto.ParentId },
+                        new SqlParameter("@cid", SqlDbType.Int) { Value = primaryChildId },
+                        new SqlParameter("@tprefix", SqlDbType.NVarChar) { Value = titleBase + " (Series " },
+                        new SqlParameter("@tsuffix", SqlDbType.NVarChar) { Value = titleSuffix },
+                        new SqlParameter("@desc", SqlDbType.NVarChar) { Value = jobDescription },
+                        new SqlParameter("@pay", SqlDbType.Decimal) { Value = payment },
+                        new SqlParameter("@city", SqlDbType.NVarChar, 100) { Value = dto.City ?? "" },
+                        new SqlParameter("@head", SqlDbType.Int) { Value = headJobId },
+                        new SqlParameter("@headDate", SqlDbType.Date) { Value = headDate },
+                        new SqlParameter("@end", SqlDbType.Date) { Value = seriesEnd },
+                        new SqlParameter("@tasks", SqlDbType.NVarChar) { Value = (object)tasksJson ?? DBNull.Value },
+                        new SqlParameter("@mask", SqlDbType.NVarChar, 64) { Value = maskCsv });
 
-                if (dto.Latitude.HasValue && dto.Longitude.HasValue)
-                {
+                    // 5) children (set-based across the whole series)
+                    foreach (var childId in childIdsToBook.Distinct())
+                    {
+                        _db.Database.ExecuteSqlCommand(
+                            "INSERT INTO JobChildren (Job_ID, Child_ID, IsDeleted) SELECT Job_ID, @p0, 0 FROM Job WHERE JobSeries_ID = @p1",
+                            childId, headJobId);
+                    }
+
+                    // 6) time slots (set-based across the whole series)
+                    foreach (var slotId in requiredSlotIds)
+                    {
+                        _db.Database.ExecuteSqlCommand(
+                            "INSERT INTO JobTimeSlot (Job_ID, Slot_ID) SELECT Job_ID, @p0 FROM Job WHERE JobSeries_ID = @p1",
+                            slotId, headJobId);
+                    }
+
+                    // 7) auto-invite INSIDE the transaction - a failed invite rolls back
+                    //    the whole series instead of leaving a partially-created booking.
                     _db.Database.ExecuteSqlCommand(
-                        "UPDATE Job SET Latitude = @p0, Longitude = @p1 WHERE Job_ID = @p2",
-                        dto.Latitude.Value, dto.Longitude.Value, j.Job_ID);
-                }
+                        "INSERT INTO JobInvitation (Job_ID, Sitter_ID, Status, InvitedAt) " +
+                        "SELECT j.Job_ID, @sitter, N'Invited', SYSUTCDATETIME() FROM Job j " +
+                        "WHERE j.JobSeries_ID = @head AND NOT EXISTS " +
+                        "(SELECT 1 FROM JobInvitation i WHERE i.Job_ID = j.Job_ID AND i.Sitter_ID = @sitter)",
+                        new SqlParameter("@sitter", SqlDbType.Int) { Value = dto.SitterId },
+                        new SqlParameter("@head", SqlDbType.Int) { Value = headJobId });
 
-                // Phase 10.0 — every occurrence of a series repeats the same
-                // booking contract, including the assigned tasks.
-                PersistAssignedTasks(j.Job_ID, assignedTasks);
+                    // 8) ONE notification on the SAME context/transaction. Deliberately NOT
+                    //    NotificationService - it owns a separate per-call context, which
+                    //    would break transactional atomicity.
+                    _db.Database.ExecuteSqlCommand(
+                        "INSERT INTO Notification (UserID, UserRole, Message, IsRead, CreatedAt, Type, IsDeleted) " +
+                        "VALUES (@p0, N'Sitter', @p1, 0, GETDATE(), N'InvitationReceived', 0)",
+                        dto.SitterId,
+                        parentName + " invited you to a job: " + titleBase + " (Series 1" + titleSuffix);
+
+                    tx.Commit();
+                }
+            }
+            catch (SqlException ex) when (ex.Number == 2601 || ex.Number == 2627)
+            {
+                // Uniqueness conflict (idempotency key or series-date safeguard). The
+                // using-block has ALREADY rolled back and disposed the transaction
+                // before this catch runs, and the replay lookup below uses a FRESH
+                // context so it can never observe the dead transaction's state.
+                if (string.IsNullOrWhiteSpace(dto.ClientRequestId)) throw;
+                using (var fresh = new BabySitterBooking_and_BabyMinderEntities())
+                {
+                    var existing = new JobSeriesRepository(fresh).FindByClientRequestId(dto.ClientRequestId);
+                    if (existing == null || existing.ParentId != dto.ParentId)
+                        throw new InvalidOperationException("Request id conflict. Retry with a new request id.");
+                    return new CreateJobResult
+                    {
+                        Success = true,
+                        Message = $"Duplicate request; returning original series ({existing.OccurrenceCount} bookings).",
+                        JobId = existing.HeadJobId,
+                        JobSeries_ID = existing.JobSeries_ID,
+                        SeriesCount = existing.OccurrenceCount,
+                        IdempotentReplay = true
+                    };
+                }
             }
 
             return new CreateJobResult
             {
                 Success = true,
-                Message = $"Series created: {seriesDates.Count} bookings.",
-                JobId = firstJob.Job_ID,
-                JobSeries_ID = firstJob.Job_ID,
-                SeriesCount = seriesDates.Count
+                Message = $"Series created: {occCount} bookings.",
+                JobId = headJobId,
+                JobSeries_ID = headJobId,
+                SeriesCount = occCount
             };
         }
 
@@ -1910,42 +2146,47 @@ namespace WebApplication2.Services.Implementations
             int affected = 0;
             // Phase 5/6: every day this termination cancels must also stop monitoring.
             var terminatedJobIds = new List<int>();
-            foreach (var j in seriesJobs)
+            // Phase 1B/G1: job updates + notifications commit atomically on THIS
+            // context (notifications are raw SQL so they cannot commit separately).
+            // The monitoring/cry hook below intentionally runs AFTER commit: it is
+            // best-effort and idempotent (guarded UPDATEs on Active/Open rows), so
+            // a hook failure can never undo a termination — and re-running it is safe.
+            using (var tx = _db.Database.BeginTransaction())
             {
-                bool inScope =
-                    scopeNormalized == "all" ||
-                    (scopeNormalized == "future" && j.JobDate >= today);
-                if (!inScope) continue;
-                if (string.Equals(j.Status, "Completed", StringComparison.OrdinalIgnoreCase)) continue;
-                if (string.Equals(j.Status, "Cancelled", StringComparison.OrdinalIgnoreCase)) continue;
-
-                int? previousSitter = j.AssignedSitter_ID;
-                j.Status = "Cancelled";
-                j.CancellationReason = $"Series terminated by {currentRole}";
-                j.CancelledAt = DateTime.UtcNow;
-                j.AssignedSitter_ID = null;
-                affected++;
-                terminatedJobIds.Add(j.Job_ID);
-
-                if (isParent && previousSitter.HasValue)
+                foreach (var j in seriesJobs)
                 {
-                    _notificationService.CreateNotification(new NotificationDto {
-                        UserId = previousSitter.Value, UserRole = "Sitter",
-                        Message = "A series you were assigned to was terminated by the parent.",
-                        Type = "SeriesTerminatedByParent", IsRead = false
-                    });
+                    bool inScope =
+                        scopeNormalized == "all" ||
+                        (scopeNormalized == "future" && j.JobDate >= today);
+                    if (!inScope) continue;
+                    if (string.Equals(j.Status, "Completed", StringComparison.OrdinalIgnoreCase)) continue;
+                    if (string.Equals(j.Status, "Cancelled", StringComparison.OrdinalIgnoreCase)) continue;
+
+                    int? previousSitter = j.AssignedSitter_ID;
+                    j.Status = "Cancelled";
+                    j.CancellationReason = $"Series terminated by {currentRole}";
+                    j.CancelledAt = DateTime.UtcNow;
+                    j.AssignedSitter_ID = null;
+                    affected++;
+                    terminatedJobIds.Add(j.Job_ID);
+
+                    if (isParent && previousSitter.HasValue)
+                    {
+                        InsertNotification(previousSitter.Value, "Sitter",
+                            "A series you were assigned to was terminated by the parent.",
+                            "SeriesTerminatedByParent");
+                    }
+                    else if (isSitter && j.Parent_ID.HasValue)
+                    {
+                        InsertNotification(j.Parent_ID.Value, "Parent",
+                            "Your series booking was terminated by the sitter.",
+                            "SeriesTerminatedBySitter");
+                    }
                 }
-                else if (isSitter && j.Parent_ID.HasValue)
-                {
-                    _notificationService.CreateNotification(new NotificationDto {
-                        UserId = j.Parent_ID.Value, UserRole = "Parent",
-                        Message = "Your series booking was terminated by the sitter.",
-                        Type = "SeriesTerminatedBySitter", IsRead = false
-                    });
-                }
+
+                _db.SaveChanges();
+                tx.Commit();
             }
-
-            _db.SaveChanges();
 
             // Phase 5/6: every day this termination just cancelled is terminal for
             // monitoring too — end its Active session(s) and cancel unresolved cry
@@ -1992,6 +2233,26 @@ namespace WebApplication2.Services.Implementations
                     "JobService: could not stop monitoring for terminal job {0} ({1}): {2}", jobId, reason, ex);
             }
         }
+        /// <summary>
+        /// Read-only pre-write check for the recurring-booking table used by
+        /// JobService.CreateJob. Returns true when the schema exists; false when
+        /// the table is missing (e.g. a freshly restored schema). Never writes and
+        /// never throws, so the caller can safely return a 503 readiness message
+        /// instead of a raw SQL error.
+        /// </summary>
+        private static bool JobSeriesTableExists()
+        {
+            const string sql = "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'dbo' AND TABLE_NAME = 'JobSeries'";
+            using (var db = new BabySitterBooking_and_BabyMinderEntities())
+            {
+                int count = db.Database.SqlQuery<int>(sql).FirstOrDefault();
+                return count > 0;
+            }
+        }
+
     }
+
+
+
 }
 
